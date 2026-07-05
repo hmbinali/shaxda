@@ -5,15 +5,15 @@
 # Personal overrides go in .conductor/settings.local.toml and must be gitignored.
 
 [scripts]
-setup = "corepack enable && pnpm install"
-archive = "rm -rf apps/web/.svelte-kit apps/web/build apps/worker/.wrangler"
+setup = "scripts/with-node.sh sh -lc 'corepack enable && pnpm install'"
+archive = "rm -rf web/.svelte-kit web/build worker/.wrangler"
 run_mode = "concurrent"
 
 # Main SvelteKit dev server.
 # Root package.json should expose:
 #   "dev:web": "pnpm --filter @shaxda/web dev"
 [scripts.run.web]
-command = "pnpm dev:web -- --host 0.0.0.0 --port $CONDUCTOR_PORT"
+command = "scripts/with-node.sh pnpm dev:web -- --host 0.0.0.0 --port $CONDUCTOR_PORT"
 default = true
 icon = "play"
 
@@ -24,17 +24,17 @@ icon = "play"
 # Wrangler/Miniflare run Workers, Durable Objects, and D1 locally.
 # The port offset lets web + worker run at the same time in one workspace.
 [scripts.run.worker]
-command = "pnpm dev:worker -- --port $((CONDUCTOR_PORT + 1))"
+command = "scripts/with-node.sh sh -lc 'pnpm dev:worker -- --port $((CONDUCTOR_PORT + 1))'"
 icon = "server"
 
 # Fast test run.
 [scripts.run.test]
-command = "pnpm test"
+command = "scripts/with-node.sh pnpm test"
 icon = "check"
 
 # Full review check.
 # Root package.json should expose:
 #   "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
 [scripts.run.check]
-command = "pnpm check"
+command = "scripts/with-node.sh pnpm check"
 icon = "check-circle"

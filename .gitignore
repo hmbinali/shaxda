@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Build output
 dist/
@@ -15,11 +16,16 @@ playwright-report/
 # Environment / secrets
 .env
 .env.*
+!.env.example
 .dev.vars
 
 # Cloudflare local state
 .wrangler/
 .wrangler/state/
+wrangler.toml.backup
+
+# Conductor local state
+.context/
 
 # Conductor personal settings
 .conductor/settings.local.toml

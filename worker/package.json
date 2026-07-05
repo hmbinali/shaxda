@@ -1,0 +1,25 @@
+{
+  "name": "@shaxda/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "format": "prettier --write .",
+    "lint": "eslint .",
+    "test": "vitest run --config vitest.config.ts --passWithNoTests",
+    "test:worker": "vitest run --config vitest.config.ts --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shaxda/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.18.0",
+    "@cloudflare/workers-types": "^4.20260701.1",
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.9",
+    "wrangler": "^4.107.0"
+  }
+}

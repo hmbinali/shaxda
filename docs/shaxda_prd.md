@@ -41,26 +41,26 @@ The product should feel like a modern Somali wooden board game: warm wood, carve
 
 ### Included in V1
 
-| Area | Decision |
-|---|---|
-| Local offline 2-player | Yes |
-| Live online 2-player | Yes |
-| Guest casual invite games | Yes |
-| Logged-in games | Yes |
-| Accounts | Yes |
-| Login method | Google only |
-| Username | Required for logged-in players |
-| Match history | Logged-in only |
-| Leaderboard | Logged-in only |
-| PWA install | Yes |
-| Offline support | Local mode works offline |
-| Languages | Somali + English |
-| Default language | Somali |
-| Visual style | Modern wooden 2.5D |
-| Board renderer | SVG |
-| Sound | Native Web Audio |
-| Online model | Server-authoritative |
-| Infrastructure | Cloudflare-first |
+| Area                      | Decision                       |
+| ------------------------- | ------------------------------ |
+| Local offline 2-player    | Yes                            |
+| Live online 2-player      | Yes                            |
+| Guest casual invite games | Yes                            |
+| Logged-in games           | Yes                            |
+| Accounts                  | Yes                            |
+| Login method              | Google only                    |
+| Username                  | Required for logged-in players |
+| Match history             | Logged-in only                 |
+| Leaderboard               | Logged-in only                 |
+| PWA install               | Yes                            |
+| Offline support           | Local mode works offline       |
+| Languages                 | Somali + English               |
+| Default language          | Somali                         |
+| Visual style              | Modern wooden 2.5D             |
+| Board renderer            | SVG                            |
+| Sound                     | Native Web Audio               |
+| Online model              | Server-authoritative           |
+| Infrastructure            | Cloudflare-first               |
 
 ### Excluded from V1
 
@@ -137,54 +137,54 @@ Requirements:
 
 ## 5. Product Decisions
 
-| Decision | V1 Choice |
-|---|---|
-| Main format | Website + installable PWA |
-| Main audience | Somali-first, diaspora-friendly |
-| Languages | Somali + English |
-| Monetization | None in V1 |
-| Game timer | None |
+| Decision          | V1 Choice                                                           |
+| ----------------- | ------------------------------------------------------------------- |
+| Main format       | Website + installable PWA                                           |
+| Main audience     | Somali-first, diaspora-friendly                                     |
+| Languages         | Somali + English                                                    |
+| Monetization      | None in V1                                                          |
+| Game timer        | None                                                                |
 | Turn housekeeping | Reconnect grace, claim-win after disconnect, abandoned-room cleanup |
-| AI | Not in V1 |
-| 3D | Not in V1 |
-| Future 3D support | Renderer stays swappable |
-| Sound | Native Web Audio |
-| Backend | Cloudflare Workers + Durable Objects + D1 |
-| Auth | Better Auth + Google only |
-| Database | Cloudflare D1 |
-| Local save | IndexedDB |
-| Small prefs | localStorage |
+| AI                | Not in V1                                                           |
+| 3D                | Not in V1                                                           |
+| Future 3D support | Renderer stays swappable                                            |
+| Sound             | Native Web Audio                                                    |
+| Backend           | Cloudflare Workers + Durable Objects + D1                           |
+| Auth              | Better Auth + Google only                                           |
+| Database          | Cloudflare D1                                                       |
+| Local save        | IndexedDB                                                           |
+| Small prefs       | localStorage                                                        |
 
 ---
 
 ## 6. Final Tech Stack
 
-| Layer | Choice | Notes |
-|---|---|---|
-| Language | TypeScript | Shared across frontend, backend, engine, validation, and tests. |
-| Monorepo | pnpm workspaces + Turborepo | Apps and packages stay organized. |
-| Web framework | SvelteKit | Marketing, rules, and game app in one project. |
-| Hosting/runtime | Cloudflare Workers + static assets | Low-maintenance, Cloudflare-first deployment. |
-| Cloudflare adapter | Native SvelteKit Cloudflare adapter | No Next.js/OpenNext. |
-| Client state | Svelte stores | Enough for local and online game state. |
-| Styling | Tailwind CSS + shadcn-svelte | Fast UI development with custom design control. |
-| Board rendering | SVG | Lightweight, crisp, easy to animate, easy to swap later. |
-| Animation | Svelte transitions + spring/tween motion | Placement, movement, selection, jare, capture, invalid move, win. |
-| Sound | Native Web Audio | V1 uses direct Web Audio utility. No Howler.js. |
-| Realtime | Durable Objects + WebSockets | One Durable Object per online match. |
-| WebSocket cost control | Durable Object WebSocket Hibernation | Required. |
-| Database | Cloudflare D1 | Users, profiles, match summaries, compact replay, leaderboard, small analytics. |
-| ORM | Drizzle ORM | Type-safe schema and queries. |
-| Auth | Better Auth | Google login only. |
-| Validation | Zod | WebSocket messages, API payloads, moves, important user input. |
-| i18n | Paraglide / Inlang | Somali default + English. |
-| PWA | `@vite-pwa/sveltekit` | Installable app and offline local mode. |
-| Unit tests | Vitest | Game engine and pure functions. |
-| Worker tests | Workers Vitest pool / Miniflare | Workers, Durable Objects, D1, auth, APIs. |
-| E2E tests | Playwright | Local game, online room, login, reconnect, claim-win. |
-| Analytics | Cloudflare Web Analytics + D1 summary events | No high-volume analytics in V1. |
-| Error monitoring | Cloudflare logs first | Add Sentry later only if needed. |
-| Domain | Namecheap + Cloudflare DNS | Buy domain on Namecheap, manage DNS in Cloudflare. |
+| Layer                  | Choice                                       | Notes                                                                           |
+| ---------------------- | -------------------------------------------- | ------------------------------------------------------------------------------- |
+| Language               | TypeScript                                   | Shared across frontend, backend, engine, validation, and tests.                 |
+| Monorepo               | pnpm workspaces + Turborepo                  | Apps and packages stay organized.                                               |
+| Web framework          | SvelteKit                                    | Marketing, rules, and game app in one project.                                  |
+| Hosting/runtime        | Cloudflare Workers + static assets           | Low-maintenance, Cloudflare-first deployment.                                   |
+| Cloudflare adapter     | Native SvelteKit Cloudflare adapter          | No Next.js/OpenNext.                                                            |
+| Client state           | Svelte stores                                | Enough for local and online game state.                                         |
+| Styling                | Tailwind CSS + shadcn-svelte                 | Fast UI development with custom design control.                                 |
+| Board rendering        | SVG                                          | Lightweight, crisp, easy to animate, easy to swap later.                        |
+| Animation              | Svelte transitions + spring/tween motion     | Placement, movement, selection, jare, capture, invalid move, win.               |
+| Sound                  | Native Web Audio                             | V1 uses direct Web Audio utility. No Howler.js.                                 |
+| Realtime               | Durable Objects + WebSockets                 | One Durable Object per online match.                                            |
+| WebSocket cost control | Durable Object WebSocket Hibernation         | Required.                                                                       |
+| Database               | Cloudflare D1                                | Users, profiles, match summaries, compact replay, leaderboard, small analytics. |
+| ORM                    | Drizzle ORM                                  | Type-safe schema and queries.                                                   |
+| Auth                   | Better Auth                                  | Google login only.                                                              |
+| Validation             | Zod                                          | WebSocket messages, API payloads, moves, important user input.                  |
+| i18n                   | Paraglide / Inlang                           | Somali default + English.                                                       |
+| PWA                    | `@vite-pwa/sveltekit`                        | Installable app and offline local mode.                                         |
+| Unit tests             | Vitest                                       | Game engine and pure functions.                                                 |
+| Worker tests           | Workers Vitest pool / Miniflare              | Workers, Durable Objects, D1, auth, APIs.                                       |
+| E2E tests              | Playwright                                   | Local game, online room, login, reconnect, claim-win.                           |
+| Analytics              | Cloudflare Web Analytics + D1 summary events | No high-volume analytics in V1.                                                 |
+| Error monitoring       | Cloudflare logs first                        | Add Sentry later only if needed.                                                |
+| Domain                 | Namecheap + Cloudflare DNS                   | Buy domain on Namecheap, manage DNS in Cloudflare.                              |
 
 ---
 
@@ -192,9 +192,8 @@ Requirements:
 
 ```txt
 shaxda/
-  apps/
-    web/              # SvelteKit marketing site + game app + PWA
-    worker/           # Cloudflare Worker APIs + Durable Objects
+  web/                # SvelteKit marketing site + game app + PWA
+  worker/             # Cloudflare Worker APIs + Durable Objects
 
   packages/
     game-engine/      # Pure TypeScript Shaxda rules engine
@@ -617,10 +616,10 @@ Use Conductor as a multi-agent workspace, not as a one-shot generator.
 
 ### Agent Usage
 
-| Agent | Best Use |
-|---|---|
+| Agent  | Best Use                                                         |
+| ------ | ---------------------------------------------------------------- |
 | Claude | Architecture, refactors, UI/UX, docs, reviews, complex reasoning |
-| Codex | Implementation tasks, tests, small features, fixes |
+| Codex  | Implementation tasks, tests, small features, fixes               |
 
 ### Workflow Rules
 

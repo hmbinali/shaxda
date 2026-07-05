@@ -78,16 +78,16 @@ This labeling system is for teaching, diagrams, examples, and implementation. Pl
 
 ## 6. Important Terms
 
-| Term | Meaning |
-|---|---|
-| **Shaxda** | The name of the game. |
-| **Piece** | A playing object used by a player. |
-| **Point** | A valid location on the board where a piece can be placed or moved. |
-| **Move** | Moving one own piece to the next connected empty point along a line. |
-| **Jare** | Three own pieces in a straight connected line; like three-in-a-row. |
-| **Irmaan** | A repeated/protected jare that the opponent cannot block. |
-| **Remove** | The initial removal after all 24 pieces are placed. |
-| **Capture** | Removing one opponent piece after forming a jare during movement. |
+| Term        | Meaning                                                              |
+| ----------- | -------------------------------------------------------------------- |
+| **Shaxda**  | The name of the game.                                                |
+| **Piece**   | A playing object used by a player.                                   |
+| **Point**   | A valid location on the board where a piece can be placed or moved.  |
+| **Move**    | Moving one own piece to the next connected empty point along a line. |
+| **Jare**    | Three own pieces in a straight connected line; like three-in-a-row.  |
+| **Irmaan**  | A repeated/protected jare that the opponent cannot block.            |
+| **Remove**  | The initial removal after all 24 pieces are placed.                  |
+| **Capture** | Removing one opponent piece after forming a jare during movement.    |
 
 ---
 

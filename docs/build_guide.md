@@ -23,17 +23,17 @@ This guide explains how you should operate the build process.
 
 Before starting, understand these simple ideas.
 
-| Term | Meaning |
-|---|---|
-| **GitHub repo** | The main home of the project code. |
-| **main branch** | The stable version of the project. Keep this clean. |
-| **Conductor workspace** | An isolated copy of the repo where one agent works. |
-| **Worktree** | The Git feature behind Conductor workspaces. It lets multiple copies of the same repo exist safely. |
-| **Workspace branch** | The temporary branch Conductor uses for a workspace. |
-| **Commit** | A saved change. Small commits are best. |
-| **Pull request / PR** | A review step before merging agent work into `main`. |
-| **Merge** | Accepting a workspace branch into `main`. |
-| **Pull / rebase** | Updating other workspaces after `main` changes. |
+| Term                    | Meaning                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| **GitHub repo**         | The main home of the project code.                                                                  |
+| **main branch**         | The stable version of the project. Keep this clean.                                                 |
+| **Conductor workspace** | An isolated copy of the repo where one agent works.                                                 |
+| **Worktree**            | The Git feature behind Conductor workspaces. It lets multiple copies of the same repo exist safely. |
+| **Workspace branch**    | The temporary branch Conductor uses for a workspace.                                                |
+| **Commit**              | A saved change. Small commits are best.                                                             |
+| **Pull request / PR**   | A review step before merging agent work into `main`.                                                |
+| **Merge**               | Accepting a workspace branch into `main`.                                                           |
+| **Pull / rebase**       | Updating other workspaces after `main` changes.                                                     |
 
 Simple rule:
 

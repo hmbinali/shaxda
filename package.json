@@ -16,8 +16,9 @@
     "test:watch": "vitest --watch",
     "test:worker": "turbo run test:worker",
     "test:e2e": "playwright test",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "format": "turbo run format",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown",
     "prepare": "node scripts/install-git-hooks.mjs"
   },
   "lint-staged": {

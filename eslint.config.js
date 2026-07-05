@@ -20,8 +20,8 @@ export default tseslint.config(
       "playwright-report/**",
       "**/playwright-report/**",
       "test-results/**",
-      "**/test-results/**"
-    ]
+      "**/test-results/**",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -30,20 +30,20 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         ...globals.browser,
-        ...globals.node
+        ...globals.node,
       },
       parserOptions: {
-        extraFileExtensions: [".svelte"]
-      }
-    }
+        extraFileExtensions: [".svelte"],
+      },
+    },
   },
   {
     files: ["**/*.svelte"],
     languageOptions: {
       parserOptions: {
-        parser: tseslint.parser
-      }
-    }
+        parser: tseslint.parser,
+      },
+    },
   },
-  prettier
+  prettier,
 );

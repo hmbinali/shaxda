@@ -23,17 +23,17 @@ export default defineConfig({
             src: "/icon.svg",
             sizes: "any",
             type: "image/svg+xml",
-            purpose: "any maskable"
-          }
-        ]
+            purpose: "any maskable",
+          },
+        ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2}"]
-      }
-    })
+        globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2}"],
+      },
+    }),
   ],
   test: {
     environment: "jsdom",
-    passWithNoTests: true
-  }
+    passWithNoTests: true,
+  },
 });

@@ -7,7 +7,7 @@ describe("worker", () => {
 
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      service: "shaxda"
+      service: "shaxda",
     });
   });
 });

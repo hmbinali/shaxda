@@ -7,9 +7,9 @@ const config = {
     adapter: adapter(),
     alias: {
       $components: "src/lib/components",
-      $utils: "src/lib/utils"
-    }
-  }
+      $utils: "src/lib/utils",
+    },
+  },
 };
 
 export default config;

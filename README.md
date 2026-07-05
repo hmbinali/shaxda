@@ -11,6 +11,7 @@ pnpm install
 pnpm dev:web
 pnpm dev:worker
 pnpm check
+pnpm test:e2e
 ```
 
 Required milestone checks:
@@ -21,6 +22,9 @@ pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+Git hooks are installed by `pnpm install`. The pre-commit hook runs staged
+formatting/linting, and the pre-push hook runs `pnpm check`.
 
 ## Workspace Layout
 

@@ -26,6 +26,16 @@ set -eu
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+if ! node --version >/dev/null 2>&1 && [ -f .nvmrc ]; then
+  node_version="$(tr -d '[:space:]' < .nvmrc)"
+  node_version="\${node_version#v}"
+  nvm_node_bin="$HOME/.nvm/versions/node/v$node_version/bin"
+
+  if [ -d "$nvm_node_bin" ]; then
+    export PATH="$nvm_node_bin:$PATH"
+  fi
+fi
+
 ${command}
 `;
 }

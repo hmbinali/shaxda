@@ -162,6 +162,8 @@ Example if Player A starts:
 
 Important: a jare during placement does **not** cause immediate removal. It only decides first advantage.
 
+If one placement completes more than one jare line at the same time, it still counts as a single placement event. If first advantage has not already been decided, that player gets first advantage once. No pieces are removed during placement.
+
 ---
 
 ## 11. Phase Two: Initial Removal
@@ -238,6 +240,10 @@ Capture choice:
 - the captured piece may be ordinary;
 - the captured piece may be part of an opponent jare;
 - there are no capture restrictions.
+
+If one movement completes more than one jare line at the same time, it still grants exactly one capture.
+
+A movement-phase capture is allowed only when the move newly completes at least one jare line that was not complete before that move. A player cannot capture again from a jare that stayed unchanged.
 
 ![Examples of valid jare](shaxda_jare_examples.png)
 
@@ -336,6 +342,25 @@ If the blocked player is still unable to move, the opponent must continue making
 
 Blocking by itself does not win the game.
 
+If both players are blocked, the game is a draw.
+
+If the only possible space-making move would newly form a jare, the game is a draw instead. The space-making rule is only for reopening movement; it cannot be used to force a capture.
+
+## 18.1 Draw and Termination Rules
+
+A game can end in a draw when:
+
+1. both players are blocked;
+2. the required space-making move is impossible without newly forming a jare;
+3. the same movement position occurs three times with the same player to move and no pending capture;
+4. 80 consecutive movement turns complete without a capture.
+
+The repeated-position rule uses board occupancy, current player, phase, and pending-capture status. Placement and initial-removal positions do not count toward repetition.
+
+The no-capture clock starts when movement begins. A normal movement turn without a capture increments it. A capture resets it to zero.
+
+Idle-but-connected online behavior is not a board-game draw rule. Online games should use a soft idle nudge, then allow the opponent to claim a win after the configured idle grace period in `docs/shaxda_prd.md`.
+
 ---
 
 ## 19. Winning the Game
@@ -366,7 +391,7 @@ What does **not** automatically win:
 8. During movement, a newly formed jare allows one capture.
 9. Repeated jare is allowed only if opened and reformed.
 10. If a player has irmaan, the opponent may give up if there is no realistic way to stop repeated captures.
-11. The game ends when a win condition is met.
+11. The game ends when a win, draw, or resignation condition is met.
 
 ---
 
@@ -454,6 +479,11 @@ The example shows an **irmaan** position for the wood-piece player: a repeated j
 - Blocking does not win the game.
 - The opponent must make space for the blocked player.
 - The space-making move cannot make a jare.
+- Both-blocked and forced-jare space-making positions are draws.
+
+### Draw
+
+A game is drawn by both-blocked positions, forced-jare space-making positions, threefold movement repetition, or 80 movement turns without capture.
 
 ### Win
 

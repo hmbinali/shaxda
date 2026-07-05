@@ -1,6 +1,13 @@
 import { ADJACENCY } from "./board";
-import { completesJare } from "./jare";
-import type { GameAction, GameState, PlayerId, PointId } from "./types";
+import { completesJare, formsNewJare } from "./jare";
+import type {
+  BoardOccupancy,
+  GameAction,
+  GameEndReason,
+  GameState,
+  PlayerId,
+  PointId,
+} from "./types";
 
 export type ActionError =
   | "wrongPhase"
@@ -12,6 +19,7 @@ export type ActionError =
   | "notAdjacent"
   | "destinationOccupied"
   | "noPiecesInHand"
+  | "alreadyRemovedInitial"
   | "unsupportedAction";
 
 export type ActionResult =
@@ -35,8 +43,9 @@ export function applyAction(
     case "move":
       return applyMove(state, action.player, action.from, action.to);
     case "capture":
+      return applyCapture(state, action.player, action.point);
     case "resign":
-      return fail("unsupportedAction");
+      return applyResign(state, action.player);
   }
 }
 
@@ -88,6 +97,7 @@ function applyPlace(
         firstAdvantage: advantageHolder,
         phase: "initialRemoval",
         currentPlayer: advantageHolder,
+        pendingCapture: null,
       },
     };
   }
@@ -100,6 +110,7 @@ function applyPlace(
       players,
       firstAdvantage,
       currentPlayer: otherPlayer(player),
+      pendingCapture: null,
     },
   };
 }
@@ -126,16 +137,27 @@ function applyMove(
     return fail("destinationOccupied");
   }
 
+  const board = {
+    ...state.board,
+    [from]: null,
+    [to]: player,
+  };
+  const hasPendingCapture = formsNewJare(state.board, board, to, player);
+
   return {
     ok: true,
     state: {
       ...state,
-      board: {
-        ...state.board,
-        [from]: null,
-        [to]: player,
-      },
-      currentPlayer: otherPlayer(player),
+      board,
+      phase: hasPendingCapture ? "capture" : "movement",
+      currentPlayer: hasPendingCapture ? player : otherPlayer(player),
+      pendingCapture: hasPendingCapture ? { player, formedAt: to } : null,
+      draw: hasPendingCapture
+        ? state.draw
+        : {
+            ...state.draw,
+            turnsSinceCapture: state.draw.turnsSinceCapture + 1,
+          },
     },
   };
 }
@@ -159,20 +181,28 @@ function applyRemoveInitial(
   if (occupant === player) {
     return fail("notOpponentPiece");
   }
+  if (state.initialRemoval.removedBy[player]) {
+    return fail("alreadyRemovedInitial");
+  }
 
   const board = { ...state.board, [point]: null };
-  const piecesOnBoard = Object.values(board).filter(
-    (owner) => owner !== null,
-  ).length;
+  const initialRemoval = {
+    removedBy: {
+      ...state.initialRemoval.removedBy,
+      [player]: true,
+    },
+  };
 
-  if (piecesOnBoard === 22) {
+  if (initialRemoval.removedBy.A && initialRemoval.removedBy.B) {
     return {
       ok: true,
       state: {
         ...state,
         board,
+        initialRemoval,
         phase: "movement",
         currentPlayer: state.firstAdvantage ?? state.currentPlayer,
+        pendingCapture: null,
       },
     };
   }
@@ -182,7 +212,113 @@ function applyRemoveInitial(
     state: {
       ...state,
       board,
+      initialRemoval,
       currentPlayer: otherPlayer(player),
+      pendingCapture: null,
     },
   };
+}
+
+function applyCapture(
+  state: GameState,
+  player: PlayerId,
+  point: PointId,
+): ActionResult {
+  if (state.phase !== "capture" || state.pendingCapture === null) {
+    return fail("wrongPhase");
+  }
+  if (
+    player !== state.currentPlayer ||
+    player !== state.pendingCapture.player
+  ) {
+    return fail("notYourTurn");
+  }
+
+  const occupant = state.board[point];
+  if (occupant === null) {
+    return fail("pointEmpty");
+  }
+  if (occupant === player) {
+    return fail("notOpponentPiece");
+  }
+
+  const board = { ...state.board, [point]: null };
+  const opponent = otherPlayer(player);
+  const players = {
+    ...state.players,
+    [player]: {
+      ...state.players[player],
+      captured: state.players[player].captured + 1,
+    },
+  };
+  const opponentPieces = countPieces(board, opponent);
+  const endReason = getCaptureEndReason(opponentPieces);
+
+  if (endReason !== null) {
+    return {
+      ok: true,
+      state: {
+        ...state,
+        board,
+        players,
+        phase: "gameOver",
+        currentPlayer: player,
+        pendingCapture: null,
+        draw: {
+          turnsSinceCapture: 0,
+          repeatedPositions: state.draw.repeatedPositions,
+        },
+        winner: player,
+        endReason,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      board,
+      players,
+      phase: "movement",
+      currentPlayer: opponent,
+      pendingCapture: null,
+      draw: {
+        turnsSinceCapture: 0,
+        repeatedPositions: state.draw.repeatedPositions,
+      },
+    },
+  };
+}
+
+function applyResign(state: GameState, player: PlayerId): ActionResult {
+  if (state.phase === "gameOver") {
+    return fail("wrongPhase");
+  }
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      phase: "gameOver",
+      currentPlayer: otherPlayer(player),
+      pendingCapture: null,
+      winner: otherPlayer(player),
+      endReason: "resignation",
+    },
+  };
+}
+
+function countPieces(board: BoardOccupancy, player: PlayerId): number {
+  return Object.values(board).filter((owner) => owner === player).length;
+}
+
+function getCaptureEndReason(pieceCount: number): GameEndReason | null {
+  if (pieceCount === 0) {
+    return "opponentCapturedAll";
+  }
+  if (pieceCount < 3) {
+    return "opponentBelowThree";
+  }
+  return null;
 }

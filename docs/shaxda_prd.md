@@ -232,13 +232,12 @@ When built in V1.1, it should use:
 
 ```txt
 shaxda/
-  apps/
-    web/              # SvelteKit marketing site + game app + PWA
-    worker/           # Cloudflare Worker APIs + Durable Objects
+  web/                # SvelteKit marketing site + game app + PWA
+  worker/             # Cloudflare Worker APIs + Durable Objects
 
   packages/
-    game-engine/      # Pure TypeScript Shaxda rules engine
-    shared/           # Zod schemas, shared types, WebSocket protocol, fixtures
+    game-engine/      # Pure TypeScript Shaxda rules, board data, and API contracts
+    shared/           # Zod schemas, WebSocket protocol, and canonical fixtures
     db/               # D1 + Drizzle schema and queries when persistence is needed
     i18n/             # Somali messages/content now; English later if added
     ui/               # Shared UI components and design tokens
@@ -251,8 +250,9 @@ shaxda/
 
 ### Architecture Rules
 
-- Keep rules in `packages/game-engine`.
-- Keep shared types, Zod schemas, WebSocket protocol, and fixture states in `packages/shared`.
+- Keep rules, board data, dependency-free game types, and engine API signatures in `packages/game-engine`.
+- Keep Zod schemas, WebSocket protocol, and fixture states in `packages/shared`.
+- `packages/shared` may import `packages/game-engine`; `packages/game-engine` must never import `packages/shared`.
 - Keep database schema and queries in `packages/db` only when D1 persistence is needed.
 - Keep visual UI separate from game rules.
 - Use the same engine on client and server.
@@ -266,22 +266,23 @@ shaxda/
 
 ## 9. Foundation Contracts
 
-Before parallel implementation expands, freeze a contracts layer in `packages/shared`.
+Before parallel implementation expands, freeze a contracts layer split between `packages/game-engine` and `packages/shared`.
 
 Required contracts:
 
-- board point labels;
-- adjacency map;
-- valid jare-line list;
-- `GameState`, `Action`, `Phase`, and `Player` types;
+- board point labels from `packages/game-engine`;
+- adjacency map from `packages/game-engine`;
+- valid jare-line list from `packages/game-engine`;
+- dependency-free `GameState`, `Action`, `Phase`, and `Player` types from `packages/game-engine`;
 - Zod schemas for public actions and WebSocket messages;
 - engine public API signatures:
-  - `initialState()`;
+  - `createInitialState(startingPlayer)`;
   - `legalActions(state)`;
   - `applyAction(state, action)`;
   - `serialize(state)`;
   - `deserialize(serialized)`;
-  - replay/action-log helpers;
+  - `applyActionLog(initialState, actions)`;
+  - `replayActions(startingPlayer, actions)`;
 - WebSocket protocol with a `v: 1` protocol version field;
 - canonical fixture states.
 
@@ -345,19 +346,20 @@ Required engine areas:
 
 Do not implement game rules inside Svelte components or Worker handlers. Those layers must call the engine.
 
-### 10.1 Rule Gaps to Resolve in `shaxda_game.md`
+### 10.1 Rule Decisions Recorded in `shaxda_game.md`
 
-Before finalizing the engine, the game rules document should explicitly answer these items:
+The game rules document explicitly answers these items. Engine work must follow those answers:
 
-| Gap                                               | Required decision                                                                                 |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Draw / termination rule                           | Define how games end if players repeat positions or avoid captures forever.                       |
-| Both players blocked                              | Define result when the current player is blocked and the opponent cannot legally make space.      |
-| Space-making move impossible without forming jare | Define whether to allow the jare but forbid capture, or declare draw.                             |
-| Multi-jare placement                              | Define whether one placement can complete multiple jare lines and how first advantage is handled. |
-| Idle-but-connected opponent online                | Define housekeeping behavior for a player who stays connected but does not move.                  |
+| Decision                                          | Source                                                                                        |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Draw / termination rule                           | `shaxda_game.md` §18.1: threefold movement repetition or 80 movement turns without capture.   |
+| Both players blocked                              | `shaxda_game.md` §18: draw.                                                                   |
+| Space-making move impossible without forming jare | `shaxda_game.md` §18: draw; forced space-making cannot be used to force capture.              |
+| Multi-jare placement                              | `shaxda_game.md` §10: one first-advantage event only; no removal during placement.            |
+| Multi-jare movement                               | `shaxda_game.md` §14: exactly one capture for a newly completed movement jare event.          |
+| Idle-but-connected opponent online                | `shaxda_game.md` §18.1 and PRD §15.3: soft nudge, then claim-win after configured idle grace. |
 
-These are rules/product decisions, not implementation details. Agents must not invent them inside engine code.
+These are rules/product decisions, not implementation details. Agents must not invent different answers inside engine code.
 
 ### 10.2 Compact Replay Format
 
@@ -903,6 +905,8 @@ This roadmap replaces the old fully serial M0–M20 plan. It is organized as tra
 
 Goal: clean monorepo with tooling and a deployed hello-world.
 
+Local foundation verification is covered by `pnpm check`, `pnpm test:worker`, and `pnpm test:e2e`. Remote Cloudflare preview/production deployment verification is intentionally deferred to D1/P1 so Phase 0 does not require pointing local work at remote Cloudflare resources.
+
 Includes:
 
 - pnpm workspace;
@@ -924,6 +928,8 @@ Includes:
 
 Goal: freeze shared types, board data, engine API shape, WebSocket protocol, and fixture states.
 
+Status: frozen when the Phase 0 closeout branch containing these contracts is merged. Later changes require explicit contract-change commits and active workspace rebases.
+
 Includes:
 
 - board point labels;
@@ -936,7 +942,7 @@ Includes:
 - fixture states;
 - full-game action scripts where possible.
 
-Definition of done: contracts merged and marked frozen. Later changes require explicit contract-change commits.
+Definition of done: contracts merged and marked frozen in `docs/shaxda_prd.md` and `AGENTS.md`. Later changes require explicit contract-change commits.
 
 ### Phase 1 — Parallel Tracks After F1
 

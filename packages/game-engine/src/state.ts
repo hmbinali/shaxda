@@ -14,6 +14,16 @@ export function createInitialState(startingPlayer: PlayerId): GameState {
     currentPlayer: startingPlayer,
     startingPlayer,
     firstAdvantage: null,
+    initialRemoval: {
+      removedBy: { A: false, B: false },
+    },
+    pendingCapture: null,
+    draw: {
+      turnsSinceCapture: 0,
+      repeatedPositions: {},
+    },
+    winner: null,
+    endReason: null,
     players: {
       A: { inHand: PIECES_PER_PLAYER, captured: 0 },
       B: { inHand: PIECES_PER_PLAYER, captured: 0 },

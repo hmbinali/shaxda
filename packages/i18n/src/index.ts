@@ -1,18 +1,12 @@
 export const defaultLocale = "so";
-export const locales = ["so", "en"] as const;
+export const locales = ["so"] as const;
 
 export const messages = {
   so: {
     appName: "Shaxda",
-    foundationLabel: "Aasaaska mashruuca",
+    foundationLabel: "Qandaraasyada F1",
     foundationSummary:
-      "Qaab-dhismeedka app-ka Shaxda ayaa diyaar u ah marxaladaha xiga.",
-  },
-  en: {
-    appName: "Shaxda",
-    foundationLabel: "Project foundation",
-    foundationSummary:
-      "The Shaxda app foundation is ready for the next milestones.",
+      "Qaab-dhismeedka shaxda, xeerarka, iyo ciyaarta martida ayaa diyaar u ah marxaladaha xiga.",
   },
 } as const;
 

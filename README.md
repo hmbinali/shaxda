@@ -1,6 +1,10 @@
 # Shaxda
 
-Free, installable web version of the traditional Somali board game.
+Free, installable Somali-only web version of the traditional Somali board game.
+
+V1.0 is focused on local 2-player play, guest invite online play, public Somali
+rules/learning pages, and PWA installability. Accounts, Google login, logged-in
+history, leaderboard, replay viewer, and English/i18n are V1.1 or later.
 
 ## Development
 
@@ -33,8 +37,8 @@ web/                # SvelteKit site and game UI
 worker/             # Cloudflare Worker
 packages/
   game-engine/      # Pure TypeScript rules package
-  shared/           # Shared schemas and types
+  shared/           # Zod schemas, WebSocket protocol, and fixtures
   db/               # D1/Drizzle package
-  i18n/             # Somali + English messages
+  i18n/             # Somali messages/content scaffold
   ui/               # Shared UI tokens and components
 ```

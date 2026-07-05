@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@shaxda/game-engine": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

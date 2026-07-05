@@ -8,47 +8,55 @@
 
 Shaxda — a free, installable web version of the traditional Somali board game.
 
-V1 includes:
+V1.0 includes:
 
 - one website for marketing, rules, learning, and the game;
 - local offline 2-player mode;
-- live online 2-player mode;
-- guest casual invite games;
-- Google-login account games;
-- logged-in match history;
-- logged-in leaderboard;
-- Somali + English;
+- guest live online 2-player invite games;
+- guest display names only;
+- Somali-only user-facing content and UI;
 - PWA installability.
 
-V1 does **not** include:
+V1.0 does **not** include:
 
+- accounts;
+- Google login;
+- logged-in games;
+- permanent usernames;
+- match history;
+- leaderboard;
+- replay viewer;
+- English UI/content or a language toggle;
 - AI opponent;
 - real 3D;
 - ads;
 - sponsors;
 - sponsor placeholders;
 - payment flows;
+- affiliate/referral flows;
 - tournaments as a core feature;
 - chat;
 - spectating;
 - app-store wrapper.
+
+Accounts, Google login, logged-in history, leaderboard, replay viewer, Better Auth, and full English/i18n are V1.1 candidates only after V1.0 has launched.
 
 ## Source-of-Truth Documents
 
 Read these before relevant work:
 
 1. `docs/shaxda_prd.md`
-   - Product, tech stack, architecture, infrastructure rules, build workflow, and milestone roadmap.
-   - Work tasks should follow the milestone order in this file.
+   - Product, tech stack, architecture, infrastructure rules, build workflow, and phased roadmap.
+   - Work tasks should follow the phase/track order in this file.
 
 2. `docs/shaxda_game.md`
-   - Exact Shaxda rules, board, terms, phases, jare, repeated jare, irmaan, blocked-player handling, and win conditions.
+   - Exact Shaxda rules, board, terms, phases, jare, repeated jare, irmaan, blocked-player handling, and win/draw conditions.
    - Required before rules-engine, move-validation, board-model, replay, or online-sync work.
    - Authoritative over assumptions for game rules.
 
 3. `docs/shaxda_brd.md`
    - Business, brand, and revenue strategy later.
-   - Do not create monetization features in V1 unless this document and the PRD are updated.
+   - Do not create monetization features in V1.0 unless this document and the PRD are updated.
 
 ## Locked Stack — Do Not Substitute
 
@@ -60,16 +68,16 @@ Read these before relevant work:
 - Native Web Audio for sound
 - Cloudflare Workers
 - Cloudflare Durable Objects + WebSockets
-- Cloudflare D1 + Drizzle ORM
-- Better Auth with Google login only
+- Cloudflare D1 + Drizzle ORM when persistence is introduced
 - Guest mode for casual invite games
 - Zod for validation
-- Paraglide / Inlang for i18n
-- Somali default + English
+- Somali-only V1.0 content with future-friendly copy structure
 - `@vite-pwa/sveltekit`
 - Vitest
 - Workers Vitest pool / Miniflare
 - Playwright
+
+Do not introduce Better Auth, Google OAuth, Paraglide/Inlang, or English routes/content in V1.0 unless `docs/shaxda_prd.md` is deliberately changed first.
 
 ## Build Principles
 
@@ -85,9 +93,12 @@ It must be pure TypeScript with no dependency on:
 - D1;
 - WebSockets;
 - localStorage;
-- IndexedDB.
+- IndexedDB;
+- Zod.
 
 The web UI and the server must both call this engine.
+
+`packages/shared` may import `game-engine` to expose Zod schemas, WebSocket protocol contracts, and canonical fixtures. The engine must never import `shared`.
 
 ### 2. Functional Before Beautiful
 
@@ -120,7 +131,7 @@ Wrangler/Miniflare simulate Workers, Durable Objects, and D1 locally.
 
 Do not point local work at remote Cloudflare resources unless the task is explicitly about deployment.
 
-### 5. No Monetization in V1
+### 5. No Monetization in V1.0
 
 Do not add:
 
@@ -157,9 +168,9 @@ Monetization is post-V1 only after the game is finished and has users.
 
 - Do not write every move as a D1 row.
 - Active match state lives in the Durable Object.
-- Completed logged-in games store one summary row + compact replay.
+- Completed logged-in persistence is V1.1 only.
 - Guest games write nothing permanent by default.
-- Leaderboard/history are logged-in only.
+- If D1 is introduced for V1.0, keep it to tiny summary/operational events.
 - Index every common D1 query.
 - Avoid full-table scans.
 
@@ -169,13 +180,13 @@ Monetization is post-V1 only after the game is finished and has users.
 - Validate every API payload with Zod.
 - Treat client input as untrusted.
 
-### UI / i18n
+### UI / Content
 
-- Somali is the default language.
-- English is supported from V1.
-- Preserve Somali terms such as `shaxda`, `jare`, and `irmaan` in both languages.
+- Somali is the only visible V1.0 language.
+- Do not add English content, `/en` routes, or a language toggle in V1.0.
+- Preserve Somali terms such as `shaxda`, `jare`, and `irmaan`.
 - Marketing/rules pages should be static/prerendered.
-- Gameplay should be client-rendered and not invoke Workers on every interaction.
+- Gameplay should be client-rendered and not invoke Workers on every local interaction.
 
 ## Repository Layout
 
@@ -184,10 +195,10 @@ web/                # SvelteKit site + game UI + PWA
 worker/             # Cloudflare Worker + Durable Objects
 
 packages/
-  game-engine/      # Pure TS Shaxda rules
-  shared/           # Zod schemas + shared types + WebSocket protocol
-  db/               # D1 + Drizzle schema and queries
-  i18n/             # Paraglide messages
+  game-engine/      # Pure TypeScript Shaxda rules and dependency-free contracts
+  shared/           # Zod schemas + WebSocket protocol + canonical fixtures
+  db/               # D1 + Drizzle schema and queries when persistence is needed
+  i18n/             # Somali messages/content scaffold; English later if added
   ui/               # Shared UI and design tokens
 
 docs/
@@ -196,17 +207,35 @@ docs/
   shaxda_brd.md     # business strategy later
 ```
 
+## Current Roadmap
+
+Use the phased roadmap in `docs/shaxda_prd.md`.
+
+```txt
+Phase 0: F0 foundation + F1 contracts/fixtures
+Phase 1: A2/A3 engine, B1 board UI, C1 content, D1 DO spike, E1 assets
+Phase 2: L1 local game, then L2/L3/L4 polish/sound/PWA
+Phase 3: O1/O2/O3 guest online play/resilience/hardening
+Phase 4: Q1 QA, BETA1 community beta, P1 launch
+V1.1: accounts -> history/replay -> leaderboard -> English
+```
+
+F1 contracts are the parallelism gate for A2, A3, B1, and O1. C1, D1, and E1 may run earlier only if they do not define or consume game state/action contracts.
+
+After F1 is merged and marked frozen, contract changes require an explicit contract-change commit and all active workspaces must rebase.
+
+F0 remote Cloudflare deployment verification is deferred to D1/P1. Do not point local Phase 0 work at remote Cloudflare resources unless the task is explicitly about deployment.
+
 ## How to Work a Task
 
-1. Find the task/milestone in `docs/shaxda_prd.md`.
+1. Find the task/phase in `docs/shaxda_prd.md`.
 2. Read any relevant source document:
-   - rules work → `docs/shaxda_game.md`;
-   - Durable Object / D1 / online / infrastructure work → `docs/shaxda_prd.md`.
-3. If using Claude and a relevant skill exists, use it.
-4. Implement the smallest working slice.
-5. Add or update tests.
-6. Run checks.
-7. Commit one logical change.
+   - rules work -> `docs/shaxda_game.md`;
+   - Durable Object / D1 / online / infrastructure work -> `docs/shaxda_prd.md`.
+3. Implement the smallest working slice.
+4. Add or update tests.
+5. Run checks.
+6. Commit one logical change.
 
 ## Conductor Workflow
 
@@ -215,30 +244,27 @@ Conductor uses isolated workspaces/worktrees. You do **not** need to manually cr
 Use:
 
 ```txt
-One Conductor workspace = one focused task/milestone branch/review flow.
+One Conductor workspace = one focused task/phase branch/review flow.
 ```
 
 Name workspaces clearly:
 
 ```txt
-m0-foundation
-m1-board-data
-m2-engine-core
-m17-content-pages
-m11-online-core
+f1-contracts-fixtures
+a2-advanced-engine
+b1-board-ui-fixtures
+c1-somali-content
+d1-do-hibernation-spike
+o1-online-gameplay
 ```
 
-Do not run tasks that depend on M0 until the M0 scaffold has merged.
-
-Correct start order:
+Correct sequencing:
 
 ```txt
-1. Agent/workspace 1: M0 foundation.
-2. Agent/workspace 2: AGENTS.md / CLAUDE.md / docs review if needed.
-3. Merge M0.
-4. Then fan out:
-   - workspace A: M1 board data / engine;
-   - workspace B: content pages.
+1. Finish/merge F0 if it is not already merged.
+2. Close F1 contracts and fixtures.
+3. After F1 freezes, fan out A2/A3, B1, and O1-dependent work.
+4. C1, D1, and E1 can run before F1 only under the no-contract-touch rule.
 ```
 
 ## Required Commands
@@ -284,15 +310,15 @@ refactor: ...
 
 One commit = one logical change.
 
-Do not create a “build full game” commit.
+Do not create a "build full game" commit.
 
 ## Definition of Done
 
 A task is done only when:
 
-- the PRD milestone/task is complete;
+- the PRD phase/task is complete;
 - tests are added or updated where appropriate;
 - lint/typecheck/tests/build pass;
-- no V1-excluded feature was added;
+- no V1.0-excluded feature was added;
 - the diff is small enough to review;
 - the commit message follows the project convention.

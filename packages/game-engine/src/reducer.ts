@@ -1,3 +1,4 @@
+import { ADJACENCY } from "./board";
 import { completesJare } from "./jare";
 import type { GameAction, GameState, PlayerId, PointId } from "./types";
 
@@ -32,6 +33,7 @@ export function applyAction(
     case "removeInitial":
       return applyRemoveInitial(state, action.player, action.point);
     case "move":
+      return applyMove(state, action.player, action.from, action.to);
     case "capture":
     case "resign":
       return fail("unsupportedAction");
@@ -97,6 +99,42 @@ function applyPlace(
       board,
       players,
       firstAdvantage,
+      currentPlayer: otherPlayer(player),
+    },
+  };
+}
+
+function applyMove(
+  state: GameState,
+  player: PlayerId,
+  from: PointId,
+  to: PointId,
+): ActionResult {
+  if (state.phase !== "movement") {
+    return fail("wrongPhase");
+  }
+  if (player !== state.currentPlayer) {
+    return fail("notYourTurn");
+  }
+  if (state.board[from] !== player) {
+    return fail("notOwnPiece");
+  }
+  if (!(ADJACENCY[from] as readonly PointId[]).includes(to)) {
+    return fail("notAdjacent");
+  }
+  if (state.board[to] !== null) {
+    return fail("destinationOccupied");
+  }
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      board: {
+        ...state.board,
+        [from]: null,
+        [to]: player,
+      },
       currentPlayer: otherPlayer(player),
     },
   };

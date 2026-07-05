@@ -1,0 +1,6 @@
+name = "shaxda-worker"
+main = "src/index.ts"
+compatibility_date = "2026-07-05"
+
+[observability]
+enabled = true

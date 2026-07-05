@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.svelte-kit/
+.turbo/
+
+# Tests
+coverage/
+test-results/
+playwright-report/
+
+# Environment / secrets
+.env
+.env.*
+.dev.vars
+
+# Cloudflare local state
+.wrangler/
+.wrangler/state/
+
+# Conductor personal settings
+.conductor/settings.local.toml
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/

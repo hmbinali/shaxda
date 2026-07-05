@@ -1,0 +1,7 @@
+# .conductor/settings.local.toml
+# Optional personal overrides.
+# Do not commit this file.
+
+# Example:
+# [scripts.run.web]
+# command = "pnpm dev:web -- --host 0.0.0.0 --port $CONDUCTOR_PORT"

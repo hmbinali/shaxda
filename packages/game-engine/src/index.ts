@@ -1,4 +1,15 @@
-export const gameEnginePackage = {
-  name: "@shaxda/game-engine",
-  milestone: "M0 foundation",
-} as const;
+export { ADJACENCY, JARE_LINES, POINT_IDS } from "./board";
+export type { JareLine } from "./board";
+export { createInitialState, PIECES_PER_PLAYER } from "./state";
+export type {
+  BoardOccupancy,
+  GameAction,
+  GameState,
+  Phase,
+  PlayerId,
+  PlayerState,
+  PointId,
+  PointState,
+  Ring,
+  RingPosition,
+} from "./types";

@@ -8,6 +8,8 @@ describe("createInitialState", () => {
 
     expect(state.phase).toBe("placement");
     expect(state.currentPlayer).toBe("B");
+    expect(state.startingPlayer).toBe("B");
+    expect(state.firstAdvantage).toBeNull();
     expect(Object.keys(state.board)).toHaveLength(POINT_IDS.length);
 
     for (const id of POINT_IDS) {

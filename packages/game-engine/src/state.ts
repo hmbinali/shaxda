@@ -12,6 +12,8 @@ export function createInitialState(startingPlayer: PlayerId): GameState {
     phase: "placement",
     board,
     currentPlayer: startingPlayer,
+    startingPlayer,
+    firstAdvantage: null,
     players: {
       A: { inHand: PIECES_PER_PLAYER, captured: 0 },
       B: { inHand: PIECES_PER_PLAYER, captured: 0 },

@@ -294,6 +294,10 @@ describe("initial removal", () => {
     expect(afterRemoval.board.O1).toBeNull();
     expect(afterRemoval.phase).toBe("initialRemoval");
     expect(afterRemoval.currentPlayer).toBe("A");
+    expect(afterRemoval.initialRemoval.removedBy).toEqual({
+      A: false,
+      B: true,
+    });
     expect(piecesOnBoard(afterRemoval)).toBe(23);
   });
 
@@ -327,6 +331,21 @@ describe("initial removal", () => {
       state,
       { type: "removeInitial", player: "B", point: "O2" },
       "notOpponentPiece",
+    );
+  });
+
+  it("rejects a player removing twice in hand-built initial-removal states", () => {
+    const state = placeAll(createInitialState("A"), NO_JARE_ORDER);
+
+    expectError(
+      {
+        ...state,
+        initialRemoval: {
+          removedBy: { ...state.initialRemoval.removedBy, B: true },
+        },
+      },
+      { type: "removeInitial", player: "B", point: "O1" },
+      "alreadyRemovedInitial",
     );
   });
 
@@ -371,6 +390,10 @@ describe("initial removal", () => {
     expect(piecesFor(afterSecondRemoval, "B")).toBe(11);
     expect(afterSecondRemoval.players.A.captured).toBe(0);
     expect(afterSecondRemoval.players.B.captured).toBe(0);
+    expect(afterSecondRemoval.initialRemoval.removedBy).toEqual({
+      A: true,
+      B: true,
+    });
   });
 
   it("does not mutate the input state", () => {
@@ -400,6 +423,7 @@ describe("movement", () => {
     expect(afterMove.board.O1).toBe("B");
     expect(afterMove.currentPlayer).toBe("A");
     expect(afterMove.phase).toBe("movement");
+    expect(afterMove.draw.turnsSinceCapture).toBe(1);
   });
 
   it("rejects movement outside the movement phase", () => {
@@ -456,6 +480,100 @@ describe("movement", () => {
 
     expect(state).toEqual(snapshot);
   });
+
+  it("enters capture phase when movement newly forms a jare", () => {
+    const state = createMovementState();
+    const withJareThreat: GameState = {
+      ...state,
+      currentPlayer: "A",
+      board: {
+        ...state.board,
+        O1: "A",
+        O2: "A",
+        O3: null,
+        O4: "A",
+        O8: "B",
+      },
+    };
+
+    const afterMove = apply(withJareThreat, {
+      type: "move",
+      player: "A",
+      from: "O4",
+      to: "O3",
+    });
+
+    expect(afterMove.phase).toBe("capture");
+    expect(afterMove.currentPlayer).toBe("A");
+    expect(afterMove.pendingCapture).toEqual({ player: "A", formedAt: "O3" });
+  });
+});
+
+describe("capture", () => {
+  it("captures one opponent piece after a movement-phase jare", () => {
+    let state = createMovementState();
+    state = {
+      ...state,
+      currentPlayer: "A",
+      board: {
+        ...state.board,
+        O1: "A",
+        O2: "A",
+        O3: null,
+        O4: "A",
+        O8: "B",
+      },
+    };
+
+    state = apply(state, {
+      type: "move",
+      player: "A",
+      from: "O4",
+      to: "O3",
+    });
+    state = apply(state, { type: "capture", player: "A", point: "O8" });
+
+    expect(state.phase).toBe("movement");
+    expect(state.currentPlayer).toBe("B");
+    expect(state.pendingCapture).toBeNull();
+    expect(state.board.O8).toBeNull();
+    expect(state.players.A.captured).toBe(1);
+    expect(state.draw.turnsSinceCapture).toBe(0);
+  });
+
+  it("ends the game when a capture reduces the opponent below three pieces", () => {
+    let state: GameState = {
+      ...createMovementState(),
+      phase: "capture",
+      currentPlayer: "A",
+      pendingCapture: { player: "A", formedAt: "O3" },
+      board: {
+        ...createMovementState().board,
+        O1: "A",
+        O2: "A",
+        O3: "A",
+        O4: "B",
+        O5: "B",
+        O6: "B",
+        O7: null,
+        O8: null,
+        M1: null,
+        M3: null,
+        M5: null,
+        M7: null,
+        I2: null,
+        I4: null,
+        I6: null,
+        I8: null,
+      },
+    };
+
+    state = apply(state, { type: "capture", player: "A", point: "O4" });
+
+    expect(state.phase).toBe("gameOver");
+    expect(state.winner).toBe("A");
+    expect(state.endReason).toBe("opponentBelowThree");
+  });
 });
 
 describe("scripted reducer flow", () => {
@@ -475,26 +593,40 @@ describe("scripted reducer flow", () => {
     expect(piecesFor(state, "B")).toBe(11);
 
     state = apply(state, { type: "move", player: "A", from: "O3", to: "O2" });
-    state = apply(state, { type: "move", player: "B", from: "O4", to: "O3" });
-    state = apply(state, { type: "move", player: "A", from: "O2", to: "O1" });
+
+    expect(state.phase).toBe("capture");
+
+    state = apply(state, { type: "capture", player: "A", point: "O4" });
+    state = apply(state, { type: "move", player: "B", from: "O8", to: "O1" });
+    state = apply(state, { type: "move", player: "A", from: "O2", to: "O3" });
 
     expect(state.currentPlayer).toBe("B");
-    expect(state.board.O1).toBe("A");
+    expect(state.board.O1).toBe("B");
     expect(state.board.O2).toBeNull();
-    expect(state.board.O3).toBe("B");
+    expect(state.board.O3).toBe("A");
     expect(state.board.O4).toBeNull();
   });
 });
 
-describe("unsupported actions", () => {
-  it("rejects capture and resign until M3", () => {
+describe("terminal actions", () => {
+  it("rejects capture outside a pending capture", () => {
     const state = createInitialState("A");
 
     expectError(
       state,
       { type: "capture", player: "A", point: "O1" },
-      "unsupportedAction",
+      "wrongPhase",
     );
-    expectError(state, { type: "resign", player: "A" }, "unsupportedAction");
+  });
+
+  it("allows a player to resign", () => {
+    const state = apply(createInitialState("A"), {
+      type: "resign",
+      player: "A",
+    });
+
+    expect(state.phase).toBe("gameOver");
+    expect(state.winner).toBe("B");
+    expect(state.endReason).toBe("resignation");
   });
 });

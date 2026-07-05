@@ -10,6 +10,14 @@ describe("createInitialState", () => {
     expect(state.currentPlayer).toBe("B");
     expect(state.startingPlayer).toBe("B");
     expect(state.firstAdvantage).toBeNull();
+    expect(state.initialRemoval.removedBy).toEqual({ A: false, B: false });
+    expect(state.pendingCapture).toBeNull();
+    expect(state.draw).toEqual({
+      turnsSinceCapture: 0,
+      repeatedPositions: {},
+    });
+    expect(state.winner).toBeNull();
+    expect(state.endReason).toBeNull();
     expect(Object.keys(state.board)).toHaveLength(POINT_IDS.length);
 
     for (const id of POINT_IDS) {

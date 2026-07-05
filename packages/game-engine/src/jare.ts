@@ -27,7 +27,32 @@ export function completesJare(
   point: PointId,
   player: PlayerId,
 ): boolean {
-  return JARE_LINES_BY_POINT[point].some((line) =>
+  return completedJareLines(board, point, player).length > 0;
+}
+
+export function completedJareLines(
+  board: BoardOccupancy,
+  point: PointId,
+  player: PlayerId,
+): readonly JareLine[] {
+  return JARE_LINES_BY_POINT[point].filter((line) =>
     line.every((id) => board[id] === player),
+  );
+}
+
+/**
+ * A repeated jare earns a capture only when the move newly completes a line
+ * that was not complete before the move. This keeps the rule stateless.
+ */
+export function formsNewJare(
+  before: BoardOccupancy,
+  after: BoardOccupancy,
+  point: PointId,
+  player: PlayerId,
+): boolean {
+  return JARE_LINES_BY_POINT[point].some(
+    (line) =>
+      line.every((id) => after[id] === player) &&
+      !line.every((id) => before[id] === player),
   );
 }

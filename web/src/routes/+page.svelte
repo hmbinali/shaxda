@@ -16,7 +16,7 @@
       <strong class="text-xl tracking-normal">{messages.so.appName}</strong>
       <span
         class="rounded border border-board-700/25 px-2 py-1 text-sm text-board-700"
-        >M0</span
+        >F1</span
       >
     </div>
 
@@ -33,7 +33,6 @@
         {messages.so.foundationSummary}
       </p>
     </div>
-
-    <p class="text-sm text-board-700">{messages.en.foundationSummary}</p>
+    <p class="text-sm text-board-700">Soomaali keliya - ciyaar marti ah</p>
   </section>
 </main>

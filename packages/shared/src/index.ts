@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export * from "./fixtures";
+export * from "./schemas";
+
 export const appMetadata = {
   id: "shaxda",
   name: "Shaxda",

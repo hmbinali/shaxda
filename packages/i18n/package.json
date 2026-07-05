@@ -16,9 +16,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@inlang/paraglide-js": "^2.20.2"
-  },
   "devDependencies": {
     "typescript": "^5.8.3",
     "vitest": "^4.1.9"

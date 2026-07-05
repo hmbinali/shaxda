@@ -134,10 +134,16 @@ export const drawFixture: GameState = {
   ...baseMovementState("A", {
     O1: "A",
     O2: "A",
-    O4: "B",
+    O3: "A",
     O5: "B",
+    O6: "B",
+    O7: "B",
   }),
   phase: "gameOver",
+  players: {
+    A: { inHand: 0, captured: 8 },
+    B: { inHand: 0, captured: 8 },
+  },
   winner: null,
   endReason: "drawTermination",
   draw: {

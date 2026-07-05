@@ -21,6 +21,17 @@ describe("serialization", () => {
       "Invalid serialized game state",
     );
   });
+
+  it("rejects serialized states with unknown phase or end reason values", () => {
+    const state = createInitialState("A");
+
+    expect(() =>
+      deserialize(JSON.stringify({ ...state, phase: "paused" })),
+    ).toThrow("Invalid serialized game state");
+    expect(() =>
+      deserialize(JSON.stringify({ ...state, endReason: "timeout" })),
+    ).toThrow("Invalid serialized game state");
+  });
 });
 
 describe("action logs", () => {

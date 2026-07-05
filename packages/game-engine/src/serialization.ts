@@ -108,12 +108,12 @@ function isGameStateLike(value: unknown): value is GameState {
   const state = value as Partial<GameState>;
 
   return (
-    typeof state.phase === "string" &&
+    isPhase(state.phase) &&
     isPlayer(state.currentPlayer) &&
     isPlayer(state.startingPlayer) &&
     (state.firstAdvantage === null || isPlayer(state.firstAdvantage)) &&
     (state.winner === null || isPlayer(state.winner)) &&
-    (typeof state.endReason === "string" || state.endReason === null) &&
+    (state.endReason === null || isGameEndReason(state.endReason)) &&
     isBoard(state.board) &&
     isRecord(state.players) &&
     isRecord(state.players.A) &&
@@ -150,6 +150,27 @@ function isPointState(value: unknown): value is PointState {
 
 function isPlayer(value: unknown): value is PlayerId {
   return value === "A" || value === "B";
+}
+
+function isPhase(value: unknown): value is GameState["phase"] {
+  return (
+    value === "placement" ||
+    value === "initialRemoval" ||
+    value === "movement" ||
+    value === "capture" ||
+    value === "gameOver"
+  );
+}
+
+function isGameEndReason(value: unknown): value is GameState["endReason"] {
+  return (
+    value === "opponentBelowThree" ||
+    value === "opponentCapturedAll" ||
+    value === "resignation" ||
+    value === "drawTermination" ||
+    value === "bothBlocked" ||
+    value === "forcedJareSpaceMaking"
+  );
 }
 
 function isPointId(value: unknown): value is (typeof POINT_IDS)[number] {

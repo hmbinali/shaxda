@@ -29,6 +29,19 @@ describe("game contract schemas", () => {
     }
   });
 
+  it("keeps draw fixtures above the below-three win threshold", () => {
+    const pieceCounts = Object.fromEntries(
+      ["A", "B"].map((player) => [
+        player,
+        Object.values(gameFixtures.draw.board).filter(
+          (owner) => owner === player,
+        ).length,
+      ]),
+    );
+
+    expect(pieceCounts).toEqual({ A: 3, B: 3 });
+  });
+
   it("roundtrips every fixture through engine serialization", () => {
     for (const fixture of Object.values(gameFixtures)) {
       expect(deserialize(serialize(fixture))).toEqual(fixture);

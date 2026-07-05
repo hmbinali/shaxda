@@ -10,13 +10,24 @@
     "dev:worker": "pnpm --filter @shaxda/worker dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "lint:staged": "lint-staged",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:watch": "vitest --watch",
     "test:worker": "turbo run test:worker",
     "test:e2e": "playwright test",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "format": "turbo run format"
+    "format": "turbo run format",
+    "prepare": "node scripts/install-git-hooks.mjs"
+  },
+  "lint-staged": {
+    "*.{cjs,js,mjs,ts,svelte}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,json,md,toml,yaml,yml}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@playwright/test": "^1.54.1",
@@ -25,6 +36,7 @@
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-svelte": "^3.9.0",
     "globals": "^16.3.0",
+    "lint-staged": "^17.0.8",
     "prettier": "^3.6.2",
     "prettier-plugin-svelte": "^3.4.0",
     "svelte-eslint-parser": "^1.2.0",

@@ -39,28 +39,28 @@ The product should feel like a modern Somali wooden board game: warm wood, carve
 
 ### Included in V1.0
 
-| Area | Decision |
-|---|---|
-| Local offline 2-player | Yes |
-| Live online 2-player | Yes |
-| Guest casual invite games | Yes |
-| Logged-in games | No, V1.1 |
-| Accounts | No, V1.1 |
-| Google login | No, V1.1 |
-| Username system | Guest display name only in V1.0; permanent usernames in V1.1 |
-| Match history | No, V1.1 |
-| Leaderboard | No, V1.1 |
-| Replay viewer | No, V1.1 |
-| PWA install | Yes |
-| Offline support | Local mode works offline after app shell is cached |
-| Languages | Somali only in V1.0 |
-| Default language | Somali |
-| English/i18n | Future-friendly structure only; no visible English toggle/routes in V1.0 |
-| Visual style | Modern wooden 2.5D |
-| Board renderer | SVG |
-| Sound | Native Web Audio |
-| Online model | Server-authoritative |
-| Infrastructure | Cloudflare-first |
+| Area                      | Decision                                                                 |
+| ------------------------- | ------------------------------------------------------------------------ |
+| Local offline 2-player    | Yes                                                                      |
+| Live online 2-player      | Yes                                                                      |
+| Guest casual invite games | Yes                                                                      |
+| Logged-in games           | No, V1.1                                                                 |
+| Accounts                  | No, V1.1                                                                 |
+| Google login              | No, V1.1                                                                 |
+| Username system           | Guest display name only in V1.0; permanent usernames in V1.1             |
+| Match history             | No, V1.1                                                                 |
+| Leaderboard               | No, V1.1                                                                 |
+| Replay viewer             | No, V1.1                                                                 |
+| PWA install               | Yes                                                                      |
+| Offline support           | Local mode works offline after app shell is cached                       |
+| Languages                 | Somali only in V1.0                                                      |
+| Default language          | Somali                                                                   |
+| English/i18n              | Future-friendly structure only; no visible English toggle/routes in V1.0 |
+| Visual style              | Modern wooden 2.5D                                                       |
+| Board renderer            | SVG                                                                      |
+| Sound                     | Native Web Audio                                                         |
+| Online model              | Server-authoritative                                                     |
+| Infrastructure            | Cloudflare-first                                                         |
 
 ### Excluded from V1.0
 
@@ -176,55 +176,55 @@ When built in V1.1, it should use:
 
 ## 6. Product Decisions
 
-| Decision | V1.0 Choice |
-|---|---|
-| Main format | Website + installable PWA |
-| Main audience | Somali-first, diaspora-friendly |
-| Languages | Somali only |
-| English | V1.1 unless strong post-launch evidence says otherwise |
-| Monetization | None in V1.0 |
-| Game timer | No visible chess clock |
-| Turn housekeeping | Reconnect grace, idle nudge, claim-win after disconnect/idle grace, abandoned-room cleanup |
-| AI | Not in V1.0 |
-| 3D | Not in V1.0 |
-| Future 3D support | Renderer stays swappable |
-| Sound | Native Web Audio |
-| Backend | Cloudflare Workers + Durable Objects |
-| Auth | None in V1.0; Better Auth + Google in V1.1 |
-| Database | Not required for core V1.0 gameplay; D1 may be used for tiny summary events and V1.1 persistence |
-| Local save | localStorage |
-| Small prefs | localStorage |
+| Decision          | V1.0 Choice                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------ |
+| Main format       | Website + installable PWA                                                                        |
+| Main audience     | Somali-first, diaspora-friendly                                                                  |
+| Languages         | Somali only                                                                                      |
+| English           | V1.1 unless strong post-launch evidence says otherwise                                           |
+| Monetization      | None in V1.0                                                                                     |
+| Game timer        | No visible chess clock                                                                           |
+| Turn housekeeping | Reconnect grace, idle nudge, claim-win after disconnect/idle grace, abandoned-room cleanup       |
+| AI                | Not in V1.0                                                                                      |
+| 3D                | Not in V1.0                                                                                      |
+| Future 3D support | Renderer stays swappable                                                                         |
+| Sound             | Native Web Audio                                                                                 |
+| Backend           | Cloudflare Workers + Durable Objects                                                             |
+| Auth              | None in V1.0; Better Auth + Google in V1.1                                                       |
+| Database          | Not required for core V1.0 gameplay; D1 may be used for tiny summary events and V1.1 persistence |
+| Local save        | localStorage                                                                                     |
+| Small prefs       | localStorage                                                                                     |
 
 ---
 
 ## 7. Final Tech Stack
 
-| Layer | Choice | Notes |
-|---|---|---|
-| Language | TypeScript | Shared across frontend, backend, engine, validation, and tests. |
-| Monorepo | pnpm workspaces + Turborepo | Apps and packages stay organized. |
-| Web framework | SvelteKit | Marketing, rules, and game app in one project. |
-| Hosting/runtime | Cloudflare Workers + static assets | Low-maintenance, Cloudflare-first deployment. |
-| Cloudflare adapter | Native SvelteKit Cloudflare adapter | No Next.js/OpenNext. |
-| Client state | Svelte stores | Enough for local and online game state. |
-| Styling | Tailwind CSS + shadcn-svelte | Fast UI development with custom design control. |
-| Board rendering | SVG | Lightweight, crisp, easy to animate, easy to swap later. |
-| Animation | Svelte transitions + spring/tween motion | Placement, movement, selection, jare, capture, invalid move, win. |
-| Sound | Native Web Audio | V1.0 uses direct Web Audio utility. No Howler.js. |
-| Realtime | Durable Objects + WebSockets | One Durable Object per online match. |
-| WebSocket cost control | Durable Object WebSocket Hibernation | Required. |
-| Database | Cloudflare D1 | Optional tiny V1.0 summary events; main use is V1.1 users, matches, replay, leaderboard. |
-| ORM | Drizzle ORM | Use when D1 persistence is introduced. |
-| Auth | Better Auth | V1.1 only, Google login only. |
-| Validation | Zod | WebSocket messages, API payloads, moves, important user input. |
-| i18n | Future-friendly content structure | No full English/i18n in V1.0. Paraglide/Inlang may be introduced in V1.1. |
-| PWA | `@vite-pwa/sveltekit` | Installable app and offline local mode. |
-| Unit tests | Vitest | Game engine and pure functions. |
-| Worker tests | Workers Vitest pool / Miniflare | Workers, Durable Objects, WebSockets, alarms, optional D1. |
-| E2E tests | Playwright | Local game, online room, reconnect, claim-win. |
-| Analytics | Cloudflare Web Analytics + optional D1 summary events | No high-volume analytics in V1.0. |
-| Error monitoring | Cloudflare logs first | Add Sentry later only if needed. |
-| Domain | Namecheap + Cloudflare DNS | Buy domain on Namecheap, manage DNS in Cloudflare. |
+| Layer                  | Choice                                                | Notes                                                                                    |
+| ---------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Language               | TypeScript                                            | Shared across frontend, backend, engine, validation, and tests.                          |
+| Monorepo               | pnpm workspaces + Turborepo                           | Apps and packages stay organized.                                                        |
+| Web framework          | SvelteKit                                             | Marketing, rules, and game app in one project.                                           |
+| Hosting/runtime        | Cloudflare Workers + static assets                    | Low-maintenance, Cloudflare-first deployment.                                            |
+| Cloudflare adapter     | Native SvelteKit Cloudflare adapter                   | No Next.js/OpenNext.                                                                     |
+| Client state           | Svelte stores                                         | Enough for local and online game state.                                                  |
+| Styling                | Tailwind CSS + shadcn-svelte                          | Fast UI development with custom design control.                                          |
+| Board rendering        | SVG                                                   | Lightweight, crisp, easy to animate, easy to swap later.                                 |
+| Animation              | Svelte transitions + spring/tween motion              | Placement, movement, selection, jare, capture, invalid move, win.                        |
+| Sound                  | Native Web Audio                                      | V1.0 uses direct Web Audio utility. No Howler.js.                                        |
+| Realtime               | Durable Objects + WebSockets                          | One Durable Object per online match.                                                     |
+| WebSocket cost control | Durable Object WebSocket Hibernation                  | Required.                                                                                |
+| Database               | Cloudflare D1                                         | Optional tiny V1.0 summary events; main use is V1.1 users, matches, replay, leaderboard. |
+| ORM                    | Drizzle ORM                                           | Use when D1 persistence is introduced.                                                   |
+| Auth                   | Better Auth                                           | V1.1 only, Google login only.                                                            |
+| Validation             | Zod                                                   | WebSocket messages, API payloads, moves, important user input.                           |
+| i18n                   | Future-friendly content structure                     | No full English/i18n in V1.0. Paraglide/Inlang may be introduced in V1.1.                |
+| PWA                    | `@vite-pwa/sveltekit`                                 | Installable app and offline local mode.                                                  |
+| Unit tests             | Vitest                                                | Game engine and pure functions.                                                          |
+| Worker tests           | Workers Vitest pool / Miniflare                       | Workers, Durable Objects, WebSockets, alarms, optional D1.                               |
+| E2E tests              | Playwright                                            | Local game, online room, reconnect, claim-win.                                           |
+| Analytics              | Cloudflare Web Analytics + optional D1 summary events | No high-volume analytics in V1.0.                                                        |
+| Error monitoring       | Cloudflare logs first                                 | Add Sentry later only if needed.                                                         |
+| Domain                 | Namecheap + Cloudflare DNS                            | Buy domain on Namecheap, manage DNS in Cloudflare.                                       |
 
 ---
 
@@ -349,13 +349,13 @@ Do not implement game rules inside Svelte components or Worker handlers. Those l
 
 Before finalizing the engine, the game rules document should explicitly answer these items:
 
-| Gap | Required decision |
-|---|---|
-| Draw / termination rule | Define how games end if players repeat positions or avoid captures forever. |
-| Both players blocked | Define result when the current player is blocked and the opponent cannot legally make space. |
-| Space-making move impossible without forming jare | Define whether to allow the jare but forbid capture, or declare draw. |
-| Multi-jare placement | Define whether one placement can complete multiple jare lines and how first advantage is handled. |
-| Idle-but-connected opponent online | Define housekeeping behavior for a player who stays connected but does not move. |
+| Gap                                               | Required decision                                                                                 |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Draw / termination rule                           | Define how games end if players repeat positions or avoid captures forever.                       |
+| Both players blocked                              | Define result when the current player is blocked and the opponent cannot legally make space.      |
+| Space-making move impossible without forming jare | Define whether to allow the jare but forbid capture, or declare draw.                             |
+| Multi-jare placement                              | Define whether one placement can complete multiple jare lines and how first advantage is handled. |
+| Idle-but-connected opponent online                | Define housekeeping behavior for a player who stays connected but does not move.                  |
 
 These are rules/product decisions, not implementation details. Agents must not invent them inside engine code.
 
@@ -831,10 +831,10 @@ Use Conductor as a multi-agent workspace, not as a one-shot generator.
 
 ### Agent Usage
 
-| Agent | Best Use |
-|---|---|
+| Agent  | Best Use                                                         |
+| ------ | ---------------------------------------------------------------- |
 | Claude | Architecture, refactors, UI/UX, docs, reviews, complex reasoning |
-| Codex | Implementation tasks, tests, small features, fixes |
+| Codex  | Implementation tasks, tests, small features, fixes               |
 
 ### Workflow Rules
 

@@ -24,10 +24,10 @@
   "lint-staged": {
     "*.{cjs,js,mjs,ts,svelte}": [
       "eslint --fix",
-      "prettier --write"
+      "prettier --write --ignore-unknown"
     ],
     "*.{css,json,md,toml,yaml,yml}": [
-      "prettier --write"
+      "prettier --write --ignore-unknown"
     ]
   },
   "devDependencies": {

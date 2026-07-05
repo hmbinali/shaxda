@@ -37,6 +37,10 @@ function piecesOnBoard(state: GameState): number {
   return POINT_IDS.filter((point) => state.board[point] !== null).length;
 }
 
+function piecesFor(state: GameState, player: "A" | "B"): number {
+  return POINT_IDS.filter((point) => state.board[point] === player).length;
+}
+
 /**
  * Full 24-placement order in which neither player ever completes a jare.
  * The starter ends up on {ring odds of O/I, ring evens of M}, the other
@@ -258,6 +262,111 @@ describe("placement", () => {
     expect(state.players.A.inHand).toBe(0);
     expect(state.players.B.inHand).toBe(0);
     expect(state.currentPlayer).toBe(state.firstAdvantage);
+  });
+});
+
+describe("initial removal", () => {
+  it("lets the first-advantage player remove first, then passes removal to the opponent", () => {
+    const state = placeAll(createInitialState("A"), NO_JARE_ORDER);
+
+    expect(state.firstAdvantage).toBe("B");
+    expect(state.currentPlayer).toBe("B");
+
+    const afterRemoval = apply(state, {
+      type: "removeInitial",
+      player: "B",
+      point: "O1",
+    });
+
+    expect(afterRemoval.board.O1).toBeNull();
+    expect(afterRemoval.phase).toBe("initialRemoval");
+    expect(afterRemoval.currentPlayer).toBe("A");
+    expect(piecesOnBoard(afterRemoval)).toBe(23);
+  });
+
+  it("rejects out-of-turn initial removal", () => {
+    const state = placeAll(createInitialState("A"), NO_JARE_ORDER);
+
+    expectError(
+      state,
+      { type: "removeInitial", player: "A", point: "O2" },
+      "notYourTurn",
+    );
+  });
+
+  it("rejects initial removal outside the initial-removal phase", () => {
+    expectError(
+      createInitialState("A"),
+      { type: "removeInitial", player: "A", point: "O1" },
+      "wrongPhase",
+    );
+  });
+
+  it("rejects removing empty points and own pieces", () => {
+    const state = placeAll(createInitialState("A"), NO_JARE_ORDER);
+
+    expectError(
+      { ...state, board: { ...state.board, O1: null } },
+      { type: "removeInitial", player: "B", point: "O1" },
+      "pointEmpty",
+    );
+    expectError(
+      state,
+      { type: "removeInitial", player: "B", point: "O2" },
+      "notOpponentPiece",
+    );
+  });
+
+  it("allows removing an opponent piece inside a jare", () => {
+    const state = placeAll(createInitialState("A"), NO_JARE_ORDER);
+    const withOpponentJare: GameState = {
+      ...state,
+      currentPlayer: "A",
+      firstAdvantage: "A",
+      board: {
+        ...state.board,
+        O1: "B",
+        O2: "B",
+        O3: "B",
+      },
+    };
+
+    const afterRemoval = apply(withOpponentJare, {
+      type: "removeInitial",
+      player: "A",
+      point: "O2",
+    });
+
+    expect(afterRemoval.board.O2).toBeNull();
+  });
+
+  it("transitions to movement after both players remove one piece", () => {
+    const afterFirstRemoval = apply(
+      placeAll(createInitialState("A"), NO_JARE_ORDER),
+      { type: "removeInitial", player: "B", point: "O1" },
+    );
+    const afterSecondRemoval = apply(afterFirstRemoval, {
+      type: "removeInitial",
+      player: "A",
+      point: "O2",
+    });
+
+    expect(afterSecondRemoval.phase).toBe("movement");
+    expect(afterSecondRemoval.currentPlayer).toBe("B");
+    expect(piecesOnBoard(afterSecondRemoval)).toBe(22);
+    expect(piecesFor(afterSecondRemoval, "A")).toBe(11);
+    expect(piecesFor(afterSecondRemoval, "B")).toBe(11);
+    expect(afterSecondRemoval.players.A.captured).toBe(0);
+    expect(afterSecondRemoval.players.B.captured).toBe(0);
+  });
+
+  it("does not mutate the input state", () => {
+    const state = placeAll(createInitialState("A"), NO_JARE_ORDER);
+    const snapshot = structuredClone(state);
+
+    apply(state, { type: "removeInitial", player: "B", point: "O1" });
+
+    expect(state).toEqual(snapshot);
   });
 });
 

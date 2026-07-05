@@ -30,6 +30,7 @@ export function applyAction(
     case "place":
       return applyPlace(state, action.player, action.point);
     case "removeInitial":
+      return applyRemoveInitial(state, action.player, action.point);
     case "move":
     case "capture":
     case "resign":
@@ -96,6 +97,53 @@ function applyPlace(
       board,
       players,
       firstAdvantage,
+      currentPlayer: otherPlayer(player),
+    },
+  };
+}
+
+function applyRemoveInitial(
+  state: GameState,
+  player: PlayerId,
+  point: PointId,
+): ActionResult {
+  if (state.phase !== "initialRemoval") {
+    return fail("wrongPhase");
+  }
+  if (player !== state.currentPlayer) {
+    return fail("notYourTurn");
+  }
+
+  const occupant = state.board[point];
+  if (occupant === null) {
+    return fail("pointEmpty");
+  }
+  if (occupant === player) {
+    return fail("notOpponentPiece");
+  }
+
+  const board = { ...state.board, [point]: null };
+  const piecesOnBoard = Object.values(board).filter(
+    (owner) => owner !== null,
+  ).length;
+
+  if (piecesOnBoard === 22) {
+    return {
+      ok: true,
+      state: {
+        ...state,
+        board,
+        phase: "movement",
+        currentPlayer: state.firstAdvantage ?? state.currentPlayer,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      board,
       currentPlayer: otherPlayer(player),
     },
   };

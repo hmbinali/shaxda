@@ -180,9 +180,8 @@ Monetization is post-V1 only after the game is finished and has users.
 ## Repository Layout
 
 ```txt
-apps/
-  web/              # SvelteKit site + game UI + PWA
-  worker/           # Cloudflare Worker + Durable Objects
+web/                # SvelteKit site + game UI + PWA
+worker/             # Cloudflare Worker + Durable Objects
 
 packages/
   game-engine/      # Pure TS Shaxda rules

@@ -6,7 +6,7 @@
 
 [scripts]
 setup = "corepack enable && pnpm install"
-archive = "rm -rf apps/web/.svelte-kit apps/web/build apps/worker/.wrangler"
+archive = "rm -rf web/.svelte-kit web/build worker/.wrangler"
 run_mode = "concurrent"
 
 # Main SvelteKit dev server.

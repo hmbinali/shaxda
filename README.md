@@ -25,9 +25,8 @@ pnpm build
 ## Workspace Layout
 
 ```txt
-apps/
-  web/              # SvelteKit site and game UI
-  worker/           # Cloudflare Worker
+web/                # SvelteKit site and game UI
+worker/             # Cloudflare Worker
 packages/
   game-engine/      # Pure TypeScript rules package
   shared/           # Shared schemas and types

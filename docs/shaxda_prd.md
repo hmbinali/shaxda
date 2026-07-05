@@ -192,9 +192,8 @@ Requirements:
 
 ```txt
 shaxda/
-  apps/
-    web/              # SvelteKit marketing site + game app + PWA
-    worker/           # Cloudflare Worker APIs + Durable Objects
+  web/                # SvelteKit marketing site + game app + PWA
+  worker/             # Cloudflare Worker APIs + Durable Objects
 
   packages/
     game-engine/      # Pure TypeScript Shaxda rules engine

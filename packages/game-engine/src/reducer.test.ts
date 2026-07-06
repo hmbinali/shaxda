@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { POINT_IDS } from "./board";
-import { applyAction } from "./reducer";
+import { applyAction, getActingPlayer } from "./reducer";
 import { createInitialState } from "./state";
-import type { GameAction, GameState, PointId } from "./types";
+import type {
+  BoardOccupancy,
+  GameAction,
+  GameState,
+  PlayerId,
+  PointId,
+} from "./types";
 
 function apply(state: GameState, action: GameAction): GameState {
   const result = applyAction(state, action);
@@ -52,6 +58,49 @@ function createMovementState(): GameState {
     player: "A",
     point: "O2",
   });
+}
+
+function baseMovementState(
+  currentPlayer: PlayerId,
+  pieces: Partial<Record<PointId, PlayerId>>,
+  overrides: Partial<GameState> = {},
+): GameState {
+  const state = createInitialState("A");
+
+  return {
+    ...state,
+    ...overrides,
+    phase: "movement",
+    currentPlayer,
+    firstAdvantage: "A",
+    players: {
+      A: { inHand: 0, captured: 0 },
+      B: { inHand: 0, captured: 0 },
+    },
+    initialRemoval: {
+      removedBy: { A: true, B: true },
+    },
+    board: boardWith(pieces),
+    pendingCapture: null,
+    winner: null,
+    endReason: null,
+  };
+}
+
+function boardWith(
+  pieces: Partial<Record<PointId, PlayerId | null>>,
+): BoardOccupancy {
+  const emptyBoard = Object.fromEntries(
+    POINT_IDS.map((point) => [point, null]),
+  ) as BoardOccupancy;
+
+  return { ...emptyBoard, ...pieces };
+}
+
+function movementPositionKey(state: GameState): string {
+  const board = POINT_IDS.map((point) => state.board[point] ?? "-").join("");
+
+  return `${state.phase}|${state.pendingCapture === null ? "none" : "capture"}|${state.currentPlayer}|${board}`;
 }
 
 /**
@@ -506,6 +555,162 @@ describe("movement", () => {
     expect(afterMove.phase).toBe("capture");
     expect(afterMove.currentPlayer).toBe("A");
     expect(afterMove.pendingCapture).toEqual({ player: "A", formedAt: "O3" });
+  });
+
+  it("does not capture from a standing unchanged jare", () => {
+    const state = baseMovementState("A", {
+      O1: "A",
+      O2: "A",
+      O3: "A",
+      O4: "A",
+      O6: "B",
+      O8: "B",
+      M1: "B",
+    });
+
+    const afterMove = apply(state, {
+      type: "move",
+      player: "A",
+      from: "O4",
+      to: "O5",
+    });
+
+    expect(afterMove.phase).toBe("movement");
+    expect(afterMove.pendingCapture).toBeNull();
+    expect(afterMove.currentPlayer).toBe("B");
+  });
+
+  it("allows a broken jare to be re-formed for another capture", () => {
+    let state = baseMovementState("A", {
+      O1: "A",
+      O2: "A",
+      O4: "A",
+      O5: "B",
+      O6: "B",
+      O8: "B",
+      M1: "B",
+      M2: "B",
+    });
+
+    state = apply(state, { type: "move", player: "A", from: "O4", to: "O3" });
+
+    expect(state.phase).toBe("capture");
+
+    state = apply(state, { type: "capture", player: "A", point: "M1" });
+    state = apply(state, { type: "move", player: "B", from: "M2", to: "M3" });
+    state = apply(state, { type: "move", player: "A", from: "O3", to: "O4" });
+    state = apply(state, { type: "move", player: "B", from: "M3", to: "M2" });
+    state = apply(state, { type: "move", player: "A", from: "O4", to: "O3" });
+
+    expect(state.phase).toBe("capture");
+    expect(state.pendingCapture).toEqual({ player: "A", formedAt: "O3" });
+  });
+
+  it("requires the opponent to make immediate non-jare space for a blocked player", () => {
+    const state = baseMovementState("A", {
+      O1: "A",
+      M1: "A",
+      I1: "A",
+      O2: "B",
+      O4: "B",
+      O8: "B",
+      M2: "B",
+      M8: "B",
+      I2: "B",
+      I8: "B",
+    });
+
+    expect(getActingPlayer(state)).toBe("B");
+    expectError(
+      state,
+      { type: "move", player: "A", from: "O1", to: "O2" },
+      "notYourTurn",
+    );
+    expectError(
+      state,
+      { type: "move", player: "B", from: "O4", to: "O5" },
+      "notSpaceMaking",
+    );
+
+    const afterSpaceMaking = apply(state, {
+      type: "move",
+      player: "B",
+      from: "O2",
+      to: "O3",
+    });
+
+    expect(afterSpaceMaking.phase).toBe("movement");
+    expect(afterSpaceMaking.currentPlayer).toBe("A");
+    expect(getActingPlayer(afterSpaceMaking)).toBe("A");
+    expect(afterSpaceMaking.board.O2).toBeNull();
+    expect(afterSpaceMaking.draw.turnsSinceCapture).toBe(1);
+  });
+
+  it("ends in a draw after 80 movement turns without capture", () => {
+    const state = baseMovementState(
+      "A",
+      {
+        O1: "A",
+        M5: "B",
+      },
+      {
+        draw: {
+          turnsSinceCapture: 79,
+          repeatedPositions: {},
+        },
+      },
+    );
+
+    const afterMove = apply(state, {
+      type: "move",
+      player: "A",
+      from: "O1",
+      to: "O2",
+    });
+
+    expect(afterMove.phase).toBe("gameOver");
+    expect(afterMove.winner).toBeNull();
+    expect(afterMove.endReason).toBe("drawTermination");
+    expect(afterMove.draw.turnsSinceCapture).toBe(80);
+  });
+
+  it("ends in a draw when a movement position occurs for the third time", () => {
+    const before = baseMovementState("A", {
+      O1: "A",
+      M5: "B",
+    });
+    const afterBoard: BoardOccupancy = {
+      ...before.board,
+      O1: null,
+      O2: "A",
+    };
+    const repeatedState = {
+      ...before,
+      board: afterBoard,
+      currentPlayer: "B" as const,
+    };
+    const repeatedKey = movementPositionKey(repeatedState);
+    const state: GameState = {
+      ...before,
+      draw: {
+        turnsSinceCapture: 4,
+        repeatedPositions: {
+          [repeatedKey]: 2,
+        },
+      },
+    };
+
+    const afterMove = apply(state, {
+      type: "move",
+      player: "A",
+      from: "O1",
+      to: "O2",
+    });
+
+    expect(afterMove.phase).toBe("gameOver");
+    expect(afterMove.winner).toBeNull();
+    expect(afterMove.endReason).toBe("drawTermination");
+    expect(afterMove.draw.repeatedPositions[repeatedKey]).toBe(3);
   });
 });
 

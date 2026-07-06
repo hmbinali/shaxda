@@ -1,6 +1,12 @@
-import { deserialize, replayActions, serialize } from "@shaxda/game-engine";
+import {
+  applyActionLog,
+  deserialize,
+  replayActions,
+  serialize,
+} from "@shaxda/game-engine";
 import { describe, expect, it } from "vitest";
 import {
+  a2ConformanceActionScripts,
   clientMessageSchema,
   fullGameActionScripts,
   gameActionSchema,
@@ -30,16 +36,43 @@ describe("game contract schemas", () => {
   });
 
   it("keeps draw fixtures above the below-three win threshold", () => {
-    const pieceCounts = Object.fromEntries(
-      ["A", "B"].map((player) => [
-        player,
-        Object.values(gameFixtures.draw.board).filter(
-          (owner) => owner === player,
-        ).length,
-      ]),
-    );
+    for (const fixture of [
+      gameFixtures.draw,
+      gameFixtures.drawByEightyTurns,
+      gameFixtures.drawByRepetition,
+      gameFixtures.forcedJareSpaceMaking,
+    ]) {
+      const pieceCounts = Object.fromEntries(
+        ["A", "B"].map((player) => [
+          player,
+          Object.values(fixture.board).filter((owner) => owner === player)
+            .length,
+        ]),
+      );
 
-    expect(pieceCounts).toEqual({ A: 3, B: 3 });
+      expect(pieceCounts.A).toBeGreaterThanOrEqual(3);
+      expect(pieceCounts.B).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("includes A2 draw and blocked fixtures", () => {
+    expect(gameFixtures.blockedSpaceMade.phase).toBe("movement");
+    expect(gameFixtures.blockedSpaceMade.currentPlayer).toBe("B");
+    expect(gameFixtures.drawByEightyTurns).toMatchObject({
+      phase: "gameOver",
+      winner: null,
+      endReason: "drawTermination",
+    });
+    expect(gameFixtures.drawByRepetition).toMatchObject({
+      phase: "gameOver",
+      winner: null,
+      endReason: "drawTermination",
+    });
+    expect(gameFixtures.forcedJareSpaceMaking).toMatchObject({
+      phase: "gameOver",
+      winner: null,
+      endReason: "forcedJareSpaceMaking",
+    });
   });
 
   it("roundtrips every fixture through engine serialization", () => {
@@ -104,6 +137,14 @@ describe("fixture action scripts", () => {
   it("replays to expected final states", () => {
     for (const script of fullGameActionScripts) {
       const result = replayActions(script.startingPlayer, script.actions);
+
+      expect(result).toEqual({ ok: true, state: script.expectedFinalState });
+    }
+  });
+
+  it("replays A2 conformance scenarios from explicit initial states", () => {
+    for (const script of a2ConformanceActionScripts) {
+      const result = applyActionLog(script.initialState, script.actions);
 
       expect(result).toEqual({ ok: true, state: script.expectedFinalState });
     }

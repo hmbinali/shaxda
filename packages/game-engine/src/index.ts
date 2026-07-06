@@ -7,9 +7,9 @@ export {
   formsNewJare,
   JARE_LINES_BY_POINT,
 } from "./jare";
-export { getLegalMoves } from "./moves";
+export { getLegalMoves, getSpaceMakingMoves, hasLegalMoves } from "./moves";
 export type { Move } from "./moves";
-export { applyAction } from "./reducer";
+export { applyAction, getActingPlayer } from "./reducer";
 export type { ActionError, ActionResult } from "./reducer";
 export {
   applyActionLog,

@@ -1,5 +1,6 @@
-import { ADJACENCY } from "./board";
+import { ADJACENCY, POINT_IDS } from "./board";
 import { completesJare, formsNewJare } from "./jare";
+import { getLegalMoves, getSpaceMakingMoves, hasLegalMoves } from "./moves";
 import type {
   BoardOccupancy,
   GameAction,
@@ -20,6 +21,7 @@ export type ActionError =
   | "destinationOccupied"
   | "noPiecesInHand"
   | "alreadyRemovedInitial"
+  | "notSpaceMaking"
   | "unsupportedAction";
 
 export type ActionResult =
@@ -27,6 +29,17 @@ export type ActionResult =
 
 export function otherPlayer(player: PlayerId): PlayerId {
   return player === "A" ? "B" : "A";
+}
+
+export function getActingPlayer(state: GameState): PlayerId {
+  if (
+    state.phase === "movement" &&
+    !hasLegalMoves(state, state.currentPlayer)
+  ) {
+    return otherPlayer(state.currentPlayer);
+  }
+
+  return state.currentPlayer;
 }
 
 const fail = (error: ActionError): ActionResult => ({ ok: false, error });
@@ -124,7 +137,17 @@ function applyMove(
   if (state.phase !== "movement") {
     return fail("wrongPhase");
   }
-  if (player !== state.currentPlayer) {
+
+  const currentPlayerBlocked = !hasLegalMoves(state, state.currentPlayer);
+  const spaceMakingFor =
+    currentPlayerBlocked && player === otherPlayer(state.currentPlayer)
+      ? state.currentPlayer
+      : null;
+
+  if (!currentPlayerBlocked && player !== state.currentPlayer) {
+    return fail("notYourTurn");
+  }
+  if (currentPlayerBlocked && spaceMakingFor === null) {
     return fail("notYourTurn");
   }
   if (state.board[from] !== player) {
@@ -136,28 +159,63 @@ function applyMove(
   if (state.board[to] !== null) {
     return fail("destinationOccupied");
   }
+  if (
+    spaceMakingFor !== null &&
+    !getSpaceMakingMoves(state, spaceMakingFor).some(
+      (move) => move.from === from && move.to === to,
+    )
+  ) {
+    return fail("notSpaceMaking");
+  }
 
   const board = {
     ...state.board,
     [from]: null,
     [to]: player,
   };
+
+  if (spaceMakingFor !== null) {
+    return {
+      ok: true,
+      state: finalizeMovementTurn(
+        {
+          ...state,
+          board,
+          phase: "movement",
+          pendingCapture: null,
+        },
+        spaceMakingFor,
+        { turnCompleted: true },
+      ),
+    };
+  }
+
   const hasPendingCapture = formsNewJare(state.board, board, to, player);
+
+  if (!hasPendingCapture) {
+    return {
+      ok: true,
+      state: finalizeMovementTurn(
+        {
+          ...state,
+          board,
+          phase: "movement",
+          pendingCapture: null,
+        },
+        otherPlayer(player),
+        { turnCompleted: true },
+      ),
+    };
+  }
 
   return {
     ok: true,
     state: {
       ...state,
       board,
-      phase: hasPendingCapture ? "capture" : "movement",
-      currentPlayer: hasPendingCapture ? player : otherPlayer(player),
-      pendingCapture: hasPendingCapture ? { player, formedAt: to } : null,
-      draw: hasPendingCapture
-        ? state.draw
-        : {
-            ...state.draw,
-            turnsSinceCapture: state.draw.turnsSinceCapture + 1,
-          },
+      phase: "capture",
+      currentPlayer: player,
+      pendingCapture: { player, formedAt: to },
     },
   };
 }
@@ -196,14 +254,16 @@ function applyRemoveInitial(
   if (initialRemoval.removedBy.A && initialRemoval.removedBy.B) {
     return {
       ok: true,
-      state: {
-        ...state,
-        board,
-        initialRemoval,
-        phase: "movement",
-        currentPlayer: state.firstAdvantage ?? state.currentPlayer,
-        pendingCapture: null,
-      },
+      state: finalizeMovementTurn(
+        {
+          ...state,
+          board,
+          initialRemoval,
+          phase: "movement",
+          pendingCapture: null,
+        },
+        state.firstAdvantage ?? state.currentPlayer,
+      ),
     };
   }
 
@@ -266,7 +326,7 @@ function applyCapture(
         pendingCapture: null,
         draw: {
           turnsSinceCapture: 0,
-          repeatedPositions: state.draw.repeatedPositions,
+          repeatedPositions: {},
         },
         winner: player,
         endReason,
@@ -276,18 +336,17 @@ function applyCapture(
 
   return {
     ok: true,
-    state: {
-      ...state,
-      board,
-      players,
-      phase: "movement",
-      currentPlayer: opponent,
-      pendingCapture: null,
-      draw: {
-        turnsSinceCapture: 0,
-        repeatedPositions: state.draw.repeatedPositions,
+    state: finalizeMovementTurn(
+      {
+        ...state,
+        board,
+        players,
+        phase: "movement",
+        pendingCapture: null,
       },
-    },
+      opponent,
+      { captured: true, turnCompleted: true },
+    ),
   };
 }
 
@@ -321,4 +380,88 @@ function getCaptureEndReason(pieceCount: number): GameEndReason | null {
     return "opponentBelowThree";
   }
   return null;
+}
+
+interface FinalizeMovementOptions {
+  captured?: boolean;
+  turnCompleted?: boolean;
+}
+
+function finalizeMovementTurn(
+  state: GameState,
+  nextPlayer: PlayerId,
+  options: FinalizeMovementOptions = {},
+): GameState {
+  const draw = options.captured
+    ? {
+        turnsSinceCapture: 0,
+        repeatedPositions: {},
+      }
+    : {
+        turnsSinceCapture: options.turnCompleted
+          ? state.draw.turnsSinceCapture + 1
+          : state.draw.turnsSinceCapture,
+        repeatedPositions: { ...state.draw.repeatedPositions },
+      };
+
+  const movementState: GameState = {
+    ...state,
+    phase: "movement",
+    currentPlayer: nextPlayer,
+    pendingCapture: null,
+    draw,
+    winner: null,
+    endReason: null,
+  };
+  const key = movementPositionKey(movementState);
+  const repeatedPositions = {
+    ...movementState.draw.repeatedPositions,
+    [key]: (movementState.draw.repeatedPositions[key] ?? 0) + 1,
+  };
+  const withRepetition: GameState = {
+    ...movementState,
+    draw: {
+      ...movementState.draw,
+      repeatedPositions,
+    },
+  };
+
+  if ((repeatedPositions[key] ?? 0) >= 3) {
+    return endDraw(withRepetition, "drawTermination");
+  }
+
+  if (withRepetition.draw.turnsSinceCapture >= 80) {
+    return endDraw(withRepetition, "drawTermination");
+  }
+
+  if (hasLegalMoves(withRepetition, nextPlayer)) {
+    return withRepetition;
+  }
+
+  const opponent = otherPlayer(nextPlayer);
+  if (getLegalMoves(withRepetition, opponent).length === 0) {
+    return endDraw(withRepetition, "bothBlocked");
+  }
+
+  if (getSpaceMakingMoves(withRepetition, nextPlayer).length === 0) {
+    return endDraw(withRepetition, "forcedJareSpaceMaking");
+  }
+
+  return withRepetition;
+}
+
+function movementPositionKey(state: GameState): string {
+  const board = POINT_IDS.map((point) => state.board[point] ?? "-").join("");
+
+  return `${state.phase}|${state.pendingCapture === null ? "none" : "capture"}|${state.currentPlayer}|${board}`;
+}
+
+function endDraw(state: GameState, endReason: GameEndReason): GameState {
+  return {
+    ...state,
+    phase: "gameOver",
+    pendingCapture: null,
+    winner: null,
+    endReason,
+  };
 }

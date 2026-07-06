@@ -1,6 +1,6 @@
 import { POINT_IDS } from "./board";
-import { getLegalMoves } from "./moves";
-import { otherPlayer } from "./reducer";
+import { getLegalMoves, getSpaceMakingMoves, hasLegalMoves } from "./moves";
+import { getActingPlayer, otherPlayer } from "./reducer";
 import type { GameAction, GameState, PlayerId } from "./types";
 
 export function legalActions(state: GameState): readonly GameAction[] {
@@ -40,7 +40,20 @@ export function legalActions(state: GameState): readonly GameAction[] {
         ...resign,
       ];
     }
-    case "movement":
+    case "movement": {
+      if (!hasLegalMoves(state, state.currentPlayer)) {
+        const blockedPlayer = state.currentPlayer;
+        const actingPlayer = getActingPlayer(state);
+
+        return [
+          ...getSpaceMakingMoves(state, blockedPlayer).map(
+            ({ from, to }) =>
+              ({ type: "move", player: actingPlayer, from, to }) as const,
+          ),
+          ...resign,
+        ];
+      }
+
       return [
         ...getLegalMoves(state, state.currentPlayer).map(
           ({ from, to }) =>
@@ -48,6 +61,7 @@ export function legalActions(state: GameState): readonly GameAction[] {
         ),
         ...resign,
       ];
+    }
     case "capture": {
       const capturePlayer = state.pendingCapture?.player ?? state.currentPlayer;
       return [

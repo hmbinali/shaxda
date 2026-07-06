@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { legalActions } from "./actions";
+import { POINT_IDS } from "./board";
 import { applyAction } from "./reducer";
 import { createInitialState } from "./state";
-import type { GameAction, GameState, PointId } from "./types";
+import type {
+  BoardOccupancy,
+  GameAction,
+  GameState,
+  PlayerId,
+  PointId,
+} from "./types";
 
 function apply(state: GameState, action: GameAction): GameState {
   const result = applyAction(state, action);
@@ -20,6 +27,31 @@ function placeAll(state: GameState, points: readonly PointId[]): GameState {
       apply(current, { type: "place", player: current.currentPlayer, point }),
     state,
   );
+}
+
+function baseMovementState(
+  currentPlayer: PlayerId,
+  pieces: Partial<Record<PointId, PlayerId>>,
+): GameState {
+  const state = createInitialState("A");
+  const board = Object.fromEntries(
+    POINT_IDS.map((point) => [point, null]),
+  ) as BoardOccupancy;
+
+  return {
+    ...state,
+    phase: "movement",
+    currentPlayer,
+    firstAdvantage: "A",
+    players: {
+      A: { inHand: 0, captured: 0 },
+      B: { inHand: 0, captured: 0 },
+    },
+    initialRemoval: {
+      removedBy: { A: true, B: true },
+    },
+    board: { ...board, ...pieces },
+  };
 }
 
 const NO_JARE_ORDER: readonly PointId[] = [
@@ -94,6 +126,31 @@ describe("legalActions", () => {
     expect(legalActions(state)).toEqual([
       { type: "capture", player: "A", point: "O4" },
       { type: "capture", player: "A", point: "O5" },
+      { type: "resign", player: "A" },
+    ]);
+  });
+
+  it("enumerates opponent space-making moves when the current player is blocked", () => {
+    const state = baseMovementState("A", {
+      O1: "A",
+      M1: "A",
+      I1: "A",
+      O2: "B",
+      O4: "B",
+      O8: "B",
+      M2: "B",
+      M8: "B",
+      I2: "B",
+      I8: "B",
+    });
+
+    expect(legalActions(state)).toEqual([
+      { type: "move", player: "B", from: "O2", to: "O3" },
+      { type: "move", player: "B", from: "O8", to: "O7" },
+      { type: "move", player: "B", from: "M2", to: "M3" },
+      { type: "move", player: "B", from: "M8", to: "M7" },
+      { type: "move", player: "B", from: "I2", to: "I3" },
+      { type: "move", player: "B", from: "I8", to: "I7" },
       { type: "resign", player: "A" },
     ]);
   });

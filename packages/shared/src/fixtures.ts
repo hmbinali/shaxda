@@ -1,6 +1,7 @@
 import {
   POINT_IDS,
   applyAction,
+  applyActionLog,
   createInitialState,
   replayActions,
 } from "@shaxda/game-engine";
@@ -117,6 +118,98 @@ export const blockedPlayerFixture = baseMovementState("B", {
   I8: "A",
 });
 
+export const blockedSpaceMadeFixture = mustApply(blockedPlayerFixture, {
+  type: "move",
+  player: "A",
+  from: "O2",
+  to: "O3",
+});
+
+const drawByEightyInitialState = baseMovementState(
+  "A",
+  {
+    O1: "A",
+    O5: "A",
+    M5: "A",
+    I1: "B",
+    I5: "B",
+    M1: "B",
+  },
+  {
+    draw: {
+      turnsSinceCapture: 79,
+      repeatedPositions: {},
+    },
+  },
+);
+
+export const drawByEightyTurnsFixture = mustApply(drawByEightyInitialState, {
+  type: "move",
+  player: "A",
+  from: "O1",
+  to: "O2",
+});
+
+const drawByRepetitionBeforeState = baseMovementState("A", {
+  O1: "A",
+  O5: "A",
+  M5: "A",
+  I1: "B",
+  I5: "B",
+  M1: "B",
+});
+const drawByRepetitionAfterState: GameState = {
+  ...drawByRepetitionBeforeState,
+  board: {
+    ...drawByRepetitionBeforeState.board,
+    O1: null,
+    O2: "A",
+  },
+  currentPlayer: "B",
+};
+const drawByRepetitionKey = movementPositionKey(drawByRepetitionAfterState);
+const drawByRepetitionInitialState: GameState = {
+  ...drawByRepetitionBeforeState,
+  draw: {
+    turnsSinceCapture: 4,
+    repeatedPositions: {
+      [drawByRepetitionKey]: 2,
+    },
+  },
+};
+
+export const drawByRepetitionFixture = mustApply(drawByRepetitionInitialState, {
+  type: "move",
+  player: "A",
+  from: "O1",
+  to: "O2",
+});
+
+const forcedJareSpaceMakingInitialState = baseMovementState("A", {
+  O1: "B",
+  O3: "B",
+  O5: "B",
+  O4: "A",
+  O6: "A",
+  O7: "A",
+  O8: "A",
+  M1: "A",
+  M2: "A",
+  M3: "A",
+  M5: "A",
+  M7: "A",
+});
+
+export const forcedJareSpaceMakingFixture = mustApply(
+  forcedJareSpaceMakingInitialState,
+  {
+    type: "move",
+    player: "A",
+    from: "M2",
+    to: "O2",
+  },
+);
+
 export const winFixture: GameState = {
   ...baseMovementState("A", {
     O1: "A",
@@ -161,6 +254,38 @@ export const fullGameActionScripts = [
   },
 ] as const;
 
+export const a2ConformanceActionScripts = [
+  {
+    name: "blocked-space-making",
+    initialState: blockedPlayerFixture,
+    actions: [{ type: "move", player: "A", from: "O2", to: "O3" }],
+    expectedFinalState: blockedSpaceMadeFixture,
+  },
+  {
+    name: "draw-by-80-turns",
+    initialState: drawByEightyInitialState,
+    actions: [{ type: "move", player: "A", from: "O1", to: "O2" }],
+    expectedFinalState: drawByEightyTurnsFixture,
+  },
+  {
+    name: "draw-by-repetition",
+    initialState: drawByRepetitionInitialState,
+    actions: [{ type: "move", player: "A", from: "O1", to: "O2" }],
+    expectedFinalState: drawByRepetitionFixture,
+  },
+  {
+    name: "forced-jare-space-making",
+    initialState: forcedJareSpaceMakingInitialState,
+    actions: [{ type: "move", player: "A", from: "M2", to: "O2" }],
+    expectedFinalState: forcedJareSpaceMakingFixture,
+  },
+] as const satisfies readonly {
+  name: string;
+  initialState: GameState;
+  actions: readonly GameAction[];
+  expectedFinalState: GameState;
+}[];
+
 export const gameFixtures = {
   emptyBoard: emptyBoardFixture,
   midPlacement: midPlacementFixture,
@@ -170,6 +295,10 @@ export const gameFixtures = {
   capturePending: capturePendingFixture,
   repeatedJare: repeatedJareFixture,
   blockedPlayer: blockedPlayerFixture,
+  blockedSpaceMade: blockedSpaceMadeFixture,
+  drawByEightyTurns: drawByEightyTurnsFixture,
+  drawByRepetition: drawByRepetitionFixture,
+  forcedJareSpaceMaking: forcedJareSpaceMakingFixture,
   win: winFixture,
   draw: drawFixture,
 } as const;
@@ -194,6 +323,21 @@ function mustApply(state: GameState, action: GameAction): GameState {
 
   if (!result.ok) {
     throw new Error(`fixture action failed: ${result.error}`);
+  }
+
+  return result.state;
+}
+
+export function mustApplyActionLog(
+  initialState: GameState,
+  actions: readonly GameAction[],
+): GameState {
+  const result = applyActionLog(initialState, actions);
+
+  if (!result.ok) {
+    throw new Error(
+      `fixture action log failed at action ${result.actionIndex}: ${result.error}`,
+    );
   }
 
   return result.state;
@@ -234,4 +378,10 @@ function boardWith(
   ) as BoardOccupancy;
 
   return { ...emptyBoard, ...pieces };
+}
+
+function movementPositionKey(state: GameState): string {
+  const board = POINT_IDS.map((point) => state.board[point] ?? "-").join("");
+
+  return `${state.phase}|${state.pendingCapture === null ? "none" : "capture"}|${state.currentPlayer}|${board}`;
 }

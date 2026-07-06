@@ -6,7 +6,8 @@ export * from "./schemas";
 export const appMetadata = {
   id: "shaxda",
   name: "Shaxda",
-  description: "Free Somali shaxda board game.",
+  description:
+    "Shaxda waa ciyaar Soomaali ah oo lagu barto xeerarka, lagu ciyaaro hal qalab, laguna diyaariyay ciyaar marti ah.",
 } as const;
 
 export const healthResponseSchema = z.object({

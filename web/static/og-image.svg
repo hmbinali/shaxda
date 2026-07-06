@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Shaxda</title>
+  <desc id="desc">Loox shaxda ah iyo qoraal Soomaali ah</desc>
+  <rect width="1200" height="630" fill="#f8f1e8" />
+  <rect x="42" y="42" width="1116" height="546" rx="22" fill="#ead8c2" stroke="#6e4327" stroke-width="6" />
+  <g transform="translate(120 78)" stroke="#332016" stroke-linecap="round" fill="none">
+    <rect x="0" y="0" width="420" height="420" stroke-width="12" />
+    <rect x="70" y="70" width="280" height="280" stroke-width="10" />
+    <rect x="140" y="140" width="140" height="140" stroke-width="8" />
+    <line x1="210" y1="0" x2="210" y2="140" stroke-width="8" />
+    <line x1="210" y1="280" x2="210" y2="420" stroke-width="8" />
+    <line x1="0" y1="210" x2="140" y2="210" stroke-width="8" />
+    <line x1="280" y1="210" x2="420" y2="210" stroke-width="8" />
+  </g>
+  <g fill="#6e4327" stroke="#332016" stroke-width="5">
+    <circle cx="120" cy="78" r="18" />
+    <circle cx="330" cy="78" r="18" />
+    <circle cx="540" cy="78" r="18" />
+    <circle cx="190" cy="148" r="16" />
+    <circle cx="330" cy="148" r="16" />
+    <circle cx="470" cy="148" r="16" />
+    <circle cx="260" cy="218" r="14" />
+    <circle cx="330" cy="218" r="14" />
+    <circle cx="400" cy="218" r="14" />
+    <circle cx="120" cy="288" r="18" />
+    <circle cx="190" cy="288" r="16" />
+    <circle cx="260" cy="288" r="14" />
+    <circle cx="400" cy="288" r="14" />
+    <circle cx="470" cy="288" r="16" />
+    <circle cx="540" cy="288" r="18" />
+    <circle cx="260" cy="358" r="14" />
+    <circle cx="330" cy="358" r="14" />
+    <circle cx="400" cy="358" r="14" />
+    <circle cx="190" cy="428" r="16" />
+    <circle cx="330" cy="428" r="16" />
+    <circle cx="470" cy="428" r="16" />
+    <circle cx="120" cy="498" r="18" />
+    <circle cx="330" cy="498" r="18" />
+    <circle cx="540" cy="498" r="18" />
+  </g>
+  <text x="650" y="230" fill="#332016" font-family="Inter, Arial, sans-serif" font-size="96" font-weight="700">Shaxda</text>
+  <text x="654" y="300" fill="#6e4327" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="600">Ciyaar dhaqameed Soomaali ah</text>
+  <text x="654" y="360" fill="#332016" font-family="Inter, Arial, sans-serif" font-size="28">Baro xeerarka, ciyaar, oo wadaag.</text>
+</svg>

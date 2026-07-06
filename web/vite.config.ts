@@ -1,5 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 import { sveltekit } from "@sveltejs/kit/vite";
+import { svelteTesting } from "@testing-library/svelte/vite";
 import { SvelteKitPWA } from "@vite-pwa/sveltekit";
 import { defineConfig } from "vitest/config";
 
@@ -7,6 +8,7 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     sveltekit(),
+    svelteTesting(),
     SvelteKitPWA({
       registerType: "autoUpdate",
       manifest: {
@@ -41,5 +43,6 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     passWithNoTests: true,
+    setupFiles: ["./src/test/setup.ts"],
   },
 });

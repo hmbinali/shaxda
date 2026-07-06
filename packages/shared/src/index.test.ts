@@ -15,6 +15,7 @@ import {
   healthResponseSchema,
   protocolVersion,
   serverMessageSchema,
+  appMetadata,
 } from "./index";
 
 describe("healthResponseSchema", () => {
@@ -25,6 +26,16 @@ describe("healthResponseSchema", () => {
         service: "shaxda",
       },
     );
+  });
+});
+
+describe("appMetadata", () => {
+  it("uses Somali-only public description text", () => {
+    expect(appMetadata.description).not.toContain(
+      "Free Somali shaxda board game",
+    );
+    expect(appMetadata.description).toContain("Shaxda");
+    expect(appMetadata.description).toContain("Soomaali");
   });
 });
 

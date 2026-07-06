@@ -40,6 +40,7 @@ describe("game contract schemas", () => {
       gameFixtures.draw,
       gameFixtures.drawByEightyTurns,
       gameFixtures.drawByRepetition,
+      gameFixtures.forcedJareSpaceMaking,
     ]) {
       const pieceCounts = Object.fromEntries(
         ["A", "B"].map((player) => [
@@ -54,7 +55,7 @@ describe("game contract schemas", () => {
     }
   });
 
-  it("includes A2 draw and blocked end-state fixtures", () => {
+  it("includes A2 draw and blocked fixtures", () => {
     expect(gameFixtures.blockedSpaceMade.phase).toBe("movement");
     expect(gameFixtures.blockedSpaceMade.currentPlayer).toBe("B");
     expect(gameFixtures.drawByEightyTurns).toMatchObject({
@@ -67,10 +68,11 @@ describe("game contract schemas", () => {
       winner: null,
       endReason: "drawTermination",
     });
-    expect(gameFixtures.bothBlocked.endReason).toBe("bothBlocked");
-    expect(gameFixtures.forcedJareSpaceMaking.endReason).toBe(
-      "forcedJareSpaceMaking",
-    );
+    expect(gameFixtures.forcedJareSpaceMaking).toMatchObject({
+      phase: "gameOver",
+      winner: null,
+      endReason: "forcedJareSpaceMaking",
+    });
   });
 
   it("roundtrips every fixture through engine serialization", () => {

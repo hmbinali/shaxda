@@ -185,24 +185,30 @@ export const drawByRepetitionFixture = mustApply(drawByRepetitionInitialState, {
   to: "O2",
 });
 
-export const bothBlockedFixture: GameState = {
-  ...baseMovementState(
-    "A",
-    Object.fromEntries(
-      POINT_IDS.map((point, index) => [point, index % 2 === 0 ? "A" : "B"]),
-    ) as Record<PointId, PlayerId>,
-  ),
-  phase: "gameOver",
-  winner: null,
-  endReason: "bothBlocked",
-};
+const forcedJareSpaceMakingInitialState = baseMovementState("A", {
+  O1: "B",
+  O3: "B",
+  O5: "B",
+  O4: "A",
+  O6: "A",
+  O7: "A",
+  O8: "A",
+  M1: "A",
+  M2: "A",
+  M3: "A",
+  M5: "A",
+  M7: "A",
+});
 
-export const forcedJareSpaceMakingFixture: GameState = {
-  ...blockedPlayerFixture,
-  phase: "gameOver",
-  winner: null,
-  endReason: "forcedJareSpaceMaking",
-};
+export const forcedJareSpaceMakingFixture = mustApply(
+  forcedJareSpaceMakingInitialState,
+  {
+    type: "move",
+    player: "A",
+    from: "M2",
+    to: "O2",
+  },
+);
 
 export const winFixture: GameState = {
   ...baseMovementState("A", {
@@ -267,6 +273,12 @@ export const a2ConformanceActionScripts = [
     actions: [{ type: "move", player: "A", from: "O1", to: "O2" }],
     expectedFinalState: drawByRepetitionFixture,
   },
+  {
+    name: "forced-jare-space-making",
+    initialState: forcedJareSpaceMakingInitialState,
+    actions: [{ type: "move", player: "A", from: "M2", to: "O2" }],
+    expectedFinalState: forcedJareSpaceMakingFixture,
+  },
 ] as const satisfies readonly {
   name: string;
   initialState: GameState;
@@ -286,7 +298,6 @@ export const gameFixtures = {
   blockedSpaceMade: blockedSpaceMadeFixture,
   drawByEightyTurns: drawByEightyTurnsFixture,
   drawByRepetition: drawByRepetitionFixture,
-  bothBlocked: bothBlockedFixture,
   forcedJareSpaceMaking: forcedJareSpaceMakingFixture,
   win: winFixture,
   draw: drawFixture,

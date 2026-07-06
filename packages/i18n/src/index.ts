@@ -20,6 +20,10 @@ export const messages = {
         capturePending: "Qabasho jare kadib",
         repeatedJare: "Jare soo noqnoqda",
         blockedPlayer: "Ciyaaryahan xanniban",
+        blockedSpaceMade: "Meel loo furay",
+        drawByEightyTurns: "Barbaro 80 wareeg",
+        drawByRepetition: "Barbaro soo noqnoqosho",
+        forcedJareSpaceMaking: "Barbaro jare qasab ah",
         win: "Guul",
         draw: "Barbaro",
       },
@@ -32,6 +36,12 @@ export const messages = {
         capturePending: "Jare cusub ayaa keenay in dhagax la qabto.",
         repeatedJare: "Xaalad muujinaysa jare soo noqnoqda.",
         blockedPlayer: "Dhinac ayaa ku dhow in la xannibo.",
+        blockedSpaceMade: "Dhinaca kale ayaa sameeyay meel lagu dhaqaaqo.",
+        drawByEightyTurns:
+          "80 wareeg ayaa dhammaaday iyada oo aan qabasho jirin.",
+        drawByRepetition: "Isla xaalad dhaqdhaqaaq ayaa timid saddex jeer.",
+        forcedJareSpaceMaking:
+          "Meel furistu waxay qasab ka dhigaysaa jare, sidaas darteed waa barbaro.",
         win: "Ciyaartu waxay ku dhammaatay guul.",
         draw: "Ciyaartu waxay ku dhammaatay barbaro.",
       },

@@ -1,12 +1,15 @@
 import {
+  POINT_IDS,
   applyActionLog,
   deserialize,
   replayActions,
   serialize,
 } from "@shaxda/game-engine";
+import type { GameState } from "@shaxda/game-engine";
 import { describe, expect, it } from "vitest";
 import {
   a2ConformanceActionScripts,
+  bothBlockedFixture,
   clientMessageSchema,
   fullGameActionScripts,
   gameActionSchema,
@@ -38,6 +41,7 @@ describe("game contract schemas", () => {
   it("keeps draw fixtures above the below-three win threshold", () => {
     for (const fixture of [
       gameFixtures.draw,
+      bothBlockedFixture,
       gameFixtures.drawByEightyTurns,
       gameFixtures.drawByRepetition,
       gameFixtures.forcedJareSpaceMaking,
@@ -55,9 +59,21 @@ describe("game contract schemas", () => {
     }
   });
 
-  it("includes A2 draw and blocked fixtures", () => {
+  it("keeps canonical fixtures internally consistent", () => {
+    for (const fixture of Object.values(gameFixtures)) {
+      assertFixtureInvariants(fixture);
+    }
+    assertFixtureInvariants(bothBlockedFixture);
+  });
+
+  it("includes A3 draw and blocked fixtures", () => {
     expect(gameFixtures.blockedSpaceMade.phase).toBe("movement");
     expect(gameFixtures.blockedSpaceMade.currentPlayer).toBe("B");
+    expect(bothBlockedFixture).toMatchObject({
+      phase: "gameOver",
+      winner: null,
+      endReason: "bothBlocked",
+    });
     expect(gameFixtures.drawByEightyTurns).toMatchObject({
       phase: "gameOver",
       winner: null,
@@ -149,4 +165,94 @@ describe("fixture action scripts", () => {
       expect(result).toEqual({ ok: true, state: script.expectedFinalState });
     }
   });
+
+  it("covers first advantage, repeated jare, and capture-win conformance", () => {
+    expect(gameFixtures.placementJare).toMatchObject({
+      phase: "placement",
+      firstAdvantage: "A",
+    });
+
+    const repeatedJareResult = applyActionLog(gameFixtures.repeatedJare, [
+      { type: "move", player: "A", from: "O4", to: "O3" },
+    ]);
+    expect(repeatedJareResult).toMatchObject({
+      ok: true,
+      state: {
+        phase: "capture",
+        currentPlayer: "A",
+        pendingCapture: { player: "A", formedAt: "O3" },
+      },
+    });
+
+    const captureWinState: GameState = {
+      ...gameFixtures.win,
+      phase: "capture",
+      currentPlayer: "A",
+      board: {
+        ...gameFixtures.win.board,
+        O6: "B",
+      },
+      pendingCapture: { player: "A", formedAt: "O3" },
+      winner: null,
+      endReason: null,
+    };
+    const captureWinResult = applyActionLog(captureWinState, [
+      { type: "capture", player: "A", point: "O4" },
+    ]);
+
+    expect(captureWinResult).toMatchObject({
+      ok: true,
+      state: {
+        phase: "gameOver",
+        winner: "A",
+        endReason: "opponentBelowThree",
+      },
+    });
+  });
 });
+
+const DRAW_REASONS = new Set([
+  "drawTermination",
+  "bothBlocked",
+  "forcedJareSpaceMaking",
+]);
+const WIN_REASONS = new Set([
+  "opponentBelowThree",
+  "opponentCapturedAll",
+  "resignation",
+]);
+
+function assertFixtureInvariants(state: GameState): void {
+  expect(Object.keys(state.board).sort()).toEqual([...POINT_IDS].sort());
+
+  for (const point of POINT_IDS) {
+    expect(["A", "B", null]).toContain(state.board[point]);
+  }
+
+  if (state.phase === "capture") {
+    expect(state.pendingCapture).not.toBeNull();
+    expect(state.pendingCapture?.player).toBe(state.currentPlayer);
+  } else {
+    expect(state.pendingCapture).toBeNull();
+  }
+
+  expect(state.draw.turnsSinceCapture).toBeGreaterThanOrEqual(0);
+  for (const count of Object.values(state.draw.repeatedPositions)) {
+    expect(count).toBeGreaterThanOrEqual(0);
+  }
+
+  if (state.phase !== "gameOver") {
+    expect(state.winner).toBeNull();
+    expect(state.endReason).toBeNull();
+    return;
+  }
+
+  expect(state.endReason).not.toBeNull();
+  if (state.endReason !== null && DRAW_REASONS.has(state.endReason)) {
+    expect(state.winner).toBeNull();
+  } else if (state.endReason !== null && WIN_REASONS.has(state.endReason)) {
+    expect(state.winner).not.toBeNull();
+  } else {
+    throw new Error(`unknown fixture end reason ${state.endReason}`);
+  }
+}

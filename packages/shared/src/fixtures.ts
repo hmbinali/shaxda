@@ -1,6 +1,5 @@
 import {
   POINT_IDS,
-  applyAction,
   applyActionLog,
   createInitialState,
   replayActions,
@@ -75,18 +74,90 @@ export const emptyBoardFixture = createInitialState("A");
 export const midPlacementFixture = mustReplay("A", midPlacementActions);
 export const placementJareFixture = mustReplay("A", placementJareActions);
 export const initialRemovalFixture = mustReplay("A", initialRemovalActions);
-export const movementFixture = mustReplay("A", movementActions);
-export const capturePendingFixture = mustApply(
-  baseMovementState("A", {
-    O1: "A",
-    O2: "A",
-    O4: "A",
-    O5: "B",
-    O6: "B",
-    O8: "B",
-  }),
-  { type: "move", player: "A", from: "O4", to: "O3" },
+const movementFixtureBeforeRepetition = baseMovementState(
+  "B",
+  {
+    ...Object.fromEntries(
+      noJarePlacementOrder.map((point, index) => [
+        point,
+        index % 2 === 0 ? "A" : "B",
+      ]),
+    ),
+    O1: null,
+    O2: null,
+  },
+  { firstAdvantage: "B" },
 );
+export const movementFixture = withMovementPositionRecorded(
+  movementFixtureBeforeRepetition,
+);
+const capturePendingInitialState = baseMovementState("A", {
+  O1: "A",
+  O2: "A",
+  O4: "A",
+  O5: "B",
+  O6: "B",
+  O8: "B",
+});
+export const capturePendingFixture: GameState = {
+  ...capturePendingInitialState,
+  board: {
+    ...capturePendingInitialState.board,
+    O3: "A",
+    O4: null,
+  },
+  phase: "capture",
+  currentPlayer: "A",
+  pendingCapture: { player: "A", formedAt: "O3" },
+};
+
+const earlyResignationExpectedState: GameState = {
+  ...createInitialState("A"),
+  phase: "gameOver",
+  board: boardWith({
+    O1: "A",
+    O2: "B",
+  }),
+  currentPlayer: "A",
+  players: {
+    A: { inHand: 11, captured: 0 },
+    B: { inHand: 11, captured: 0 },
+  },
+  winner: "A",
+  endReason: "resignation",
+};
+
+const bothBlockedPieces = Object.fromEntries(
+  POINT_IDS.map((point, index) => [point, index % 2 === 0 ? "A" : "B"]),
+) as Partial<Record<PointId, PlayerId>>;
+export const bothBlockedFixture: GameState = {
+  ...baseMovementState("A", bothBlockedPieces),
+  phase: "gameOver",
+  winner: null,
+  endReason: "bothBlocked",
+};
+
+const blockedSpaceMadeBoard = {
+  O1: "B",
+  O2: null,
+  O3: "A",
+  M1: "B",
+  I1: "B",
+  O8: "A",
+  M2: "A",
+  M8: "A",
+  I2: "A",
+  I8: "A",
+} satisfies Partial<Record<PointId, PlayerId | null>>;
+
+export const blockedSpaceMadeFixture = withMovementPositionRecorded({
+  ...baseMovementState("B", {}),
+  board: boardWith(blockedSpaceMadeBoard),
+  draw: {
+    turnsSinceCapture: 1,
+    repeatedPositions: {},
+  },
+});
 
 export const repeatedJareFixture = baseMovementState(
   "A",
@@ -118,13 +189,6 @@ export const blockedPlayerFixture = baseMovementState("B", {
   I8: "A",
 });
 
-export const blockedSpaceMadeFixture = mustApply(blockedPlayerFixture, {
-  type: "move",
-  player: "A",
-  from: "O2",
-  to: "O3",
-});
-
 const drawByEightyInitialState = baseMovementState(
   "A",
   {
@@ -143,12 +207,25 @@ const drawByEightyInitialState = baseMovementState(
   },
 );
 
-export const drawByEightyTurnsFixture = mustApply(drawByEightyInitialState, {
-  type: "move",
-  player: "A",
-  from: "O1",
-  to: "O2",
+const drawByEightyAfterMove = withMovementPositionRecorded({
+  ...drawByEightyInitialState,
+  board: {
+    ...drawByEightyInitialState.board,
+    O1: null,
+    O2: "A",
+  },
+  currentPlayer: "B",
+  draw: {
+    turnsSinceCapture: 80,
+    repeatedPositions: {},
+  },
 });
+export const drawByEightyTurnsFixture: GameState = {
+  ...drawByEightyAfterMove,
+  phase: "gameOver",
+  winner: null,
+  endReason: "drawTermination",
+};
 
 const drawByRepetitionBeforeState = baseMovementState("A", {
   O1: "A",
@@ -178,12 +255,18 @@ const drawByRepetitionInitialState: GameState = {
   },
 };
 
-export const drawByRepetitionFixture = mustApply(drawByRepetitionInitialState, {
-  type: "move",
-  player: "A",
-  from: "O1",
-  to: "O2",
-});
+export const drawByRepetitionFixture: GameState = {
+  ...drawByRepetitionAfterState,
+  phase: "gameOver",
+  draw: {
+    turnsSinceCapture: 5,
+    repeatedPositions: {
+      [drawByRepetitionKey]: 3,
+    },
+  },
+  winner: null,
+  endReason: "drawTermination",
+};
 
 const forcedJareSpaceMakingInitialState = baseMovementState("A", {
   O1: "B",
@@ -200,15 +283,25 @@ const forcedJareSpaceMakingInitialState = baseMovementState("A", {
   M7: "A",
 });
 
-export const forcedJareSpaceMakingFixture = mustApply(
-  forcedJareSpaceMakingInitialState,
-  {
-    type: "move",
-    player: "A",
-    from: "M2",
-    to: "O2",
+const forcedJareSpaceMakingAfterMove = withMovementPositionRecorded({
+  ...forcedJareSpaceMakingInitialState,
+  board: {
+    ...forcedJareSpaceMakingInitialState.board,
+    O2: "A",
+    M2: null,
   },
-);
+  currentPlayer: "B",
+  draw: {
+    turnsSinceCapture: 1,
+    repeatedPositions: {},
+  },
+});
+export const forcedJareSpaceMakingFixture: GameState = {
+  ...forcedJareSpaceMakingAfterMove,
+  phase: "gameOver",
+  winner: null,
+  endReason: "forcedJareSpaceMaking",
+};
 
 export const winFixture: GameState = {
   ...baseMovementState("A", {
@@ -250,11 +343,23 @@ export const fullGameActionScripts = [
     name: "early-resignation",
     startingPlayer: "A",
     actions: resignationScriptActions,
-    expectedFinalState: mustReplay("A", resignationScriptActions),
+    expectedFinalState: earlyResignationExpectedState,
+  },
+  {
+    name: "placement-through-initial-removal",
+    startingPlayer: "A",
+    actions: movementActions,
+    expectedFinalState: movementFixture,
   },
 ] as const;
 
 export const a2ConformanceActionScripts = [
+  {
+    name: "movement-jare-pending-capture",
+    initialState: capturePendingInitialState,
+    actions: [{ type: "move", player: "A", from: "O4", to: "O3" }],
+    expectedFinalState: capturePendingFixture,
+  },
   {
     name: "blocked-space-making",
     initialState: blockedPlayerFixture,
@@ -318,16 +423,6 @@ function mustReplay(
   return result.state;
 }
 
-function mustApply(state: GameState, action: GameAction): GameState {
-  const result = applyAction(state, action);
-
-  if (!result.ok) {
-    throw new Error(`fixture action failed: ${result.error}`);
-  }
-
-  return result.state;
-}
-
 export function mustApplyActionLog(
   initialState: GameState,
   actions: readonly GameAction[],
@@ -345,7 +440,7 @@ export function mustApplyActionLog(
 
 function baseMovementState(
   currentPlayer: PlayerId,
-  pieces: Partial<Record<PointId, PlayerId>>,
+  pieces: Partial<Record<PointId, PlayerId | null>>,
   overrides: Partial<GameState> = {},
 ): GameState {
   const state = createInitialState("A");
@@ -355,7 +450,7 @@ function baseMovementState(
     ...overrides,
     phase: "movement",
     currentPlayer,
-    firstAdvantage: "A",
+    firstAdvantage: overrides.firstAdvantage ?? "A",
     players: {
       A: { inHand: 0, captured: 0 },
       B: { inHand: 0, captured: 0 },
@@ -384,4 +479,19 @@ function movementPositionKey(state: GameState): string {
   const board = POINT_IDS.map((point) => state.board[point] ?? "-").join("");
 
   return `${state.phase}|${state.pendingCapture === null ? "none" : "capture"}|${state.currentPlayer}|${board}`;
+}
+
+function withMovementPositionRecorded(state: GameState): GameState {
+  const key = movementPositionKey(state);
+
+  return {
+    ...state,
+    draw: {
+      ...state.draw,
+      repeatedPositions: {
+        ...state.draw.repeatedPositions,
+        [key]: (state.draw.repeatedPositions[key] ?? 0) + 1,
+      },
+    },
+  };
 }

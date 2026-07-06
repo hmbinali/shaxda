@@ -23,12 +23,12 @@ export const messages = {
         capturePending: "Qabasho jare kadib",
         repeatedJare: "Jare soo noqnoqda",
         blockedPlayer: "Ciyaaryahan xanniban",
-        blockedSpaceMade: "Meel bannayn kadib",
-        forcedJareSpaceMaking: "Barbaro bannayn jare ah",
+        blockedSpaceMade: "Bannayn xannibaad",
+        drawByEightyTurns: "Barbaro 80 tallaabo",
+        drawByRepetition: "Barbaro soo noqnoqosho",
+        forcedJareSpaceMaking: "Bannayn jare qasab ah",
         win: "Guul",
         draw: "Barbaro",
-        drawByEightyTurns: "Barbaro dhaqdhaqaaq badan",
-        drawByRepetition: "Barbaro boos soo noqday",
       },
       fixtureDescriptions: {
         emptyBoard: "Dhammaan godadku way bannaan yihiin.",
@@ -39,16 +39,15 @@ export const messages = {
         capturePending: "Jare cusub ayaa keenay in dhagax la qabto.",
         repeatedJare: "Xaalad muujinaysa jare soo noqnoqda.",
         blockedPlayer: "Dhinac ayaa ku dhow in la xannibo.",
-        blockedSpaceMade:
-          "Dhaqaaq ayaa loo sameeyay si ciyaaryahan xanniban meel u helo.",
+        blockedSpaceMade: "Dhaqdhaqaaq ayaa meel u furay dhinac xanniban.",
+        drawByEightyTurns:
+          "Ciyaartu waxay ku dhammaatay barbaro 80 tallaabo qabasho la'aan kadib.",
+        drawByRepetition:
+          "Ciyaartu waxay ku dhammaatay barbaro soo noqnoqosho kadib.",
         forcedJareSpaceMaking:
-          "Meel bannayn keliya oo jare samaynaysa waxay keentay barbaro.",
+          "Meel bannaynta keliya waxay samayn lahayd jare, markaas ciyaartu waa barbaro.",
         win: "Ciyaartu waxay ku dhammaatay guul.",
         draw: "Ciyaartu waxay ku dhammaatay barbaro.",
-        drawByEightyTurns:
-          "Ciyaartu waxay ku dhammaatay barbaro kadib dhaqdhaqaaqyo badan oo aan qabasho lahayn.",
-        drawByRepetition:
-          "Ciyaartu waxay ku dhammaatay barbaro kadib boos soo noqnoqday.",
       },
       selectedPoint: "Bar la doortay",
       legalHint: "Meel sharci ah",

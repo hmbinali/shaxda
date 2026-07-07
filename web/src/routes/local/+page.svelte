@@ -83,6 +83,8 @@
           <Board
             state={controller.state}
             selected={controller.selected}
+            lastAction={controller.lastAction}
+            invalidNonce={controller.invalidNonce}
             interactive
             onSelectPoint={(point) => controller.clickPoint(point)}
           />

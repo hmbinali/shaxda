@@ -1,4 +1,10 @@
-import { POINT_IDS, legalActions } from "@shaxda/game-engine";
+import {
+  JARE_LINES,
+  POINT_IDS,
+  completedJareLines,
+  legalActions,
+} from "@shaxda/game-engine";
+import type { JareLine } from "@shaxda/game-engine";
 import type {
   GameAction,
   GameState,
@@ -23,9 +29,18 @@ export interface BoardPointView {
   isRemovalTarget: boolean;
 }
 
+export interface BoardJareLineView {
+  id: string;
+  points: JareLine;
+  isCompleted: boolean;
+  owner: PlayerId | null;
+  isActivePendingCapture: boolean;
+}
+
 export interface BoardView {
   points: BoardPointView[];
   lines: typeof BOARD_LINES;
+  jareLines: BoardJareLineView[];
 }
 
 export function buildBoardView(
@@ -39,6 +54,7 @@ export function buildBoardView(
 
   return {
     lines: BOARD_LINES,
+    jareLines: buildJareLineViews(state),
     points: POINT_IDS.map((id) => {
       const coord = POINT_COORDS[id];
 
@@ -54,6 +70,50 @@ export function buildBoardView(
       };
     }),
   };
+}
+
+function buildJareLineViews(state: GameState): BoardJareLineView[] {
+  const activePendingCaptureLineIds = getActivePendingCaptureLineIds(state);
+
+  return JARE_LINES.map((line) => {
+    const owner = getLineOwner(state, line);
+    const id = line.join("-");
+
+    return {
+      id,
+      points: line,
+      isCompleted: owner !== null,
+      owner,
+      isActivePendingCapture: activePendingCaptureLineIds.has(id),
+    };
+  });
+}
+
+function getLineOwner(state: GameState, line: JareLine): PlayerId | null {
+  const [firstPoint] = line;
+  const firstOccupant = state.board[firstPoint];
+
+  if (firstOccupant === null) {
+    return null;
+  }
+
+  return line.every((point) => state.board[point] === firstOccupant)
+    ? firstOccupant
+    : null;
+}
+
+function getActivePendingCaptureLineIds(state: GameState): Set<string> {
+  if (state.pendingCapture === null) {
+    return new Set();
+  }
+
+  return new Set(
+    completedJareLines(
+      state.board,
+      state.pendingCapture.formedAt,
+      state.pendingCapture.player,
+    ).map((line) => line.join("-")),
+  );
 }
 
 function getLegalHintPoints(

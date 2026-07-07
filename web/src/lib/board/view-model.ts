@@ -1,5 +1,6 @@
-import { POINT_IDS, getLegalMoves, legalActions } from "@shaxda/game-engine";
+import { POINT_IDS, legalActions } from "@shaxda/game-engine";
 import type {
+  GameAction,
   GameState,
   PlayerId,
   PointId,
@@ -19,6 +20,7 @@ export interface BoardPointView {
   isSelected: boolean;
   isLegalHint: boolean;
   isCaptureTarget: boolean;
+  isRemovalTarget: boolean;
 }
 
 export interface BoardView {
@@ -33,6 +35,7 @@ export function buildBoardView(
   const selected = options.selected ?? null;
   const legalHintPoints = getLegalHintPoints(state, selected);
   const captureTargetPoints = getCaptureTargetPoints(state);
+  const removalTargetPoints = getRemovalTargetPoints(state);
 
   return {
     lines: BOARD_LINES,
@@ -47,6 +50,7 @@ export function buildBoardView(
         isSelected: id === selected,
         isLegalHint: legalHintPoints.has(id),
         isCaptureTarget: captureTargetPoints.has(id),
+        isRemovalTarget: removalTargetPoints.has(id),
       };
     }),
   };
@@ -56,18 +60,17 @@ function getLegalHintPoints(
   state: GameState,
   selected: PointId | null,
 ): Set<PointId> {
-  if (
-    state.phase !== "movement" ||
-    selected === null ||
-    state.board[selected] !== state.currentPlayer
-  ) {
+  if (state.phase !== "movement" || selected === null) {
     return new Set();
   }
 
   return new Set(
-    getLegalMoves(state, state.currentPlayer)
-      .filter((move) => move.from === selected)
-      .map((move) => move.to),
+    legalActions(state)
+      .filter(
+        (action): action is Extract<GameAction, { type: "move" }> =>
+          action.type === "move" && action.from === selected,
+      )
+      .map((action) => action.to),
   );
 }
 
@@ -86,4 +89,16 @@ function getCaptureTargetPoints(state: GameState): Set<PointId> {
 
 function isCaptureByPendingPlayer(player: PlayerId, state: GameState): boolean {
   return player === state.pendingCapture?.player;
+}
+
+function getRemovalTargetPoints(state: GameState): Set<PointId> {
+  if (state.phase !== "initialRemoval") {
+    return new Set();
+  }
+
+  return new Set(
+    legalActions(state)
+      .filter((action) => action.type === "removeInitial")
+      .map((action) => action.point),
+  );
 }

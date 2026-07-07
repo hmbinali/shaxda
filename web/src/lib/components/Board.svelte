@@ -9,10 +9,19 @@
   } from "$lib/board/layout";
   import { buildBoardView } from "$lib/board/view-model";
 
+  interface Props {
+    state: GameState;
+    selected?: PointId | null;
+    interactive?: boolean;
+    onSelectPoint?: (point: PointId) => void;
+  }
+
   let {
     state,
     selected = null,
-  }: { state: GameState; selected?: PointId | null } = $props();
+    interactive = false,
+    onSelectPoint,
+  }: Props = $props();
 
   const view = $derived(buildBoardView(state, { selected }));
   const copy = messages.so.boardGallery;
@@ -23,6 +32,15 @@
 
   function pointLabel(point: PointId): string {
     return `${copy.emptyPoint} ${point}`;
+  }
+
+  function handlePointKeydown(event: KeyboardEvent, point: PointId): void {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    onSelectPoint?.(point);
   }
 </script>
 
@@ -97,6 +115,7 @@
 
     <g data-testid="board-points">
       {#each view.points as point (point.id)}
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <g
           data-testid="board-point"
           data-point-id={point.id}
@@ -104,9 +123,16 @@
           data-selected={point.isSelected ? "true" : undefined}
           data-legal-hint={point.isLegalHint ? "true" : undefined}
           data-capture-target={point.isCaptureTarget ? "true" : undefined}
+          data-removal-target={point.isRemovalTarget ? "true" : undefined}
+          role={interactive ? "button" : undefined}
+          tabindex={interactive ? 0 : undefined}
           aria-label={point.occupant
             ? pieceLabel(point.occupant, point.id)
             : pointLabel(point.id)}
+          onclick={interactive ? () => onSelectPoint?.(point.id) : undefined}
+          onkeydown={interactive
+            ? (event) => handlePointKeydown(event, point.id)
+            : undefined}
         >
           <title>
             {point.occupant
@@ -177,6 +203,18 @@
               class="fill-transparent stroke-red-700"
               stroke-width="1.25"
               stroke-dasharray="1.8 1.3"
+            />
+          {/if}
+
+          {#if point.isRemovalTarget}
+            <circle
+              data-testid="board-removal-target"
+              cx={point.x}
+              cy={point.y}
+              r={PIECE_RADIUS + 2.1}
+              class="fill-transparent stroke-amber-700"
+              stroke-width="1.2"
+              stroke-dasharray="1.6 1.2"
             />
           {/if}
         </g>

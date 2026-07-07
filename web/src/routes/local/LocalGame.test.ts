@@ -1,0 +1,96 @@
+import { deserialize, serialize } from "@shaxda/game-engine";
+import { messages } from "@shaxda/i18n";
+import { gameFixtures } from "@shaxda/shared";
+import { fireEvent, render, screen } from "@testing-library/svelte";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LOCAL_GAME_STORAGE_KEY } from "$lib/game/localGameStorage";
+
+vi.mock("$lib/site/metadata", () => ({
+  absoluteUrl: (path: string) => `https://shaxda.example${path}`,
+  ogImagePath: "/og-image.png",
+}));
+
+import LocalGamePage from "./+page.svelte";
+
+const copy = messages.so.localGame;
+
+describe("/local", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
+  it("places a piece and persists the unfinished game", async () => {
+    const { container } = render(LocalGamePage);
+
+    await fireEvent.click(point(container, "O1"));
+
+    expect(point(container, "O1")).toHaveAttribute("data-occupant", "A");
+    const saved = window.localStorage.getItem(LOCAL_GAME_STORAGE_KEY);
+    expect(saved).not.toBeNull();
+    expect(deserialize(saved ?? "").board.O1).toBe("A");
+  });
+
+  it("shows invalid feedback for illegal taps", async () => {
+    const { container } = render(LocalGamePage);
+
+    await fireEvent.click(point(container, "O1"));
+    await fireEvent.click(point(container, "O1"));
+
+    expect(screen.getByTestId("invalid-feedback")).toHaveTextContent(
+      copy.invalid.illegalPoint,
+    );
+  });
+
+  it("resigns and displays the game-over result", async () => {
+    render(LocalGamePage);
+
+    await fireEvent.click(
+      screen.getByRole("button", { name: copy.controls.resign }),
+    );
+
+    expect(screen.getByTestId("game-result")).toHaveTextContent(
+      `${copy.result.winnerLabel}: ${copy.playerNames.B}`,
+    );
+    expect(screen.getByTestId("game-result")).toHaveTextContent(
+      copy.result.reasons.resignation,
+    );
+  });
+
+  it("starts a new game after confirmation and clears saved state", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { container } = render(LocalGamePage);
+
+    await fireEvent.click(point(container, "O1"));
+    await fireEvent.click(
+      screen.getByRole("button", { name: copy.controls.newGame }),
+    );
+
+    expect(point(container, "O1")).toHaveAttribute("data-occupant", "empty");
+    expect(window.localStorage.getItem(LOCAL_GAME_STORAGE_KEY)).toBeNull();
+  });
+
+  it("resumes an unfinished saved game", () => {
+    window.localStorage.setItem(
+      LOCAL_GAME_STORAGE_KEY,
+      serialize(gameFixtures.movement),
+    );
+
+    const { container } = render(LocalGamePage);
+
+    expect(point(container, "O8")).toHaveAttribute("data-occupant", "B");
+    expect(screen.getByText(copy.phases.movement)).toBeInTheDocument();
+  });
+});
+
+function point(container: HTMLElement, id: string): Element {
+  const element = container.querySelector(`[data-point-id="${id}"]`);
+
+  expect(element).not.toBeNull();
+
+  return element as Element;
+}

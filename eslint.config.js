@@ -45,5 +45,11 @@ export default tseslint.config(
       },
     },
   },
+  {
+    files: ["**/*.svelte.ts"],
+    languageOptions: {
+      parser: tseslint.parser,
+    },
+  },
   prettier,
 );

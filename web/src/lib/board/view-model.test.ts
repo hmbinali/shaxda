@@ -1,5 +1,10 @@
-import { POINT_IDS, getLegalMoves, legalActions } from "@shaxda/game-engine";
-import type { GameState, PlayerId, PointId } from "@shaxda/game-engine";
+import { POINT_IDS, legalActions } from "@shaxda/game-engine";
+import type {
+  GameAction,
+  GameState,
+  PlayerId,
+  PointId,
+} from "@shaxda/game-engine";
 import { gameFixtures } from "@shaxda/shared";
 import { describe, expect, it } from "vitest";
 import { buildBoardView } from "./view-model";
@@ -25,9 +30,19 @@ describe("buildBoardView", () => {
     const state = gameFixtures.movement;
     const selected = "O8";
     const view = buildBoardView(state, { selected });
-    const expectedHints = getLegalMoves(state, state.currentPlayer)
-      .filter((move) => move.from === selected)
-      .map((move) => move.to);
+    const expectedHints = legalActions(state)
+      .filter(isMoveFrom(selected))
+      .map((action) => action.to);
+
+    expect(legalHintPointIds(view.points)).toEqual(expectedHints);
+  });
+
+  it("marks legal movement hints for blocked-player space-making", () => {
+    const state = gameFixtures.blockedPlayer;
+    const view = buildBoardView(state, { selected: "O2" });
+    const expectedHints = legalActions(state)
+      .filter(isMoveFrom("O2"))
+      .map((action) => action.to);
 
     expect(legalHintPointIds(view.points)).toEqual(expectedHints);
   });
@@ -46,6 +61,17 @@ describe("buildBoardView", () => {
       .map((action) => action.point);
 
     expect(captureTargetPointIds(view.points)).toEqual(expectedTargets);
+  });
+
+  it("marks initial-removal targets without capture semantics", () => {
+    const state = gameFixtures.initialRemoval;
+    const view = buildBoardView(state);
+    const expectedTargets = legalActions(state)
+      .filter((action) => action.type === "removeInitial")
+      .map((action) => action.point);
+
+    expect(removalTargetPointIds(view.points)).toEqual(expectedTargets);
+    expect(captureTargetPointIds(view.points)).toEqual([]);
   });
 
   it("does not add decorations for the empty board or blocked movement fixture", () => {
@@ -76,8 +102,25 @@ function captureTargetPointIds(points: readonly PointView[]): PointId[] {
     .map((point) => point.id);
 }
 
+function removalTargetPointIds(points: readonly PointView[]): PointId[] {
+  return points
+    .filter((point) => point.isRemovalTarget)
+    .map((point) => point.id);
+}
+
 function decorationCount(state: GameState): number {
   return buildBoardView(state).points.filter(
-    (point) => point.isSelected || point.isLegalHint || point.isCaptureTarget,
+    (point) =>
+      point.isSelected ||
+      point.isLegalHint ||
+      point.isCaptureTarget ||
+      point.isRemovalTarget,
   ).length;
+}
+
+function isMoveFrom(
+  selected: PointId,
+): (action: GameAction) => action is Extract<GameAction, { type: "move" }> {
+  return (action): action is Extract<GameAction, { type: "move" }> =>
+    action.type === "move" && action.from === selected;
 }

@@ -158,6 +158,54 @@ describe("WebSocket protocol schemas", () => {
       roomCode: "ROOM-1",
     });
   });
+
+  it("accepts room spike echo and join messages", () => {
+    expect(
+      clientMessageSchema.parse({
+        v: protocolVersion,
+        type: "echo",
+        roomCode: "ROOM-1",
+        payload: "hello",
+      }),
+    ).toEqual({
+      v: 1,
+      type: "echo",
+      roomCode: "ROOM-1",
+      payload: "hello",
+    });
+
+    expect(
+      serverMessageSchema.parse({
+        v: protocolVersion,
+        type: "joined",
+        roomCode: "ROOM-1",
+        guestId: "guest-id-a",
+        slot: "A",
+      }),
+    ).toMatchObject({
+      v: 1,
+      type: "joined",
+      roomCode: "ROOM-1",
+      guestId: "guest-id-a",
+      slot: "A",
+    });
+
+    expect(
+      serverMessageSchema.parse({
+        v: protocolVersion,
+        type: "echoBroadcast",
+        roomCode: "ROOM-1",
+        fromGuestId: "guest-id-a",
+        payload: "hello",
+      }),
+    ).toMatchObject({
+      v: 1,
+      type: "echoBroadcast",
+      roomCode: "ROOM-1",
+      fromGuestId: "guest-id-a",
+      payload: "hello",
+    });
+  });
 });
 
 describe("fixture action scripts", () => {

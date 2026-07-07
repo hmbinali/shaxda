@@ -16,7 +16,8 @@
     "test:watch": "vitest --watch",
     "test:worker": "turbo run test:worker",
     "test:e2e": "playwright test",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "check": "pnpm format:check && pnpm check:hibernation && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "check:hibernation": "node scripts/check-hibernation.mjs",
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",
     "prepare": "node scripts/install-git-hooks.mjs"

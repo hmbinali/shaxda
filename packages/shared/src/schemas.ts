@@ -11,6 +11,7 @@ export const boardContract = {
 } as const;
 
 export const playerIdSchema = z.enum(["A", "B"]);
+export const playerSlotSchema = z.enum(["A", "B"]);
 export const pointIdSchema = z.enum(POINT_IDS);
 export const phaseSchema = z.enum([
   "placement",
@@ -124,56 +125,98 @@ const envelopeBase = {
   v: z.literal(protocolVersion),
 } as const;
 
+export const createRoomClientMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("createRoom"),
+  guestId: guestIdSchema,
+  displayName: guestDisplayNameSchema.optional(),
+});
+
+export const joinRoomClientMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("joinRoom"),
+  roomCode: roomCodeSchema,
+  guestId: guestIdSchema,
+  displayName: guestDisplayNameSchema.optional(),
+});
+
+export const gameActionClientMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("gameAction"),
+  roomCode: roomCodeSchema,
+  action: gameActionSchema,
+});
+
+export const echoClientMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("echo"),
+  roomCode: roomCodeSchema,
+  payload: z.string().max(2_000),
+});
+
+export const pingClientMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("ping"),
+  nonce: z.string().max(128).optional(),
+});
+
 export const clientMessageSchema = z.discriminatedUnion("type", [
-  z.object({
-    ...envelopeBase,
-    type: z.literal("createRoom"),
-    guestId: guestIdSchema,
-    displayName: guestDisplayNameSchema.optional(),
-  }),
-  z.object({
-    ...envelopeBase,
-    type: z.literal("joinRoom"),
-    roomCode: roomCodeSchema,
-    guestId: guestIdSchema,
-    displayName: guestDisplayNameSchema.optional(),
-  }),
-  z.object({
-    ...envelopeBase,
-    type: z.literal("gameAction"),
-    roomCode: roomCodeSchema,
-    action: gameActionSchema,
-  }),
-  z.object({
-    ...envelopeBase,
-    type: z.literal("ping"),
-    nonce: z.string().max(128).optional(),
-  }),
+  createRoomClientMessageSchema,
+  joinRoomClientMessageSchema,
+  gameActionClientMessageSchema,
+  echoClientMessageSchema,
+  pingClientMessageSchema,
 ]);
 
+export const roomCreatedServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("roomCreated"),
+  roomCode: roomCodeSchema,
+});
+
+export const joinedServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("joined"),
+  roomCode: roomCodeSchema,
+  guestId: guestIdSchema,
+  slot: playerSlotSchema,
+});
+
+export const stateServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("state"),
+  roomCode: roomCodeSchema,
+  state: gameStateSchema,
+});
+
+export const echoBroadcastServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("echoBroadcast"),
+  roomCode: roomCodeSchema,
+  fromGuestId: guestIdSchema,
+  payload: z.string().max(2_000),
+});
+
+export const errorServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("error"),
+  code: z.string().min(1).max(64),
+  message: z.string().min(1).max(240),
+});
+
+export const pongServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("pong"),
+  nonce: z.string().max(128).optional(),
+});
+
 export const serverMessageSchema = z.discriminatedUnion("type", [
-  z.object({
-    ...envelopeBase,
-    type: z.literal("roomCreated"),
-    roomCode: roomCodeSchema,
-  }),
-  z.object({
-    ...envelopeBase,
-    type: z.literal("state"),
-    roomCode: roomCodeSchema,
-    state: gameStateSchema,
-  }),
-  z.object({
-    ...envelopeBase,
-    type: z.literal("error"),
-    code: z.string().min(1).max(64),
-    message: z.string().min(1).max(240),
-  }),
-  z.object({
-    ...envelopeBase,
-    type: z.literal("pong"),
-    nonce: z.string().max(128).optional(),
-  }),
+  roomCreatedServerMessageSchema,
+  joinedServerMessageSchema,
+  stateServerMessageSchema,
+  echoBroadcastServerMessageSchema,
+  errorServerMessageSchema,
+  pongServerMessageSchema,
 ]);
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;

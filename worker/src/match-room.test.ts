@@ -265,12 +265,12 @@ describe("match room hibernation spike", () => {
       expect(room).toBeDefined();
       await state.storage.put("room", {
         ...room,
-        lastActivityAt: Date.now() - 2 * 60 * 60 * 1_000,
+        lastActivityAt: 0,
       });
-      await state.storage.setAlarm(Date.now() - 1);
+      await state.storage.setAlarm(Date.now() + 1_000);
     });
 
-    await runDurableObjectAlarm(stub);
+    await expect(runDurableObjectAlarm(stub)).resolves.toBe(true);
     await runInDurableObject(stub, async (_instance, state) => {
       await expect(state.storage.get("room")).resolves.toBeUndefined();
     });

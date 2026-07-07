@@ -116,6 +116,27 @@ export const messages = {
         },
       },
     },
+    pwa: {
+      offline: {
+        title: "Qalabku khadka kama jiro",
+        body: "Ciyaarta qalabkan way sii shaqaynaysaa haddii boggu horay u kaydsanaa.",
+      },
+      offlineReady: {
+        title: "Shaxda waa diyaar offline",
+        body: "Ciyaarta qalabkan hadda waa la furi karaa marka khadku maqanyahay.",
+      },
+      update: {
+        title: "Cusboonaysiin ayaa diyaar ah",
+        body: "Nooc cusub ayaa la helay.",
+        action: "Cusboonaysii",
+      },
+      install: {
+        title: "Ku rakib Shaxda",
+        body: "Ku dar qalabka si ciyaarta qalabkan si fudud loogu furo.",
+        action: "Rakib",
+        dismiss: "Hadda ma aha",
+      },
+    },
   },
 } as const;
 

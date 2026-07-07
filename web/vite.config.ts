@@ -5,12 +5,26 @@ import { SvelteKitPWA } from "@vite-pwa/sveltekit";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  envPrefix: ["VITE_", "PUBLIC_"],
   plugins: [
     tailwindcss(),
     sveltekit(),
     svelteTesting(),
     SvelteKitPWA({
       registerType: "autoUpdate",
+      includeAssets: [
+        "apple-touch-icon.png",
+        "favicon.png",
+        "icon.svg",
+        "icon-192.png",
+        "icon-512.png",
+        "icon-maskable.svg",
+        "icon-maskable-192.png",
+        "icon-maskable-512.png",
+        "og-image.png",
+        "og-image.svg",
+        "sounds/*.wav",
+      ],
       manifest: {
         name: "Shaxda",
         short_name: "Shaxda",
@@ -61,7 +75,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2,wav}"],
+        navigateFallback: "/local",
+        navigateFallbackAllowlist: [/\/local$/],
+        globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2,wav,webmanifest}"],
       },
     }),
   ],

@@ -11,6 +11,13 @@ import {
 } from "./localGameStorage";
 
 describe("local game storage", () => {
+  it("treats unavailable storage as empty", () => {
+    expect(loadSavedLocalGame(null)).toBeNull();
+    expect(loadResumableLocalGame(null)).toBeNull();
+    expect(() => saveLocalGame(gameFixtures.movement, null)).not.toThrow();
+    expect(() => clearSavedLocalGame(null)).not.toThrow();
+  });
+
   it("roundtrips serialized engine state", () => {
     const storage = createMemoryStorage();
 
@@ -35,6 +42,19 @@ describe("local game storage", () => {
 
     expect(loadSavedLocalGame(storage)).toBeNull();
     expect(storage.getItem(LOCAL_GAME_STORAGE_KEY)).toBeNull();
+  });
+
+  it("tolerates storage read and write failures", () => {
+    const getThrowingStorage = createThrowingStorage("getItem");
+    const setThrowingStorage = createThrowingStorage("setItem");
+    const removeThrowingStorage = createThrowingStorage("removeItem");
+
+    expect(loadSavedLocalGame(getThrowingStorage)).toBeNull();
+    expect(loadResumableLocalGame(getThrowingStorage)).toBeNull();
+    expect(() =>
+      saveLocalGame(gameFixtures.movement, setThrowingStorage),
+    ).not.toThrow();
+    expect(() => clearSavedLocalGame(removeThrowingStorage)).not.toThrow();
   });
 
   it("clears saved state", () => {
@@ -63,5 +83,35 @@ function createMemoryStorage(): LocalGameStorage {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
     removeItem: (key) => values.delete(key),
+  };
+}
+
+function createThrowingStorage(
+  method: keyof LocalGameStorage,
+): LocalGameStorage {
+  const values = new Map<string, string>();
+
+  return {
+    getItem: (key) => {
+      if (method === "getItem") {
+        throw new Error("getItem failed");
+      }
+
+      return values.get(key) ?? null;
+    },
+    setItem: (key, value) => {
+      if (method === "setItem") {
+        throw new Error("setItem failed");
+      }
+
+      values.set(key, value);
+    },
+    removeItem: (key) => {
+      if (method === "removeItem") {
+        throw new Error("removeItem failed");
+      }
+
+      values.delete(key);
+    },
   };
 }

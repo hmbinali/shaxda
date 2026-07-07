@@ -116,4 +116,46 @@ test.describe("L1 local game", () => {
       "wax ka yar saddex dhagax",
     );
   });
+
+  test("reloads local play offline and resumes the saved game", async ({
+    page,
+    context,
+  }) => {
+    await page.goto("/");
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() =>
+      Boolean(navigator.serviceWorker.controller),
+    );
+
+    await page.goto("/local");
+    await expect(
+      page.getByRole("heading", { name: "Ciyaar qalabkan", exact: true }),
+    ).toBeVisible();
+    await page.locator('[data-point-id="O1"]').click();
+    await expect(page.locator('[data-point-id="O1"]')).toHaveAttribute(
+      "data-occupant",
+      "A",
+    );
+    await expect
+      .poll(() => page.evaluate((key) => localStorage.getItem(key), storageKey))
+      .not.toBeNull();
+
+    try {
+      await context.setOffline(true);
+      await page.reload({ waitUntil: "domcontentloaded" });
+
+      await expect(
+        page.getByRole("heading", { name: "Ciyaar qalabkan", exact: true }),
+      ).toBeVisible();
+      await expect(page.locator('[data-point-id="O1"]')).toHaveAttribute(
+        "data-occupant",
+        "A",
+      );
+    } finally {
+      await context.setOffline(false);
+    }
+  });
 });

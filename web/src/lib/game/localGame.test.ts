@@ -210,4 +210,17 @@ describe("LocalGameController", () => {
 
     expect(game.state).toEqual(gameFixtures.movement);
   });
+
+  it("clears saved games when an action completes the game", () => {
+    const game = createLocalGameController({
+      initialState: gameFixtures.capturePending,
+      storage,
+    });
+    values.set(LOCAL_GAME_STORAGE_KEY, serialize(gameFixtures.capturePending));
+
+    game.clickPoint("O5");
+
+    expect(game.state.phase).toBe("gameOver");
+    expect(values.get(LOCAL_GAME_STORAGE_KEY)).toBeUndefined();
+  });
 });

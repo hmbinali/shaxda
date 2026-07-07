@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
   import { messages, siteContent } from "@shaxda/i18n";
+  import PwaNotices from "./PwaNotices.svelte";
 
   let { children }: { children: import("svelte").Snippet } = $props();
 
@@ -9,6 +10,8 @@
 </script>
 
 <div class="min-h-screen bg-board-50 text-board-900">
+  <PwaNotices />
+
   <header class="border-b border-board-700/15 bg-board-50/95">
     <nav
       class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8"

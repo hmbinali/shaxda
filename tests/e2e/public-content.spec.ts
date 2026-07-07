@@ -104,6 +104,15 @@ test.describe("C1 public content", () => {
     ).toHaveAttribute("href", "/online");
   });
 
+  test("homepage does not prerender an empty PWA notice region", async ({
+    request,
+  }) => {
+    const response = await request.get("/");
+
+    expect(response.ok()).toBe(true);
+    expect(await response.text()).not.toContain('data-testid="pwa-notices"');
+  });
+
   test("rules page includes required draw, win, and jare-line content", async ({
     page,
   }) => {

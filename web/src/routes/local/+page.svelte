@@ -1,6 +1,12 @@
 <script lang="ts">
-  import { Flag, RotateCcw } from "@lucide/svelte";
+  import { Flag, RotateCcw, Volume2, VolumeX } from "@lucide/svelte";
   import { messages } from "@shaxda/i18n";
+  import { onMount } from "svelte";
+  import {
+    SoundPlayer,
+    loadSoundPreference,
+    saveSoundPreference,
+  } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
   import PageMeta from "$components/PageMeta.svelte";
   import SiteShell from "$components/SiteShell.svelte";
@@ -10,7 +16,10 @@
   const controller = createLocalGameController({
     confirmNewGame: () => window.confirm(copy.prompts.newGame),
   });
+  const soundPlayer = new SoundPlayer();
 
+  let soundEnabled = $state(true);
+  let lastFeedbackNonce = 0;
   const status = $derived(controller.status);
   const invalidMessage = $derived(
     controller.invalid === null
@@ -19,8 +28,35 @@
   );
   const players = ["A", "B"] as const;
 
+  onMount(() => {
+    soundEnabled = loadSoundPreference();
+  });
+
+  $effect(() => {
+    const feedback = controller.feedback;
+    if (feedback === null || feedback.nonce === lastFeedbackNonce) {
+      return;
+    }
+
+    lastFeedbackNonce = feedback.nonce;
+    if (!soundEnabled) {
+      return;
+    }
+
+    void soundPlayer.play(feedback.cues);
+  });
+
   function playerName(player: "A" | "B"): string {
     return copy.playerNames[player];
+  }
+
+  function toggleSound(): void {
+    soundEnabled = !soundEnabled;
+    saveSoundPreference(soundEnabled);
+
+    if (soundEnabled) {
+      void soundPlayer.unlock();
+    }
   }
 </script>
 
@@ -47,6 +83,20 @@
           </div>
 
           <div class="flex gap-2">
+            <button
+              class="inline-flex items-center gap-2 rounded border border-board-700/30 bg-white/50 px-4 py-2 text-sm font-semibold text-board-900 hover:bg-board-100/65"
+              type="button"
+              aria-pressed={soundEnabled}
+              onclick={toggleSound}
+            >
+              {#if soundEnabled}
+                <Volume2 size={16} aria-hidden="true" />
+                {copy.controls.soundOff}
+              {:else}
+                <VolumeX size={16} aria-hidden="true" />
+                {copy.controls.soundOn}
+              {/if}
+            </button>
             <button
               class="inline-flex items-center gap-2 rounded border border-board-700/30 bg-white/50 px-4 py-2 text-sm font-semibold text-board-900 hover:bg-board-100/65"
               type="button"
@@ -83,6 +133,8 @@
           <Board
             state={controller.state}
             selected={controller.selected}
+            lastAction={controller.lastAction}
+            invalidNonce={controller.invalidNonce}
             interactive
             onSelectPoint={(point) => controller.clickPoint(point)}
           />

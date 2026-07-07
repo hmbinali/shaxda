@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "assets:all": "pnpm assets:audio && pnpm assets:icons",
+    "assets:audio": "node scripts/generate-audio.mjs",
+    "assets:icons": "node scripts/generate-icons.mjs",
     "build": "vite build",
     "dev": "vite dev",
     "format": "prettier --write .",
@@ -22,6 +25,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@sveltejs/adapter-cloudflare": "^7.2.9",
     "@sveltejs/kit": "^2.69.1",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",

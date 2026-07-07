@@ -87,6 +87,8 @@ export const messages = {
       controls: {
         newGame: "Ciyaar cusub",
         resign: "Is dhiib",
+        soundOn: "Codka shid",
+        soundOff: "Codka dami",
       },
       prompts: {
         newGame: "Ciyaar cusub ma bilaabaysaa?",

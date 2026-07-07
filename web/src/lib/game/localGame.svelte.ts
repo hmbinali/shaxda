@@ -1,9 +1,11 @@
 import {
   applyAction,
+  completesJare,
   createInitialState,
   getActingPlayer,
   legalActions,
 } from "@shaxda/game-engine";
+import type { SoundCue } from "$lib/audio/sound";
 import type {
   GameAction,
   GameEndReason,
@@ -43,6 +45,11 @@ export interface InvalidFeedback {
   nonce: number;
 }
 
+export interface LocalGameFeedback {
+  cues: readonly SoundCue[];
+  nonce: number;
+}
+
 export interface LocalGameControllerOptions {
   initialState?: GameState;
   storage?: LocalGameStorage | null;
@@ -53,11 +60,13 @@ export class LocalGameController {
   state = $state<GameState>(createInitialState("A"));
   selected = $state<PointId | null>(null);
   invalid = $state<InvalidFeedback | null>(null);
+  feedback = $state<LocalGameFeedback | null>(null);
   status = $derived(buildLocalGameStatus(this.state));
 
   readonly #storage: LocalGameStorage | null | undefined;
   readonly #confirmNewGame: () => boolean;
   #invalidNonce = 0;
+  #feedbackNonce = 0;
 
   constructor(options: LocalGameControllerOptions = {}) {
     this.#storage = options.storage;
@@ -115,11 +124,13 @@ export class LocalGameController {
     this.state = createInitialState("A");
     this.selected = null;
     this.invalid = null;
+    this.feedback = null;
     clearSavedLocalGame(this.#storage);
     return true;
   }
 
   private apply(action: GameAction): void {
+    const previousState = this.state;
     const result = applyAction(this.state, action);
 
     if (!result.ok) {
@@ -130,6 +141,9 @@ export class LocalGameController {
     this.state = result.state;
     this.selected = null;
     this.invalid = null;
+    this.emitFeedback(
+      classifyActionFeedback(previousState, action, this.state),
+    );
 
     if (this.state.phase === "gameOver") {
       clearSavedLocalGame(this.#storage);
@@ -140,6 +154,11 @@ export class LocalGameController {
 
   private markInvalid(reason: InvalidFeedback["reason"]): void {
     this.invalid = { reason, nonce: (this.#invalidNonce += 1) };
+    this.emitFeedback(["invalid"]);
+  }
+
+  private emitFeedback(cues: readonly SoundCue[]): void {
+    this.feedback = { cues, nonce: (this.#feedbackNonce += 1) };
   }
 }
 
@@ -179,4 +198,43 @@ export function buildLocalGameStatus(state: GameState): LocalGameStatus {
 function countPieces(state: GameState, player: PlayerId): number {
   return Object.values(state.board).filter((occupant) => occupant === player)
     .length;
+}
+
+function classifyActionFeedback(
+  previousState: GameState,
+  action: GameAction,
+  nextState: GameState,
+): readonly SoundCue[] {
+  switch (action.type) {
+    case "place":
+      return didCreateFirstPlacementJare(previousState, action, nextState)
+        ? ["place", "jare"]
+        : ["place"];
+    case "removeInitial":
+      return ["capture"];
+    case "move":
+      return nextState.phase === "capture" &&
+        nextState.pendingCapture?.player === action.player
+        ? ["move", "jare"]
+        : ["move"];
+    case "capture":
+      return nextState.phase === "gameOver" && nextState.winner !== null
+        ? ["capture", "win"]
+        : ["capture"];
+    case "resign":
+      return nextState.winner === null ? [] : ["win"];
+  }
+}
+
+function didCreateFirstPlacementJare(
+  previousState: GameState,
+  action: Extract<GameAction, { type: "place" }>,
+  nextState: GameState,
+): boolean {
+  return (
+    previousState.phase === "placement" &&
+    previousState.firstAdvantage === null &&
+    nextState.firstAdvantage === action.player &&
+    completesJare(nextState.board, action.point, action.player)
+  );
 }

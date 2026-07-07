@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const storageKey = "shaxda:local-game:v1";
+const soundPreferenceKey = "shaxda:sound-enabled:v1";
 const nearTerminalCaptureState = JSON.stringify({
   phase: "capture",
   board: {
@@ -73,6 +74,23 @@ test.describe("L1 local game", () => {
     await expect
       .poll(() => page.evaluate((key) => localStorage.getItem(key), storageKey))
       .not.toBeNull();
+  });
+
+  test("persists the local sound preference", async ({ page }) => {
+    await page.goto("/local");
+
+    await page.getByRole("button", { name: "Codka dami" }).click();
+
+    await expect
+      .poll(() =>
+        page.evaluate((key) => localStorage.getItem(key), soundPreferenceKey),
+      )
+      .toBe("false");
+
+    await page.reload();
+
+    const soundButton = page.getByRole("button", { name: "Codka shid" });
+    await expect(soundButton).toHaveAttribute("aria-pressed", "false");
   });
 
   test("resumes a near-terminal state and displays game over", async ({

@@ -1,8 +1,9 @@
 import { deserialize, serialize } from "@shaxda/game-engine";
 import { messages } from "@shaxda/i18n";
 import { gameFixtures } from "@shaxda/shared";
-import { fireEvent, render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SOUND_PREFERENCE_STORAGE_KEY } from "$lib/audio/sound";
 import { LOCAL_GAME_STORAGE_KEY } from "$lib/game/localGameStorage";
 
 vi.mock("$lib/site/metadata", () => ({
@@ -43,6 +44,36 @@ describe("/local", () => {
 
     expect(screen.getByTestId("invalid-feedback")).toHaveTextContent(
       copy.invalid.illegalPoint,
+    );
+  });
+
+  it("renders and persists the sound toggle state", async () => {
+    render(LocalGamePage);
+
+    const muteButton = screen.getByRole("button", {
+      name: copy.controls.soundOff,
+    });
+    expect(muteButton).toHaveAttribute("aria-pressed", "true");
+
+    await fireEvent.click(muteButton);
+
+    expect(window.localStorage.getItem(SOUND_PREFERENCE_STORAGE_KEY)).toBe(
+      "false",
+    );
+    expect(
+      screen.getByRole("button", { name: copy.controls.soundOn }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("loads the persisted muted state", async () => {
+    window.localStorage.setItem(SOUND_PREFERENCE_STORAGE_KEY, "false");
+
+    render(LocalGamePage);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: copy.controls.soundOn }),
+      ).toHaveAttribute("aria-pressed", "false"),
     );
   });
 

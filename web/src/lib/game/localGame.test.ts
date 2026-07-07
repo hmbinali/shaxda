@@ -1,5 +1,5 @@
 import { serialize } from "@shaxda/game-engine";
-import { gameFixtures } from "@shaxda/shared";
+import { gameFixtures, noJarePlacementOrder } from "@shaxda/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createLocalGameController } from "./localGame.svelte";
 import {
@@ -26,7 +26,33 @@ describe("LocalGameController", () => {
     game.clickPoint("O1");
 
     expect(game.state.board.O1).toBe("A");
+    expect(game.feedback?.cues).toEqual(["place"]);
     expect(values.get(LOCAL_GAME_STORAGE_KEY)).toBeDefined();
+  });
+
+  it("emits place and jare feedback for the first placement jare", () => {
+    const game = createLocalGameController({ storage });
+
+    game.clickPoint("O1");
+    game.clickPoint("M1");
+    game.clickPoint("O2");
+    game.clickPoint("M3");
+    game.clickPoint("O3");
+
+    expect(game.state.firstAdvantage).toBe("A");
+    expect(game.feedback?.cues).toEqual(["place", "jare"]);
+  });
+
+  it("does not emit jare feedback for no-jare first-advantage fallback", () => {
+    const game = createLocalGameController({ storage });
+
+    for (const point of noJarePlacementOrder) {
+      game.clickPoint(point);
+    }
+
+    expect(game.state.phase).toBe("initialRemoval");
+    expect(game.state.firstAdvantage).toBe("B");
+    expect(game.feedback?.cues).toEqual(["place"]);
   });
 
   it("tracks invalid point feedback", () => {
@@ -36,6 +62,62 @@ describe("LocalGameController", () => {
     game.clickPoint("O1");
 
     expect(game.invalid?.reason).toBe("illegalPoint");
+    expect(game.feedback?.cues).toEqual(["invalid"]);
+  });
+
+  it("emits move feedback for ordinary movement", () => {
+    const game = createLocalGameController({
+      initialState: gameFixtures.movement,
+      storage,
+    });
+
+    game.clickPoint("O8");
+    game.clickPoint("O1");
+
+    expect(game.feedback?.cues).toEqual(["move"]);
+  });
+
+  it("emits move and jare feedback for movement-phase jare", () => {
+    const game = createLocalGameController({
+      initialState: gameFixtures.repeatedJare,
+      storage,
+    });
+
+    game.clickPoint("O4");
+    game.clickPoint("O3");
+
+    expect(game.state.phase).toBe("capture");
+    expect(game.feedback?.cues).toEqual(["move", "jare"]);
+  });
+
+  it("emits capture feedback for non-terminal capture", () => {
+    const game = createLocalGameController({
+      initialState: {
+        ...gameFixtures.capturePending,
+        board: {
+          ...gameFixtures.capturePending.board,
+          M1: "B",
+        },
+      },
+      storage,
+    });
+
+    game.clickPoint("O5");
+
+    expect(game.state.phase).toBe("movement");
+    expect(game.feedback?.cues).toEqual(["capture"]);
+  });
+
+  it("emits capture and win feedback for terminal capture", () => {
+    const game = createLocalGameController({
+      initialState: gameFixtures.capturePending,
+      storage,
+    });
+
+    game.clickPoint("O5");
+
+    expect(game.state.phase).toBe("gameOver");
+    expect(game.feedback?.cues).toEqual(["capture", "win"]);
   });
 
   it("resigns with the legal resign action", () => {
@@ -49,6 +131,18 @@ describe("LocalGameController", () => {
     expect(game.state.phase).toBe("gameOver");
     expect(game.state.winner).toBe("B");
     expect(game.state.endReason).toBe("resignation");
+    expect(game.feedback?.cues).toEqual(["win"]);
+  });
+
+  it("uses capture feedback for initial removal", () => {
+    const game = createLocalGameController({
+      initialState: gameFixtures.initialRemoval,
+      storage,
+    });
+
+    game.clickPoint("O1");
+
+    expect(game.feedback?.cues).toEqual(["capture"]);
   });
 
   it("clears saved game when starting over after confirmation", () => {

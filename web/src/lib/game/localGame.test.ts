@@ -26,6 +26,11 @@ describe("LocalGameController", () => {
     game.clickPoint("O1");
 
     expect(game.state.board.O1).toBe("A");
+    expect(game.lastAction).toMatchObject({
+      action: { type: "place", player: "A", point: "O1" },
+      nonce: 1,
+    });
+    expect(game.invalidNonce).toBe(0);
     expect(values.get(LOCAL_GAME_STORAGE_KEY)).toBeDefined();
   });
 
@@ -36,6 +41,20 @@ describe("LocalGameController", () => {
     game.clickPoint("O1");
 
     expect(game.invalid?.reason).toBe("illegalPoint");
+    expect(game.invalid?.nonce).toBe(1);
+    expect(game.invalidNonce).toBe(1);
+  });
+
+  it("increments successful action feedback for each applied engine action", () => {
+    const game = createLocalGameController({ storage });
+
+    game.clickPoint("O1");
+    game.clickPoint("O2");
+
+    expect(game.lastAction).toMatchObject({
+      action: { type: "place", player: "B", point: "O2" },
+      nonce: 2,
+    });
   });
 
   it("resigns with the legal resign action", () => {
@@ -62,7 +81,29 @@ describe("LocalGameController", () => {
     expect(game.startNewGame()).toBe(true);
 
     expect(game.state.phase).toBe("placement");
+    expect(game.lastAction).toBeNull();
+    expect(game.invalid).toBeNull();
+    expect(game.invalidNonce).toBe(0);
     expect(values.get(LOCAL_GAME_STORAGE_KEY)).toBeUndefined();
+  });
+
+  it("clears transient feedback when starting a new game", () => {
+    const game = createLocalGameController({
+      storage,
+      confirmNewGame: () => true,
+    });
+
+    game.clickPoint("O1");
+    game.clickPoint("O1");
+
+    expect(game.lastAction).not.toBeNull();
+    expect(game.invalidNonce).toBe(1);
+
+    expect(game.startNewGame()).toBe(true);
+
+    expect(game.lastAction).toBeNull();
+    expect(game.invalid).toBeNull();
+    expect(game.invalidNonce).toBe(0);
   });
 
   it("resumes saved unfinished games", () => {

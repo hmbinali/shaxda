@@ -74,6 +74,36 @@ describe("buildBoardView", () => {
     expect(captureTargetPointIds(view.points)).toEqual([]);
   });
 
+  it("exposes jare line metadata separately from structural lines", () => {
+    const view = buildBoardView(gameFixtures.placementJare);
+    const line = view.jareLines.find(
+      (candidate) => candidate.id === "O1-O2-O3",
+    );
+
+    expect(view.jareLines).toHaveLength(16);
+    expect(line).toMatchObject({
+      id: "O1-O2-O3",
+      points: ["O1", "O2", "O3"],
+      isCompleted: true,
+      owner: "A",
+      isActivePendingCapture: false,
+    });
+  });
+
+  it("marks the pending-capture jare line through the engine helper", () => {
+    const view = buildBoardView(gameFixtures.capturePending);
+    const activeLines = view.jareLines.filter(
+      (line) => line.isActivePendingCapture,
+    );
+
+    expect(activeLines).toHaveLength(1);
+    expect(activeLines[0]).toMatchObject({
+      id: "O1-O2-O3",
+      owner: "A",
+      isCompleted: true,
+    });
+  });
+
   it("does not add decorations for the empty board or blocked movement fixture", () => {
     expect(decorationCount(gameFixtures.emptyBoard)).toBe(0);
     expect(

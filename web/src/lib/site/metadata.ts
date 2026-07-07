@@ -1,7 +1,7 @@
 import { env } from "$env/dynamic/public";
 
 export const fallbackSiteOrigin = "https://shaxda.example";
-export const ogImagePath = "/og-image.svg";
+export const ogImagePath = "/og-image.png";
 
 export function siteOrigin(): string {
   const configuredOrigin = env.PUBLIC_SITE_ORIGIN?.trim();

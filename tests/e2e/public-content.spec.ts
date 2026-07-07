@@ -58,7 +58,23 @@ test.describe("C1 public content", () => {
       );
       await expect(page.locator("meta[property='og:image']")).toHaveAttribute(
         "content",
-        /\/og-image\.svg$/,
+        /\/og-image\.png$/,
+      );
+      await expect(
+        page.locator("meta[property='og:image:width']"),
+      ).toHaveAttribute("content", "1200");
+      await expect(
+        page.locator("meta[property='og:image:height']"),
+      ).toHaveAttribute("content", "630");
+      await expect(
+        page.locator("meta[property='og:image:type']"),
+      ).toHaveAttribute("content", "image/png");
+      await expect(
+        page.locator("link[rel='apple-touch-icon']"),
+      ).toHaveAttribute("href", /\/apple-touch-icon\.png$/);
+      await expect(page.locator("link[rel='icon']")).toHaveAttribute(
+        "href",
+        /\/favicon\.png$/,
       );
       await expect(page.locator("meta[name='twitter:title']")).toHaveAttribute(
         "content",
@@ -115,5 +131,33 @@ test.describe("C1 public content", () => {
     expect(manifest.description).toContain("Shaxda");
     expect(manifest.description).toContain("Soomaali");
     expect(manifest.description).not.toContain("Free Somali shaxda board game");
+    expect(manifest.icons).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          src: "/icon-192.png",
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "any",
+        }),
+        expect.objectContaining({
+          src: "/icon-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any",
+        }),
+        expect.objectContaining({
+          src: "/icon-maskable-192.png",
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "maskable",
+        }),
+        expect.objectContaining({
+          src: "/icon-maskable-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
+        }),
+      ]),
+    );
   });
 });

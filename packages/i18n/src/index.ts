@@ -58,6 +58,62 @@ export const messages = {
       },
       emptyPoint: "Bar bannaan",
     },
+    localGame: {
+      title: "Ciyaar qalabkan",
+      description: "Ciyaar shax laba qof ah oo hal qalab lagu wada ciyaaro.",
+      heading: "Ciyaar qalabkan",
+      phaseLabel: "Wejiga",
+      turnLabel: "Wareegga",
+      actingLabel: "Ciyaaraya",
+      firstAdvantageLabel: "Horrayn",
+      piecesLabel: "Dhagax",
+      inHandLabel: "Gacanta",
+      onBoardLabel: "Looxa",
+      capturedLabel: "Qabtay",
+      turnsSinceCaptureLabel: "Dhaqaaqyo qabasho la'aan",
+      blockedPrompt:
+        "Ciyaaryahanka wareegga leh wuu xanniban yahay; ciyaaryahanka kale ha baneeyo meel sharci ah.",
+      playerNames: {
+        A: "Ciyaaryahan A",
+        B: "Ciyaaryahan B",
+      },
+      phases: {
+        placement: "Dhigis",
+        initialRemoval: "Ka saarista bilowga",
+        movement: "Dhaqdhaqaaq",
+        capture: "Qabasho",
+        gameOver: "Dhammaad",
+      },
+      controls: {
+        newGame: "Ciyaar cusub",
+        resign: "Is dhiib",
+      },
+      prompts: {
+        newGame: "Ciyaar cusub ma bilaabaysaa?",
+      },
+      invalid: {
+        gameOver: "Ciyaartu way dhammaatay.",
+        illegalPoint: "Bartaas hadda lama ciyaari karo.",
+        selectMovablePiece: "Dooro dhagax dhaqaaqi kara.",
+        illegalMove: "Dhaqaaqaas sharci ma aha.",
+        actionRejected: "Tallaabada lama aqbalin.",
+      },
+      result: {
+        winnerLabel: "Guuleystay",
+        drawLabel: "Barbaro",
+        reasons: {
+          opponentBelowThree:
+            "Qofka ka soo horjeeda wuxuu ka haray wax ka yar saddex dhagax.",
+          opponentCapturedAll:
+            "Dhammaan dhagaxa qofka ka soo horjeeda waa la qabtay.",
+          resignation: "Ciyaaryahan ayaa is dhiibay.",
+          drawTermination: "Ciyaartu waxay ku dhammaatay barbaro.",
+          bothBlocked: "Labada ciyaaryahanba way xanniban yihiin.",
+          forcedJareSpaceMaking:
+            "Bannaynta keliya waxay samayn lahayd jare qasab ah.",
+        },
+      },
+    },
   },
 } as const;
 

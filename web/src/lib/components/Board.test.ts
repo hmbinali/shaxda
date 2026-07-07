@@ -1,6 +1,6 @@
-import { render } from "@testing-library/svelte";
+import { fireEvent, render } from "@testing-library/svelte";
 import { gameFixtures } from "@shaxda/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import Board from "./Board.svelte";
 
 describe("Board", () => {
@@ -46,6 +46,38 @@ describe("Board", () => {
     expect(
       container.querySelectorAll('[data-testid="board-capture-target"]'),
     ).toHaveLength(3);
+  });
+
+  it("keeps static board points non-interactive by default", () => {
+    const { container } = render(Board, {
+      props: { state: gameFixtures.emptyBoard },
+    });
+
+    expect(point(container, "O1")).not.toHaveAttribute("role");
+    expect(point(container, "O1")).not.toHaveAttribute("tabindex");
+  });
+
+  it("calls point callbacks for interactive clicks and keyboard activation", async () => {
+    const onSelectPoint = vi.fn();
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.emptyBoard,
+        interactive: true,
+        onSelectPoint,
+      },
+    });
+
+    await fireEvent.click(point(container, "O1"));
+    await fireEvent.keyDown(point(container, "O2"), { key: "Enter" });
+    await fireEvent.keyDown(point(container, "O3"), { key: " " });
+    await fireEvent.keyDown(point(container, "O4"), { key: "Escape" });
+
+    expect(point(container, "O1")).toHaveAttribute("role", "button");
+    expect(point(container, "O1")).toHaveAttribute("tabindex", "0");
+    expect(onSelectPoint).toHaveBeenCalledTimes(3);
+    expect(onSelectPoint).toHaveBeenNthCalledWith(1, "O1");
+    expect(onSelectPoint).toHaveBeenNthCalledWith(2, "O2");
+    expect(onSelectPoint).toHaveBeenNthCalledWith(3, "O3");
   });
 });
 

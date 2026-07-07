@@ -39,4 +39,15 @@ describe("i18n scaffold", () => {
     expect(siteContent.so.pages.rules.jareLines).toContain("O1 - O2 - O3");
     expect(siteContent.so.pages.rules.jareLines).toContain("O8 - M8 - I8");
   });
+
+  it("covers every current local game end reason", () => {
+    expect(Object.keys(messages.so.localGame.result.reasons).sort()).toEqual([
+      "bothBlocked",
+      "drawTermination",
+      "forcedJareSpaceMaking",
+      "opponentBelowThree",
+      "opponentCapturedAll",
+      "resignation",
+    ]);
+  });
 });

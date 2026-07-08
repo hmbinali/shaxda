@@ -33,3 +33,6 @@ jobs:
 
       - name: End-to-end tests
         run: pnpm test:e2e
+
+      - name: Performance audit
+        run: pnpm test:perf

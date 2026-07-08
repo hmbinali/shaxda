@@ -16,7 +16,8 @@
     "test:watch": "vitest --watch",
     "test:worker": "turbo run test:worker",
     "test:e2e": "playwright test",
-    "check": "pnpm format:check && pnpm check:hibernation && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "test:perf": "lhci autorun",
+    "check": "pnpm format:check && pnpm check:hibernation && pnpm lint && pnpm typecheck && pnpm test && pnpm test:worker && pnpm build",
     "check:hibernation": "node scripts/check-hibernation.mjs",
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",
@@ -32,6 +33,8 @@
     ]
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.54.1",
     "@types/node": "^22.15.3",
     "eslint": "^9.30.1",

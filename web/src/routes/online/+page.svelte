@@ -81,6 +81,9 @@
     const linkedRoom = new URL(window.location.href).searchParams.get("room");
     if (linkedRoom !== null) {
       roomCodeInput = linkedRoom.trim().toUpperCase();
+      if (roomCodeInput.length > 0 && displayName.trim().length > 0) {
+        controller.joinRoom(roomCodeInput, guestId, displayName);
+      }
     }
 
     void renderTurnstile();

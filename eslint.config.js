@@ -9,6 +9,10 @@ export default tseslint.config(
     ignores: [
       ".svelte-kit/**",
       "**/.svelte-kit/**",
+      ".wrangler/**",
+      "**/.wrangler/**",
+      ".mf/**",
+      "**/.mf/**",
       "build/**",
       "**/build/**",
       "coverage/**",

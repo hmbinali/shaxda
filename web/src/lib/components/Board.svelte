@@ -106,7 +106,7 @@
       class="shaxda-board-svg h-full w-full overflow-visible"
       viewBox="0 0 100 100"
       preserveAspectRatio="xMidYMid meet"
-      role="img"
+      role="group"
       aria-label={copy.title}
     >
       <defs>

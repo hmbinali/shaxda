@@ -12,6 +12,7 @@ build/
 coverage/
 test-results/
 playwright-report/
+.lighthouseci/
 
 # Environment / secrets
 .env

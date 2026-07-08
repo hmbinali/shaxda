@@ -14,12 +14,19 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: /mobile-smoke\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "mobile-chromium",
+      testMatch: /mobile-smoke\.spec\.ts/,
+      use: { ...devices["Pixel 5"] },
     },
   ],
   webServer: [
     {
-      command: "pnpm --filter @shaxda/worker dev -- --ip 127.0.0.1 --port 8787",
+      command:
+        "rm -rf test-results/wrangler-e2e && pnpm --filter @shaxda/worker dev -- --ip 127.0.0.1 --port 8787 --persist-to ../test-results/wrangler-e2e",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       url: "http://127.0.0.1:8787/health",

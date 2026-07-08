@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("O1 guest online game", () => {
-  test("creates, joins by link, and syncs an authoritative move", async ({
+  test("creates, joins by link, syncs a move, and reconnects after refresh", async ({
     browser,
     page: creator,
   }) => {
@@ -31,6 +31,15 @@ test.describe("O1 guest online game", () => {
         "A",
       );
       await expect(joiner.locator('[data-point-id="O1"]')).toHaveAttribute(
+        "data-occupant",
+        "A",
+      );
+
+      await creator.reload();
+
+      await expect(creator.getByTestId("online-board")).toBeVisible();
+      await expect(creator.getByText("Wuu xiran yahay")).toBeVisible();
+      await expect(creator.locator('[data-point-id="O1"]')).toHaveAttribute(
         "data-occupant",
         "A",
       );

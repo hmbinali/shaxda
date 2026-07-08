@@ -17,6 +17,9 @@ import {
   gameStateSchema,
   healthResponseSchema,
   protocolVersion,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+  roomCodeSchema,
   serverMessageSchema,
   appMetadata,
 } from "./index";
@@ -121,18 +124,28 @@ describe("game contract schemas", () => {
 });
 
 describe("WebSocket protocol schemas", () => {
+  it("uses strict generated room-code shape", () => {
+    expect(roomCodeSchema.parse("ABCDEFGH")).toBe("ABCDEFGH");
+    expect(ROOM_CODE_ALPHABET).toBe("ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
+    expect(ROOM_CODE_LENGTH).toBe(8);
+
+    for (const roomCode of ["ABCD", "ROOM-1", "O2345678", "I2345678"]) {
+      expect(() => roomCodeSchema.parse(roomCode)).toThrow();
+    }
+  });
+
   it("requires protocol version 1 on client messages", () => {
     expect(
       clientMessageSchema.parse({
         v: protocolVersion,
         type: "gameAction",
-        roomCode: "ABCD",
+        roomCode: "ABCDEFGH",
         action: { type: "resign", player: "A" },
       }),
     ).toEqual({
       v: 1,
       type: "gameAction",
-      roomCode: "ABCD",
+      roomCode: "ABCDEFGH",
       action: { type: "resign", player: "A" },
     });
 
@@ -149,13 +162,13 @@ describe("WebSocket protocol schemas", () => {
       serverMessageSchema.parse({
         v: protocolVersion,
         type: "state",
-        roomCode: "ROOM-1",
+        roomCode: "ABCDEFGH",
         state: gameFixtures.emptyBoard,
       }),
     ).toMatchObject({
       v: 1,
       type: "state",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
     });
   });
 
@@ -164,7 +177,7 @@ describe("WebSocket protocol schemas", () => {
       serverMessageSchema.parse({
         v: protocolVersion,
         type: "presence",
-        roomCode: "ROOM-1",
+        roomCode: "ABCDEFGH",
         players: {
           A: { displayName: "Ayaan" },
           B: null,
@@ -174,7 +187,7 @@ describe("WebSocket protocol schemas", () => {
     ).toEqual({
       v: 1,
       type: "presence",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       players: {
         A: { displayName: "Ayaan" },
         B: null,
@@ -188,13 +201,13 @@ describe("WebSocket protocol schemas", () => {
       clientMessageSchema.parse({
         v: protocolVersion,
         type: "echo",
-        roomCode: "ROOM-1",
+        roomCode: "ABCDEFGH",
         payload: "hello",
       }),
     ).toEqual({
       v: 1,
       type: "echo",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       payload: "hello",
     });
 
@@ -202,14 +215,14 @@ describe("WebSocket protocol schemas", () => {
       serverMessageSchema.parse({
         v: protocolVersion,
         type: "joined",
-        roomCode: "ROOM-1",
+        roomCode: "ABCDEFGH",
         guestId: "guest-id-a",
         slot: "A",
       }),
     ).toMatchObject({
       v: 1,
       type: "joined",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       guestId: "guest-id-a",
       slot: "A",
     });
@@ -218,14 +231,14 @@ describe("WebSocket protocol schemas", () => {
       serverMessageSchema.parse({
         v: protocolVersion,
         type: "echoBroadcast",
-        roomCode: "ROOM-1",
+        roomCode: "ABCDEFGH",
         fromGuestId: "guest-id-a",
         payload: "hello",
       }),
     ).toMatchObject({
       v: 1,
       type: "echoBroadcast",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       fromGuestId: "guest-id-a",
       payload: "hello",
     });
@@ -236,19 +249,19 @@ describe("WebSocket protocol schemas", () => {
       clientMessageSchema.parse({
         v: protocolVersion,
         type: "claimWin",
-        roomCode: "ROOM-1",
+        roomCode: "ABCDEFGH",
       }),
     ).toEqual({
       v: 1,
       type: "claimWin",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
     });
 
     expect(
       serverMessageSchema.parse({
         v: protocolVersion,
         type: "matchStatus",
-        roomCode: "ROOM-1",
+        roomCode: "ABCDEFGH",
         connections: { A: true, B: false },
         idleSlot: null,
         claimableBy: "A",
@@ -257,7 +270,7 @@ describe("WebSocket protocol schemas", () => {
     ).toEqual({
       v: 1,
       type: "matchStatus",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       connections: { A: true, B: false },
       idleSlot: null,
       claimableBy: "A",
@@ -268,14 +281,14 @@ describe("WebSocket protocol schemas", () => {
       serverMessageSchema.parse({
         v: protocolVersion,
         type: "matchEnded",
-        roomCode: "ROOM-1",
+        roomCode: "ABCDEFGH",
         winner: "A",
         reason: "opponentIdleTimeout",
       }),
     ).toEqual({
       v: 1,
       type: "matchEnded",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       winner: "A",
       reason: "opponentIdleTimeout",
     });

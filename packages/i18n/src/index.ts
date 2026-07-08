@@ -192,6 +192,12 @@ export const messages = {
         notSpaceMaking: "Dhaqaaqaas meel bannayn sharci ah ma aha.",
         unsupportedAction: "Tallaabadaas lama taageero.",
         notClaimable: "Guusha hadda lama qaadan karo.",
+        rateLimited: "Codsiyo badan ayaa yimid; sug wax yar.",
+        tooManyRooms: "Qolal badan ayaad furtay; mid isticmaal ama sug.",
+        capacityFull: "Adeeggu hadda wuu buuxaa; mar kale isku day.",
+        turnstileFailed: "Hubinta amniga lama dhammaystirin.",
+        messageTooLarge: "Fariintu way ka weyn tahay inta la oggol yahay.",
+        createFailed: "Qolka lama samayn karo hadda.",
       },
       form: {
         namePlaceholder: "Magacaaga",

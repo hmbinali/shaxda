@@ -19,7 +19,7 @@ const checks = [
   {
     name: "setTimeout in Durable Object lifecycle source",
     pattern: /\bsetTimeout\s*\(/g,
-    appliesTo: (filePath) => path.basename(filePath) === "match-room.ts",
+    appliesTo: () => true,
   },
 ];
 

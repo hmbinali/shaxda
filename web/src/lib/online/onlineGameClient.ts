@@ -29,6 +29,13 @@ export interface OnlineGameClientOptions extends OnlineGameClientCallbacks {
   WebSocketCtor?: typeof WebSocket;
 }
 
+export class OnlineCreateRoomError extends Error {
+  constructor(readonly code: string) {
+    super(code);
+    this.name = "OnlineCreateRoomError";
+  }
+}
+
 export class OnlineGameClient {
   static readonly reconnectDelaysMs = [1_000, 2_000, 4_000, 8_000, 10_000];
 
@@ -56,14 +63,15 @@ export class OnlineGameClient {
     };
   }
 
-  async createRoom(): Promise<string> {
+  async createRoom(turnstileToken?: string): Promise<string> {
     const response = await this.#fetch(`${this.#httpBase}/rooms`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(turnstileToken ? { turnstileToken } : {}),
     });
 
     if (!response.ok) {
-      throw new Error("Room could not be created.");
+      throw new OnlineCreateRoomError(await createRoomErrorCode(response));
     }
 
     const message = serverMessageSchema.parse(await response.json());
@@ -234,6 +242,20 @@ export class OnlineGameClient {
     this.#socket = null;
     socket?.close();
   }
+}
+
+async function createRoomErrorCode(response: Response): Promise<string> {
+  const body = await response.json().catch(() => null);
+  if (
+    body &&
+    typeof body === "object" &&
+    "code" in body &&
+    typeof body.code === "string"
+  ) {
+    return body.code;
+  }
+
+  return "createFailed";
 }
 
 function buildJoinMessage(options: JoinRoomOptions): unknown {

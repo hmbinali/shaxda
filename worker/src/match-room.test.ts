@@ -17,14 +17,14 @@ import {
   a2ConformanceActionScripts,
   fullGameActionScripts,
   protocolVersion,
+  ROOM_CODE_ALPHABET,
   serverMessageSchema,
 } from "@shaxda/shared";
 import type { ServerMessage } from "@shaxda/shared";
 
-const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
 const testEnv = env as {
   MATCH_ROOM: DurableObjectNamespace;
+  MATCH_COORDINATOR: DurableObjectNamespace;
 };
 
 afterEach(async () => {
@@ -226,6 +226,73 @@ describe("match room hibernation spike", () => {
       type: "pong",
       nonce: "after-error",
     });
+
+    socket.close();
+  });
+
+  it("rejects oversized messages and keeps the socket usable", async () => {
+    const roomCode = await createRoom();
+    const socket = await connectRoom(roomCode);
+
+    socket.send("x".repeat(4_097));
+    await expect(nextJson(socket)).resolves.toMatchObject({
+      type: "error",
+      code: "messageTooLarge",
+    });
+
+    sendJson(socket, {
+      v: protocolVersion,
+      type: "ping",
+      nonce: "after-oversize",
+    });
+    await expect(nextJson(socket)).resolves.toMatchObject({
+      type: "pong",
+      nonce: "after-oversize",
+    });
+
+    socket.close();
+  });
+
+  it("rate-limits message floods and recovers after the window", async () => {
+    const now = 1_000_000;
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const roomCode = await createRoom();
+    const socket = await connectRoom(roomCode);
+
+    for (let index = 0; index < 31; index += 1) {
+      sendJson(socket, {
+        v: protocolVersion,
+        type: "ping",
+        nonce: `flood-${index}`,
+      });
+    }
+
+    await expect(waitForMessage(socket, "error")).resolves.toMatchObject({
+      code: "rateLimited",
+    });
+
+    sendJson(socket, {
+      v: protocolVersion,
+      type: "ping",
+      nonce: "still-limited",
+    });
+    await expect(waitForMessage(socket, "error")).resolves.toMatchObject({
+      code: "rateLimited",
+    });
+
+    vi.mocked(Date.now).mockReturnValue(now + 11_000);
+    sendJson(socket, {
+      v: protocolVersion,
+      type: "ping",
+      nonce: "after-window",
+    });
+    await expect(
+      waitForMessageWhere(
+        socket,
+        "pong",
+        (message) => message.nonce === "after-window",
+      ),
+    ).resolves.toMatchObject({ nonce: "after-window" });
 
     socket.close();
   });
@@ -668,6 +735,17 @@ describe("match room hibernation spike", () => {
     await runInDurableObject(stub, async (_instance, state) => {
       await expect(state.storage.get("room")).resolves.toBeUndefined();
     });
+    await runInDurableObject(coordinatorStub(), async (_instance, state) => {
+      const coordinator =
+        await state.storage.get<Record<string, unknown>>("coordinator");
+      expect(
+        coordinator &&
+          typeof coordinator === "object" &&
+          "activeRooms" in coordinator
+          ? (coordinator.activeRooms as Record<string, unknown>)[roomCode]
+          : undefined,
+      ).toBeUndefined();
+    });
 
     const response = await websocketResponse(roomCode);
     expect(response.status).toBe(404);
@@ -825,6 +903,12 @@ function nextJson(socket: WebSocket, timeoutMs = 1_000): Promise<unknown> {
 
 function roomStub(roomCode: string): DurableObjectStub {
   return testEnv.MATCH_ROOM.get(testEnv.MATCH_ROOM.idFromName(roomCode));
+}
+
+function coordinatorStub(): DurableObjectStub {
+  return testEnv.MATCH_COORDINATOR.get(
+    testEnv.MATCH_COORDINATOR.idFromName("global"),
+  );
 }
 
 async function triggerRoomAlarm(roomCode: string): Promise<void> {

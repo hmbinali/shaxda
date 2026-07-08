@@ -25,7 +25,22 @@
     loadGuestDisplayName,
     saveGuestDisplayName,
   } from "$lib/online/guestIdentity";
+  import { OnlineCreateRoomError } from "$lib/online/onlineGameClient";
   import { createOnlineGameController } from "$lib/online/onlineGame.svelte";
+
+  type TurnstileApi = {
+    render: (
+      container: HTMLElement,
+      options: {
+        sitekey: string;
+        callback: (token: string) => void;
+        "expired-callback": () => void;
+        "error-callback": () => void;
+      },
+    ) => string;
+    reset: (widgetId?: string) => void;
+    remove?: (widgetId: string) => void;
+  };
 
   const copy = messages.so.onlineGame;
   const gameCopy = messages.so.localGame;
@@ -42,6 +57,12 @@
   let copied = $state(false);
   let soundEnabled = $state(true);
   let lastFeedbackNonce = 0;
+  let turnstileToken = $state<string | undefined>();
+  let turnstileContainer = $state<HTMLDivElement | null>(null);
+  let turnstileWidgetId: string | undefined;
+
+  const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
+  const turnstileRequired = $derived(turnstileSiteKey.length > 0);
 
   const status = $derived(controller.status);
   const shareLink = $derived(
@@ -61,6 +82,14 @@
     if (linkedRoom !== null) {
       roomCodeInput = linkedRoom.trim().toUpperCase();
     }
+
+    void renderTurnstile();
+
+    return () => {
+      if (turnstileWidgetId && window.turnstile?.remove) {
+        window.turnstile.remove(turnstileWidgetId);
+      }
+    };
   });
 
   $effect(() => {
@@ -82,16 +111,29 @@
       return;
     }
 
+    if (turnstileRequired && !turnstileToken) {
+      formError = copy.errors.turnstileFailed;
+      return;
+    }
+
     busy = true;
     formError = null;
     saveGuestDisplayName(displayName);
 
     try {
-      const roomCode = await controller.createRoom(guestId, displayName);
+      const roomCode = await controller.createRoom(
+        guestId,
+        displayName,
+        turnstileToken,
+      );
       roomCodeInput = roomCode;
       replaceState(resolve(`/online?room=${roomCode}`), {});
-    } catch {
-      formError = copy.errors.roomNotFound;
+    } catch (error) {
+      formError =
+        error instanceof OnlineCreateRoomError
+          ? errorMessage(error.code)
+          : copy.errors.createFailed;
+      resetTurnstile();
     } finally {
       busy = false;
     }
@@ -175,6 +217,67 @@
     return code in copy.errors
       ? copy.errors[code as keyof typeof copy.errors]
       : copy.invalid.actionRejected;
+  }
+
+  async function renderTurnstile(): Promise<void> {
+    if (!turnstileRequired || turnstileContainer === null) {
+      return;
+    }
+
+    const turnstile = await loadTurnstile();
+    if (!turnstile || turnstileWidgetId) {
+      return;
+    }
+
+    turnstileWidgetId = turnstile.render(turnstileContainer, {
+      sitekey: turnstileSiteKey,
+      callback: (token) => {
+        turnstileToken = token;
+      },
+      "expired-callback": () => {
+        turnstileToken = undefined;
+      },
+      "error-callback": () => {
+        turnstileToken = undefined;
+        formError = copy.errors.turnstileFailed;
+      },
+    });
+  }
+
+  function resetTurnstile(): void {
+    turnstileToken = undefined;
+    if (turnstileWidgetId) {
+      window.turnstile?.reset(turnstileWidgetId);
+    }
+  }
+
+  async function loadTurnstile(): Promise<TurnstileApi | undefined> {
+    if (window.turnstile) {
+      return window.turnstile;
+    }
+
+    await new Promise<void>((resolveScript) => {
+      const existing = document.querySelector<HTMLScriptElement>(
+        'script[src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"]',
+      );
+      if (existing) {
+        existing.addEventListener("load", () => resolveScript(), {
+          once: true,
+        });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src =
+        "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      script.addEventListener("load", () => resolveScript(), { once: true });
+      script.addEventListener("error", () => resolveScript(), { once: true });
+      document.head.append(script);
+    });
+
+    return window.turnstile;
   }
 
   function onlineResultReason(): string | null {
@@ -330,11 +433,17 @@
                 />
               </label>
 
+              {#if turnstileRequired}
+                <div bind:this={turnstileContainer}></div>
+              {/if}
+
               <div class="flex flex-wrap gap-2">
                 <button
                   class="inline-flex items-center gap-2 rounded bg-board-900 px-4 py-2 text-sm font-semibold text-board-50 hover:bg-board-700 disabled:cursor-not-allowed disabled:opacity-55"
                   type="submit"
-                  disabled={busy || guestId.length === 0}
+                  disabled={busy ||
+                    guestId.length === 0 ||
+                    (turnstileRequired && !turnstileToken)}
                   data-testid="create-room"
                 >
                   <Plus size={16} aria-hidden="true" />

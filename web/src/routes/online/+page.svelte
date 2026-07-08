@@ -4,6 +4,7 @@
     Flag,
     LogOut,
     Plus,
+    Trophy,
     Volume2,
     VolumeX,
   } from "@lucide/svelte";
@@ -175,6 +176,16 @@
       ? copy.errors[code as keyof typeof copy.errors]
       : copy.invalid.actionRejected;
   }
+
+  function onlineResultReason(): string | null {
+    if (controller.onlineEndReason === null || status.winner === null) {
+      return null;
+    }
+
+    const perspective =
+      status.winner === controller.mySlot ? "winner" : "loser";
+    return copy.result.reasons[controller.onlineEndReason][perspective];
+  }
 </script>
 
 <PageMeta title={copy.title} description={copy.description} path="/online" />
@@ -244,6 +255,50 @@
           >
             {formError ?? invalidMessage}
           </p>
+        {/if}
+
+        {#if controller.connectionStatus === "reconnecting"}
+          <p
+            class="mb-3 rounded border border-amber-700/25 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
+            role="status"
+          >
+            {copy.notices.reconnecting}
+          </p>
+        {/if}
+
+        {#if controller.started && controller.opponentConnected === false && controller.state.phase !== "gameOver"}
+          <p
+            class="mb-3 rounded border border-amber-700/25 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
+            role="status"
+          >
+            {copy.notices.opponentDisconnected}
+          </p>
+        {/if}
+
+        {#if controller.isIdlePlayer && controller.state.phase !== "gameOver"}
+          <p
+            class="mb-3 rounded border border-board-700/25 bg-white/70 px-3 py-2 text-sm font-medium text-board-900"
+            role="status"
+          >
+            {copy.notices.idleNudge}
+          </p>
+        {/if}
+
+        {#if controller.canClaimWin}
+          <div
+            class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-green-700/25 bg-green-50 px-3 py-2 text-sm font-medium text-green-900"
+            role="status"
+          >
+            <span>{copy.notices.claimAvailable}</span>
+            <button
+              class="inline-flex items-center gap-2 rounded bg-green-900 px-3 py-2 text-sm font-semibold text-white hover:bg-green-800"
+              type="button"
+              onclick={() => controller.claimWin()}
+            >
+              <Trophy size={16} aria-hidden="true" />
+              {copy.claimWin}
+            </button>
+          </div>
         {/if}
 
         {#if controller.roomCode === null}
@@ -442,7 +497,11 @@
                 {gameCopy.result.winnerLabel}: {playerName(status.winner)}
               </h2>
             {/if}
-            {#if status.endReason !== null}
+            {#if controller.onlineEndReason !== null}
+              <p class="mt-2 text-sm leading-6 text-board-100">
+                {onlineResultReason()}
+              </p>
+            {:else if status.endReason !== null}
               <p class="mt-2 text-sm leading-6 text-board-100">
                 {gameCopy.result.reasons[status.endReason]}
               </p>

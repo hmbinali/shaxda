@@ -25,6 +25,10 @@ export type OnlinePresence = Extract<
   ServerMessage,
   { type: "presence" }
 >["players"];
+export type OnlineMatchEndReason = Extract<
+  ServerMessage,
+  { type: "matchEnded" }
+>["reason"];
 
 export interface InvalidFeedback {
   reason: PointInteractionInvalidReason | "actionRejected";
@@ -51,6 +55,11 @@ export class OnlineGameController {
   mySlot = $state<PlayerId | null>(null);
   presence = $state<OnlinePresence>({ A: null, B: null });
   connectionStatus = $state<OnlineConnectionStatus>("idle");
+  connections = $state<Record<PlayerId, boolean>>({ A: false, B: false });
+  idleSlot = $state<PlayerId | null>(null);
+  claimableBy = $state<PlayerId | null>(null);
+  claimReason = $state<OnlineMatchEndReason | null>(null);
+  onlineEndReason = $state<OnlineMatchEndReason | null>(null);
   selected = $state<PointId | null>(null);
   invalid = $state<InvalidFeedback | null>(null);
   invalidNonce = $state(0);
@@ -59,6 +68,18 @@ export class OnlineGameController {
   lastServerError = $state<string | null>(null);
   status = $derived(buildGameStatus(this.state));
   started = $derived(this.presence.A !== null && this.presence.B !== null);
+  opponentConnected = $derived(
+    this.mySlot === null ? null : this.connections[otherSlot(this.mySlot)],
+  );
+  isIdlePlayer = $derived(
+    this.mySlot !== null && this.idleSlot === this.mySlot,
+  );
+  canClaimWin = $derived(
+    this.connectionStatus === "connected" &&
+      this.mySlot !== null &&
+      this.claimableBy === this.mySlot &&
+      this.state.phase !== "gameOver",
+  );
   canInteract = $derived(
     this.connectionStatus === "connected" &&
       this.started &&
@@ -143,6 +164,18 @@ export class OnlineGameController {
     this.sendAction({ type: "resign", player: this.mySlot });
   }
 
+  claimWin(): void {
+    if (!this.canClaimWin) {
+      this.markInvalid("actionRejected");
+      return;
+    }
+
+    const sent = this.#client.sendClaimWin(this.roomCode);
+    if (!sent) {
+      this.markInvalid("actionRejected");
+    }
+  }
+
   leave(): void {
     this.#client.close();
     this.roomCode = null;
@@ -171,6 +204,15 @@ export class OnlineGameController {
       case "state":
         this.receiveState(message.state);
         return;
+      case "matchStatus":
+        this.connections = message.connections;
+        this.idleSlot = message.idleSlot;
+        this.claimableBy = message.claimableBy;
+        this.claimReason = message.claimReason;
+        return;
+      case "matchEnded":
+        this.onlineEndReason = message.reason;
+        return;
       case "error":
         this.#pendingAction = null;
         this.lastServerError = message.code;
@@ -190,6 +232,9 @@ export class OnlineGameController {
     this.selected = null;
     this.invalid = null;
     this.lastServerError = null;
+    if (nextState.phase !== "gameOver") {
+      this.onlineEndReason = null;
+    }
 
     if (action !== null) {
       this.lastAction = { action, nonce: (this.#actionNonce += 1) };
@@ -219,6 +264,11 @@ export class OnlineGameController {
     this.state = createInitialState("A");
     this.mySlot = null;
     this.presence = { A: null, B: null };
+    this.connections = { A: false, B: false };
+    this.idleSlot = null;
+    this.claimableBy = null;
+    this.claimReason = null;
+    this.onlineEndReason = null;
     this.selected = null;
     this.invalid = null;
     this.lastAction = null;
@@ -235,3 +285,7 @@ export function createOnlineGameController(
 }
 
 export type OnlineGameStatus = GameStatus;
+
+function otherSlot(slot: PlayerId): PlayerId {
+  return slot === "A" ? "B" : "A";
+}

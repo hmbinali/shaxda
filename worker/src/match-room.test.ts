@@ -424,6 +424,207 @@ describe("match room hibernation spike", () => {
     second.close();
   });
 
+  it("marks a disconnected opponent claimable after grace", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+
+    first.close();
+    await waitForMessageWhere(second, "matchStatus", (message) => {
+      return message.connections.A === false;
+    });
+    await patchStoredRoom(roomCode, (room) => ({
+      ...room,
+      connections: {
+        ...(room.connections as Record<string, unknown>),
+        A: { connected: false, disconnectedAt: Date.now() - 60_000 },
+      },
+    }));
+
+    await triggerRoomAlarm(roomCode);
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      claimableBy: "B",
+      claimReason: "opponentAbandoned",
+    });
+
+    second.close();
+  });
+
+  it("rejects claim-win before eligibility", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+
+    first.close();
+    await waitForMessageWhere(second, "matchStatus", (message) => {
+      return message.connections.A === false;
+    });
+    sendClaimWin(second, roomCode);
+
+    await expect(waitForMessage(second, "error")).resolves.toMatchObject({
+      type: "error",
+      code: "notClaimable",
+    });
+
+    second.close();
+  });
+
+  it("lets the opponent claim a win after disconnect grace", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+
+    first.close();
+    await waitForMessageWhere(second, "matchStatus", (message) => {
+      return message.connections.A === false;
+    });
+    await patchStoredRoom(roomCode, (room) => ({
+      ...room,
+      connections: {
+        ...(room.connections as Record<string, unknown>),
+        A: { connected: false, disconnectedAt: Date.now() - 60_000 },
+      },
+    }));
+    await triggerRoomAlarm(roomCode);
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      claimableBy: "B",
+      claimReason: "opponentAbandoned",
+    });
+
+    const statePromise = waitForMessage(second, "state");
+    const endedPromise = waitForMessage(second, "matchEnded");
+    sendClaimWin(second, roomCode);
+
+    await expect(statePromise).resolves.toMatchObject({
+      type: "state",
+      state: { phase: "gameOver", winner: "B", endReason: "resignation" },
+    });
+    await expect(endedPromise).resolves.toMatchObject({
+      type: "matchEnded",
+      winner: "B",
+      reason: "opponentAbandoned",
+    });
+
+    const reconnected = await connectRoom(roomCode);
+    const rejoin = await joinAndWait(reconnected, roomCode, "guest-id-a");
+    expect(rejoin.state).toMatchObject({
+      type: "state",
+      state: { phase: "gameOver", winner: "B" },
+    });
+    await expect(
+      waitForMessage(reconnected, "matchEnded"),
+    ).resolves.toMatchObject({
+      type: "matchEnded",
+      winner: "B",
+      reason: "opponentAbandoned",
+    });
+
+    reconnected.close();
+    second.close();
+  });
+
+  it("nudges idle players once and allows idle claim-win", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await patchStoredRoom(roomCode, (room) => ({
+      ...room,
+      turnStartedAt: Date.now() - 90_000,
+      nudgedTurnAt: null,
+      claimableBy: null,
+      claimReason: null,
+    }));
+
+    await triggerRoomAlarm(roomCode);
+    const nudgedRoom = await readStoredRoom(roomCode);
+    if (!nudgedRoom) {
+      throw new Error("Expected stored room after idle nudge alarm.");
+    }
+    expect(nudgedRoom).toMatchObject({
+      nudgedTurnAt: nudgedRoom.turnStartedAt,
+      claimableBy: null,
+    });
+
+    await patchStoredRoom(roomCode, (room) => ({
+      ...room,
+      turnStartedAt: Date.now() - 240_000,
+    }));
+    await triggerRoomAlarm(roomCode);
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      claimableBy: "B",
+      claimReason: "opponentIdleTimeout",
+    });
+
+    const statePromise = waitForMessage(second, "state");
+    const endedPromise = waitForMessage(second, "matchEnded");
+    sendClaimWin(second, roomCode);
+
+    await expect(statePromise).resolves.toMatchObject({
+      type: "state",
+      state: { phase: "gameOver", winner: "B", endReason: "resignation" },
+    });
+    await expect(endedPromise).resolves.toMatchObject({
+      type: "matchEnded",
+      winner: "B",
+      reason: "opponentIdleTimeout",
+    });
+
+    first.close();
+    second.close();
+  });
+
+  it("clears abandonment claimability when the opponent reconnects", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+
+    first.close();
+    await waitForMessageWhere(second, "matchStatus", (message) => {
+      return message.connections.A === false;
+    });
+    await patchStoredRoom(roomCode, (room) => ({
+      ...room,
+      connections: {
+        ...(room.connections as Record<string, unknown>),
+        A: { connected: false, disconnectedAt: Date.now() - 60_000 },
+      },
+    }));
+    await triggerRoomAlarm(roomCode);
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      claimableBy: "B",
+      claimReason: "opponentAbandoned",
+    });
+
+    const reconnected = await connectRoom(roomCode);
+    await joinAndWait(reconnected, roomCode, "guest-id-a");
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      connections: {
+        A: { connected: true, disconnectedAt: null },
+        B: { connected: true, disconnectedAt: null },
+      },
+      claimableBy: null,
+      claimReason: null,
+    });
+
+    reconnected.close();
+    second.close();
+  });
+
   it("broadcasts resignation as a game-over state", async () => {
     const roomCode = await createRoom();
     const first = await connectRoom(roomCode);
@@ -535,6 +736,14 @@ function sendAction(
   });
 }
 
+function sendClaimWin(socket: WebSocket, roomCode: string): void {
+  sendJson(socket, {
+    v: protocolVersion,
+    type: "claimWin",
+    roomCode,
+  });
+}
+
 function joinRoom(
   roomCode: string,
   guestId: string,
@@ -583,6 +792,20 @@ async function waitForMessage<Type extends ServerMessage["type"]>(
   }
 }
 
+async function waitForMessageWhere<Type extends ServerMessage["type"]>(
+  socket: WebSocket,
+  type: Type,
+  predicate: (message: Extract<ServerMessage, { type: Type }>) => boolean,
+  timeoutMs = 1_000,
+): Promise<Extract<ServerMessage, { type: Type }>> {
+  for (;;) {
+    const message = await waitForMessage(socket, type, timeoutMs);
+    if (predicate(message)) {
+      return message;
+    }
+  }
+}
+
 function nextJson(socket: WebSocket, timeoutMs = 1_000): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -604,6 +827,12 @@ function roomStub(roomCode: string): DurableObjectStub {
   return testEnv.MATCH_ROOM.get(testEnv.MATCH_ROOM.idFromName(roomCode));
 }
 
+async function triggerRoomAlarm(roomCode: string): Promise<void> {
+  await runInDurableObject(roomStub(roomCode), async (instance) => {
+    await (instance as { alarm(): Promise<void> }).alarm();
+  });
+}
+
 async function replaceStoredGameState(
   roomCode: string,
   state: GameState,
@@ -616,6 +845,33 @@ async function replaceStoredGameState(
       gameState: serialize(state),
     });
   });
+}
+
+async function patchStoredRoom(
+  roomCode: string,
+  patch: (room: Record<string, unknown>) => Record<string, unknown>,
+): Promise<void> {
+  await runInDurableObject(roomStub(roomCode), async (_instance, storage) => {
+    const room = await storage.storage.get<Record<string, unknown>>("room");
+    expect(room).toBeDefined();
+    if (!room) {
+      return;
+    }
+
+    await storage.storage.put("room", patch(room));
+    await storage.storage.setAlarm(Date.now() + 1_000);
+  });
+}
+
+async function readStoredRoom(
+  roomCode: string,
+): Promise<Record<string, unknown> | undefined> {
+  let stored: Record<string, unknown> | undefined;
+  await runInDurableObject(roomStub(roomCode), async (_instance, storage) => {
+    stored = await storage.storage.get<Record<string, unknown>>("room");
+  });
+
+  return stored;
 }
 
 function firstPointOwnedBy(state: GameState, player: PlayerId): PointId {

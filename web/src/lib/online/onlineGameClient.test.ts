@@ -1,10 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gameFixtures, protocolVersion } from "@shaxda/shared";
 import { OnlineGameClient } from "./onlineGameClient";
 
 describe("OnlineGameClient", () => {
   beforeEach(() => {
     FakeWebSocket.sockets = [];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("creates rooms through the worker", async () => {
@@ -103,6 +107,148 @@ describe("OnlineGameClient", () => {
       "connecting",
       "connected",
     ]);
+  });
+
+  it("reconnects after unexpected close and resends join", () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onStatus: (status) => statuses.push(status),
+    });
+
+    client.connect({
+      roomCode: "ROOM-1",
+      guestId: "guest-id-a",
+      displayName: "Ayaan",
+    });
+    FakeWebSocket.latest().open();
+    FakeWebSocket.latest().close();
+
+    expect(statuses).toEqual(["connecting", "connected", "reconnecting"]);
+
+    vi.advanceTimersByTime(1_000);
+    const reconnected = FakeWebSocket.latest();
+    expect(FakeWebSocket.sockets).toHaveLength(2);
+    reconnected.open();
+
+    expect(JSON.parse(reconnected.sent[0] ?? "")).toEqual({
+      v: protocolVersion,
+      type: "joinRoom",
+      roomCode: "ROOM-1",
+      guestId: "guest-id-a",
+      displayName: "Ayaan",
+    });
+    expect(statuses.at(-1)).toBe("connected");
+  });
+
+  it("does not reconnect after intentional close", () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onStatus: (status) => statuses.push(status),
+    });
+
+    client.connect({ roomCode: "ROOM-1", guestId: "guest-id-a" });
+    FakeWebSocket.latest().open();
+    client.close();
+    vi.advanceTimersByTime(10_000);
+
+    expect(FakeWebSocket.sockets).toHaveLength(1);
+    expect(statuses).toEqual(["connecting", "connected"]);
+  });
+
+  it("stops reconnecting after five failed attempts", () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    const errors: string[] = [];
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onStatus: (status) => statuses.push(status),
+      onError: (error) => errors.push(error.message),
+    });
+
+    client.connect({ roomCode: "ROOM-1", guestId: "guest-id-a" });
+    FakeWebSocket.latest().open();
+    FakeWebSocket.latest().close();
+
+    for (const delay of OnlineGameClient.reconnectDelaysMs) {
+      vi.advanceTimersByTime(delay);
+      FakeWebSocket.latest().close();
+    }
+
+    expect(statuses.at(-1)).toBe("error");
+    expect(errors.at(-1)).toBe("WebSocket reconnect failed.");
+    expect(FakeWebSocket.sockets).toHaveLength(6);
+  });
+
+  it("parses match status and match-ended messages", () => {
+    const messages: unknown[] = [];
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onMessage: (message) => messages.push(message),
+    });
+
+    client.connect({ roomCode: "ROOM-1", guestId: "guest-id-a" });
+    const socket = FakeWebSocket.latest();
+    socket.open();
+    socket.message({
+      v: protocolVersion,
+      type: "matchStatus",
+      roomCode: "ROOM-1",
+      connections: { A: true, B: false },
+      idleSlot: null,
+      claimableBy: "A",
+      claimReason: "opponentAbandoned",
+    });
+    socket.message({
+      v: protocolVersion,
+      type: "matchEnded",
+      roomCode: "ROOM-1",
+      winner: "A",
+      reason: "opponentAbandoned",
+    });
+
+    expect(messages).toEqual([
+      expect.objectContaining({ type: "matchStatus", claimableBy: "A" }),
+      expect.objectContaining({
+        type: "matchEnded",
+        reason: "opponentAbandoned",
+      }),
+    ]);
+  });
+
+  it("sends claim-win messages", () => {
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+    });
+
+    client.connect({ roomCode: "ROOM-1", guestId: "guest-id-a" });
+    const socket = FakeWebSocket.latest();
+    socket.open();
+
+    expect(client.sendClaimWin()).toBe(true);
+    expect(JSON.parse(socket.sent[1] ?? "")).toEqual({
+      v: protocolVersion,
+      type: "claimWin",
+      roomCode: "ROOM-1",
+    });
   });
 });
 

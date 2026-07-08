@@ -33,26 +33,26 @@ describe("OnlineGameController", () => {
       client: client as unknown as OnlineGameClient,
     });
 
-    game.joinRoom("room-1", "guest-id-a", "Ayaan");
+    game.joinRoom("abcdefgh", "guest-id-a", "Ayaan");
     client.status("connected");
     client.message({
       v: protocolVersion,
       type: "joined",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       guestId: "guest-id-a",
       slot: "A",
     });
     client.message({
       v: protocolVersion,
       type: "presence",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       players: { A: { displayName: "Ayaan" }, B: { displayName: "Cabdi" } },
       started: true,
     });
     client.message({
       v: protocolVersion,
       type: "state",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       state: gameFixtures.emptyBoard,
     });
 
@@ -66,7 +66,7 @@ describe("OnlineGameController", () => {
     client.message({
       v: protocolVersion,
       type: "state",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       state: {
         ...gameFixtures.emptyBoard,
         board: { ...gameFixtures.emptyBoard.board, O1: "A" },
@@ -113,7 +113,7 @@ describe("OnlineGameController", () => {
     client.message({
       v: protocolVersion,
       type: "matchStatus",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       connections: { A: true, B: false },
       idleSlot: null,
       claimableBy: "A",
@@ -125,7 +125,7 @@ describe("OnlineGameController", () => {
 
     game.claimWin();
 
-    expect(client.claims).toEqual(["ROOM-1"]);
+    expect(client.claims).toEqual(["ABCDEFGH"]);
   });
 
   it("tracks idle status, reconnecting, and online end reasons", () => {
@@ -139,7 +139,7 @@ describe("OnlineGameController", () => {
     client.message({
       v: protocolVersion,
       type: "matchStatus",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       connections: { A: true, B: true },
       idleSlot: "A",
       claimableBy: null,
@@ -148,7 +148,7 @@ describe("OnlineGameController", () => {
     client.message({
       v: protocolVersion,
       type: "matchEnded",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       winner: "B",
       reason: "opponentIdleTimeout",
     });
@@ -180,7 +180,7 @@ describe("OnlineGameController", () => {
     client.message({
       v: protocolVersion,
       type: "state",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       state: gameFixtures.emptyBoard,
     });
 
@@ -199,7 +199,7 @@ describe("OnlineGameController", () => {
     client.message({
       v: protocolVersion,
       type: "state",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       state: firstPlacementState(),
     });
     client.message({
@@ -213,15 +213,15 @@ describe("OnlineGameController", () => {
     expect(game.lastAction).not.toBeNull();
     expect(game.feedback).not.toBeNull();
 
-    game.joinRoom("room-2", "guest-id-a", "Ayaan");
+    game.joinRoom("jklmnpqr", "guest-id-a", "Ayaan");
 
-    expect(client.joined?.roomCode).toBe("ROOM-2");
+    expect(client.joined?.roomCode).toBe("JKLMNPQR");
     expectDisplayedInitialState(game);
 
     client.message({
       v: protocolVersion,
       type: "state",
-      roomCode: "ROOM-2",
+      roomCode: "JKLMNPQR",
       state: firstPlacementState(),
     });
     client.message({
@@ -243,26 +243,26 @@ function joinStartedGame(
   game: ReturnType<typeof createOnlineGameController>,
   client: FakeClient,
 ): void {
-  game.joinRoom("room-1", "guest-id-a", "Ayaan");
+  game.joinRoom("abcdefgh", "guest-id-a", "Ayaan");
   client.status("connected");
   client.message({
     v: protocolVersion,
     type: "joined",
-    roomCode: "ROOM-1",
+    roomCode: "ABCDEFGH",
     guestId: "guest-id-a",
     slot: "A",
   });
   client.message({
     v: protocolVersion,
     type: "presence",
-    roomCode: "ROOM-1",
+    roomCode: "ABCDEFGH",
     players: { A: { displayName: "Ayaan" }, B: { displayName: "Cabdi" } },
     started: true,
   });
   client.message({
     v: protocolVersion,
     type: "state",
-    roomCode: "ROOM-1",
+    roomCode: "ABCDEFGH",
     state: gameFixtures.emptyBoard,
   });
 }
@@ -301,7 +301,7 @@ class FakeClient {
   joined: JoinRoomOptions | null = null;
 
   async createRoom(): Promise<string> {
-    return "ROOM-1";
+    return "ABCDEFGH";
   }
 
   connect(options: JoinRoomOptions): void {

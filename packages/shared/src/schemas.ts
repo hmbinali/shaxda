@@ -113,11 +113,14 @@ export const gameActionSchema = z.discriminatedUnion("type", [
   resignActionSchema,
 ]);
 
+export const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const ROOM_CODE_LENGTH = 8;
+const roomCodePattern = new RegExp(`^[${ROOM_CODE_ALPHABET}]+$`);
+
 export const roomCodeSchema = z
   .string()
-  .min(4)
-  .max(32)
-  .regex(/^[A-Z0-9-]+$/);
+  .length(ROOM_CODE_LENGTH)
+  .regex(roomCodePattern);
 export const guestIdSchema = z.string().min(8).max(128);
 export const guestDisplayNameSchema = z.string().min(1).max(40);
 

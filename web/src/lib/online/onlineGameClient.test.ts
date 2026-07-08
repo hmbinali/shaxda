@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gameFixtures, protocolVersion } from "@shaxda/shared";
-import { OnlineGameClient } from "./onlineGameClient";
+import { OnlineCreateRoomError, OnlineGameClient } from "./onlineGameClient";
 
 describe("OnlineGameClient", () => {
   beforeEach(() => {
@@ -16,7 +16,7 @@ describe("OnlineGameClient", () => {
       Response.json({
         v: protocolVersion,
         type: "roomCreated",
-        roomCode: "ROOM-1",
+        roomCode: "ABCDEFGH",
       }),
     ) as unknown as typeof fetch;
     const client = new OnlineGameClient({
@@ -25,11 +25,54 @@ describe("OnlineGameClient", () => {
       WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
     });
 
-    await expect(client.createRoom()).resolves.toBe("ROOM-1");
+    await expect(client.createRoom()).resolves.toBe("ABCDEFGH");
     expect(fetchFn).toHaveBeenCalledWith("http://worker.test/rooms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: "{}",
     });
+  });
+
+  it("sends optional Turnstile tokens when creating rooms", async () => {
+    const fetchFn = vi.fn(async () =>
+      Response.json({
+        v: protocolVersion,
+        type: "roomCreated",
+        roomCode: "ABCDEFGH",
+      }),
+    ) as unknown as typeof fetch;
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      fetchFn,
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+    });
+
+    await client.createRoom("turnstile-token");
+
+    expect(fetchFn).toHaveBeenCalledWith("http://worker.test/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ turnstileToken: "turnstile-token" }),
+    });
+  });
+
+  it("maps create-room failure codes", async () => {
+    const fetchFn = vi.fn(async () =>
+      Response.json(
+        { error: "rateLimited", code: "rateLimited" },
+        { status: 429 },
+      ),
+    ) as unknown as typeof fetch;
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      fetchFn,
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+    });
+
+    await expect(client.createRoom()).rejects.toMatchObject({
+      name: "OnlineCreateRoomError",
+      code: "rateLimited",
+    } satisfies Partial<OnlineCreateRoomError>);
   });
 
   it("sends join and game-action messages and parses inbound state", () => {
@@ -45,7 +88,7 @@ describe("OnlineGameClient", () => {
     });
 
     client.connect({
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       guestId: "guest-id-a",
       displayName: " Ayaan ",
     });
@@ -56,7 +99,7 @@ describe("OnlineGameClient", () => {
     expect(JSON.parse(socket.sent[0] ?? "")).toEqual({
       v: protocolVersion,
       type: "joinRoom",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       guestId: "guest-id-a",
       displayName: "Ayaan",
     });
@@ -67,19 +110,19 @@ describe("OnlineGameClient", () => {
     expect(JSON.parse(socket.sent[1] ?? "")).toEqual({
       v: protocolVersion,
       type: "gameAction",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       action: { type: "place", player: "A", point: "O1" },
     });
 
     socket.message({
       v: protocolVersion,
       type: "state",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       state: gameFixtures.emptyBoard,
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toMatchObject({ type: "state", roomCode: "ROOM-1" });
+    expect(messages[0]).toMatchObject({ type: "state", roomCode: "ABCDEFGH" });
   });
 
   it("ignores close events from sockets replaced by reconnects", () => {
@@ -92,11 +135,11 @@ describe("OnlineGameClient", () => {
       onStatus: (status) => statuses.push(status),
     });
 
-    client.connect({ roomCode: "ROOM-1", guestId: "guest-id-a" });
+    client.connect({ roomCode: "ABCDEFGH", guestId: "guest-id-a" });
     const firstSocket = FakeWebSocket.latest();
     firstSocket.open();
 
-    client.connect({ roomCode: "ROOM-2", guestId: "guest-id-a" });
+    client.connect({ roomCode: "JKLMNPQR", guestId: "guest-id-a" });
     const secondSocket = FakeWebSocket.latest();
     secondSocket.open();
     firstSocket.dispatchEvent(new Event("close"));
@@ -121,7 +164,7 @@ describe("OnlineGameClient", () => {
     });
 
     client.connect({
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       guestId: "guest-id-a",
       displayName: "Ayaan",
     });
@@ -138,7 +181,7 @@ describe("OnlineGameClient", () => {
     expect(JSON.parse(reconnected.sent[0] ?? "")).toEqual({
       v: protocolVersion,
       type: "joinRoom",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       guestId: "guest-id-a",
       displayName: "Ayaan",
     });
@@ -156,7 +199,7 @@ describe("OnlineGameClient", () => {
       onStatus: (status) => statuses.push(status),
     });
 
-    client.connect({ roomCode: "ROOM-1", guestId: "guest-id-a" });
+    client.connect({ roomCode: "ABCDEFGH", guestId: "guest-id-a" });
     FakeWebSocket.latest().open();
     client.close();
     vi.advanceTimersByTime(10_000);
@@ -178,7 +221,7 @@ describe("OnlineGameClient", () => {
       onError: (error) => errors.push(error.message),
     });
 
-    client.connect({ roomCode: "ROOM-1", guestId: "guest-id-a" });
+    client.connect({ roomCode: "ABCDEFGH", guestId: "guest-id-a" });
     FakeWebSocket.latest().open();
     FakeWebSocket.latest().close();
 
@@ -202,13 +245,13 @@ describe("OnlineGameClient", () => {
       onMessage: (message) => messages.push(message),
     });
 
-    client.connect({ roomCode: "ROOM-1", guestId: "guest-id-a" });
+    client.connect({ roomCode: "ABCDEFGH", guestId: "guest-id-a" });
     const socket = FakeWebSocket.latest();
     socket.open();
     socket.message({
       v: protocolVersion,
       type: "matchStatus",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       connections: { A: true, B: false },
       idleSlot: null,
       claimableBy: "A",
@@ -217,7 +260,7 @@ describe("OnlineGameClient", () => {
     socket.message({
       v: protocolVersion,
       type: "matchEnded",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       winner: "A",
       reason: "opponentAbandoned",
     });
@@ -239,7 +282,7 @@ describe("OnlineGameClient", () => {
       WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
     });
 
-    client.connect({ roomCode: "ROOM-1", guestId: "guest-id-a" });
+    client.connect({ roomCode: "ABCDEFGH", guestId: "guest-id-a" });
     const socket = FakeWebSocket.latest();
     socket.open();
 
@@ -247,7 +290,7 @@ describe("OnlineGameClient", () => {
     expect(JSON.parse(socket.sent[1] ?? "")).toEqual({
       v: protocolVersion,
       type: "claimWin",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
     });
   });
 });

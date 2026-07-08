@@ -21,7 +21,7 @@ describe("/online", () => {
         Response.json({
           v: protocolVersion,
           type: "roomCreated",
-          roomCode: "ROOM-1",
+          roomCode: "ABCDEFGH",
         }),
       ),
     );
@@ -65,8 +65,32 @@ describe("/online", () => {
     );
     expect(
       (screen.getByTestId("share-link") as HTMLInputElement).value,
-    ).toContain("/online?room=ROOM-1");
-    expect(FakeWebSocket.latest().url).toContain("/rooms/ROOM-1/ws");
+    ).toContain("/online?room=ABCDEFGH");
+    expect(FakeWebSocket.latest().url).toContain("/rooms/ABCDEFGH/ws");
+  });
+
+  it("shows specific create-room errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          { error: "rateLimited", code: "rateLimited" },
+          { status: 429 },
+        ),
+      ),
+    );
+    render(OnlineGamePage);
+
+    await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
+      target: { value: "Ayaan" },
+    });
+    await fireEvent.click(screen.getByTestId("create-room"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("online-feedback")).toHaveTextContent(
+        copy.errors.rateLimited,
+      ),
+    );
   });
 
   it("shows loser-perspective copy after an online claim-win", async () => {
@@ -86,14 +110,14 @@ describe("/online", () => {
     socket.message({
       v: protocolVersion,
       type: "joined",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       guestId: "guest-id-a",
       slot: "A",
     });
     socket.message({
       v: protocolVersion,
       type: "presence",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       players: {
         A: { displayName: "Ayaan" },
         B: { displayName: "Bilan" },
@@ -103,7 +127,7 @@ describe("/online", () => {
     socket.message({
       v: protocolVersion,
       type: "state",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       state: {
         ...gameFixtures.win,
         winner: "B",
@@ -113,7 +137,7 @@ describe("/online", () => {
     socket.message({
       v: protocolVersion,
       type: "matchEnded",
-      roomCode: "ROOM-1",
+      roomCode: "ABCDEFGH",
       winner: "B",
       reason: "opponentAbandoned",
     });

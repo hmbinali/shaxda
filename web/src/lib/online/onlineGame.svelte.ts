@@ -110,8 +110,12 @@ export class OnlineGameController {
     });
   }
 
-  async createRoom(guestId: string, displayName: string): Promise<string> {
-    const roomCode = await this.#client.createRoom();
+  async createRoom(
+    guestId: string,
+    displayName: string,
+    turnstileToken?: string,
+  ): Promise<string> {
+    const roomCode = await this.#client.createRoom(turnstileToken);
     this.joinRoom(roomCode, guestId, displayName);
     return roomCode;
   }

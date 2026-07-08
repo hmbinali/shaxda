@@ -25,6 +25,9 @@ const IDLE_TIMEOUT_MS = 60 * 60 * 1_000;
 const DISCONNECT_GRACE_MS = 45_000;
 const IDLE_NUDGE_MS = 60_000;
 const IDLE_CLAIM_MS = 180_000;
+const MAX_MESSAGE_BYTES = 4_096;
+const MESSAGE_RATE_WINDOW_MS = 10_000;
+const MESSAGE_RATE_MAX = 30;
 const PLAYER_SLOTS = ["A", "B"] as const;
 
 type OnlineMatchEndReason = "opponentAbandoned" | "opponentIdleTimeout";
@@ -50,17 +53,26 @@ type RoomState = {
 };
 
 type SocketAttachment = {
+  guestId?: string;
+  slot?: PlayerSlot;
+  messageTimestamps?: number[];
+};
+
+type JoinedSocketAttachment = {
   guestId: string;
   slot: PlayerSlot;
+  messageTimestamps?: number[];
 };
+
+export interface MatchRoomEnv {
+  MATCH_COORDINATOR: DurableObjectNamespace;
+}
 
 export class MatchRoom implements DurableObject {
   constructor(
     private readonly ctx: DurableObjectState,
-    private readonly env: unknown,
-  ) {
-    void this.env;
-  }
+    private readonly env: MatchRoomEnv,
+  ) {}
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -95,9 +107,14 @@ export class MatchRoom implements DurableObject {
     ws: WebSocket,
     message: string | ArrayBuffer,
   ): Promise<void> {
+    if (!this.consumeMessageQuota(ws, Date.now())) {
+      this.sendError(ws, "rateLimited", "Too many messages.");
+      return;
+    }
+
     const parsed = parseMessage(message);
     if (!parsed.ok) {
-      this.sendError(ws, "invalidMessage", parsed.message);
+      this.sendError(ws, parsed.code, parsed.message);
       return;
     }
 
@@ -155,6 +172,7 @@ export class MatchRoom implements DurableObject {
         socket.close(1001, "Room expired.");
       }
 
+      await this.releaseCoordinatorRoom(room.roomCode);
       await this.ctx.storage.deleteAll();
       return;
     }
@@ -225,6 +243,7 @@ export class MatchRoom implements DurableObject {
 
     const { slot } = updated;
     ws.serializeAttachment({
+      ...rawSocketAttachment(ws),
       guestId: message.guestId,
       slot,
     } satisfies SocketAttachment);
@@ -865,6 +884,41 @@ export class MatchRoom implements DurableObject {
       ),
     );
   }
+
+  private consumeMessageQuota(ws: WebSocket, now: number): boolean {
+    const attachment = rawSocketAttachment(ws);
+    const windowTimestamps = (attachment.messageTimestamps ?? []).filter(
+      (timestamp) => now - timestamp < MESSAGE_RATE_WINDOW_MS,
+    );
+    const recent = windowTimestamps.slice(-(MESSAGE_RATE_MAX - 1));
+
+    if (windowTimestamps.length >= MESSAGE_RATE_MAX) {
+      ws.serializeAttachment({
+        ...attachment,
+        messageTimestamps: windowTimestamps.slice(-MESSAGE_RATE_MAX),
+      });
+      return false;
+    }
+
+    ws.serializeAttachment({
+      ...attachment,
+      messageTimestamps: [...recent, now],
+    } satisfies SocketAttachment);
+    return true;
+  }
+
+  private async releaseCoordinatorRoom(roomCode: string): Promise<void> {
+    const coordinator = this.env.MATCH_COORDINATOR.get(
+      this.env.MATCH_COORDINATOR.idFromName("global"),
+    );
+    await coordinator.fetch(
+      new Request("https://shaxda.internal/internal/coordinator/release", {
+        method: "POST",
+        body: JSON.stringify({ roomCode }),
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  }
 }
 
 function presencePlayer(displayName: string | undefined): {
@@ -879,40 +933,92 @@ function otherSlot(slot: PlayerSlot): PlayerSlot {
 
 function parseMessage(
   message: string | ArrayBuffer,
-): { ok: true; message: RoomInboundMessage } | { ok: false; message: string } {
+):
+  | { ok: true; message: RoomInboundMessage }
+  | { ok: false; code: "invalidMessage" | "messageTooLarge"; message: string } {
+  const byteLength =
+    typeof message === "string"
+      ? new TextEncoder().encode(message).byteLength
+      : message.byteLength;
+  if (byteLength > MAX_MESSAGE_BYTES) {
+    return {
+      ok: false,
+      code: "messageTooLarge",
+      message: "Message is too large.",
+    };
+  }
+
   if (typeof message !== "string") {
-    return { ok: false, message: "Message must be text JSON." };
+    return {
+      ok: false,
+      code: "invalidMessage",
+      message: "Message must be text JSON.",
+    };
   }
 
   let json: unknown;
   try {
     json = JSON.parse(message);
   } catch {
-    return { ok: false, message: "Message must be valid JSON." };
+    return {
+      ok: false,
+      code: "invalidMessage",
+      message: "Message must be valid JSON.",
+    };
   }
 
   const parsed = roomInboundSchema.safeParse(json);
   if (!parsed.success) {
-    return { ok: false, message: "Message does not match the room protocol." };
+    return {
+      ok: false,
+      code: "invalidMessage",
+      message: "Message does not match the room protocol.",
+    };
   }
 
   return { ok: true, message: parsed.data };
 }
 
-function socketAttachment(ws: WebSocket): SocketAttachment | null {
-  const attachment: unknown = ws.deserializeAttachment();
-  if (!attachment || typeof attachment !== "object") {
-    return null;
-  }
-
-  const candidate = attachment as Partial<SocketAttachment>;
+function socketAttachment(ws: WebSocket): JoinedSocketAttachment | null {
+  const attachment = rawSocketAttachment(ws);
   if (
-    typeof candidate.guestId === "string" &&
-    guestIdSchema.safeParse(candidate.guestId).success &&
-    (candidate.slot === "A" || candidate.slot === "B")
+    typeof attachment.guestId === "string" &&
+    guestIdSchema.safeParse(attachment.guestId).success &&
+    (attachment.slot === "A" || attachment.slot === "B")
   ) {
-    return { guestId: candidate.guestId, slot: candidate.slot };
+    return {
+      guestId: attachment.guestId,
+      slot: attachment.slot,
+      ...(attachment.messageTimestamps
+        ? { messageTimestamps: attachment.messageTimestamps }
+        : {}),
+    };
   }
 
   return null;
+}
+
+function rawSocketAttachment(ws: WebSocket): SocketAttachment {
+  const attachment: unknown = ws.deserializeAttachment();
+  if (!attachment || typeof attachment !== "object") {
+    return {};
+  }
+
+  const candidate = attachment as Partial<SocketAttachment>;
+  const rawTimestamps = Array.isArray(candidate.messageTimestamps)
+    ? candidate.messageTimestamps
+    : [];
+  const messageTimestamps = rawTimestamps
+    .filter((timestamp): timestamp is number => typeof timestamp === "number")
+    .slice(-MESSAGE_RATE_MAX);
+
+  return {
+    ...(typeof candidate.guestId === "string"
+      ? { guestId: candidate.guestId }
+      : {}),
+    ...(candidate.slot === "A" || candidate.slot === "B"
+      ? { slot: candidate.slot }
+      : {}),
+    ...(messageTimestamps.length > 0 ? { messageTimestamps } : {}),
+  };
 }

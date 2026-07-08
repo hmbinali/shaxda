@@ -94,6 +94,11 @@ Every `rules-candidate` item should also be tracked in
 | B13 |           |          |          | new    |         |          |       |           |
 | B14 |           |          |          | new    |         |          |       |           |
 | B15 |           |          |          | new    |         |          |       |           |
+| B16 |           |          |          | new    |         |          |       |           |
+| B17 |           |          |          | new    |         |          |       |           |
+| B18 |           |          |          | new    |         |          |       |           |
+| B19 |           |          |          | new    |         |          |       |           |
+| B20 |           |          |          | new    |         |          |       |           |
 
 ## Scope Guard
 

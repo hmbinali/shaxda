@@ -12,8 +12,12 @@ online resilience, Q1 QA, production launch, or V1.1 features.
 BETA1 is blocked until `docs/qa/q1-report.md` has a clear `Ready for BETA1`
 sign-off.
 
-Current status: blocked. `docs/qa/q1-report.md` exists, but the `Ready for
-BETA1` field is blank.
+Readiness tracking:
+
+- `docs/qa/q1-report.md` exists:
+- `Ready for BETA1` is signed off:
+- Tested commit recorded:
+- Preview or staging URL recorded:
 
 When Q1 is signed off, record:
 

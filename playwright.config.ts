@@ -17,9 +17,17 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    command: "pnpm --filter @shaxda/web preview --host 127.0.0.1 --port 4173",
-    reuseExistingServer: !process.env.CI,
-    url: "http://127.0.0.1:4173",
-  },
+  webServer: [
+    {
+      command: "pnpm --filter @shaxda/worker dev -- --ip 127.0.0.1 --port 8787",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      url: "http://127.0.0.1:8787/health",
+    },
+    {
+      command: "pnpm --filter @shaxda/web preview --host 127.0.0.1 --port 4173",
+      reuseExistingServer: !process.env.CI,
+      url: "http://127.0.0.1:4173",
+    },
+  ],
 });

@@ -9,6 +9,11 @@ import { MatchRoom } from "./match-room";
 import { generateRoomCode } from "./room-code";
 
 const MAX_ROOM_CREATION_ATTEMPTS = 5;
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+} as const;
 
 interface Env {
   MATCH_ROOM: DurableObjectNamespace;
@@ -17,6 +22,10 @@ interface Env {
 const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (request.method === "OPTIONS" && url.pathname === "/rooms") {
+      return new Response(null, { status: 204, headers: corsHeaders });
+    }
 
     if (url.pathname === "/health") {
       return Response.json(
@@ -46,24 +55,30 @@ const worker = {
         }
 
         if (!initResponse.ok) {
-          return Response.json(
-            { error: "Room could not be created" },
-            { status: 500 },
+          return withCors(
+            Response.json(
+              { error: "Room could not be created" },
+              { status: 500 },
+            ),
           );
         }
 
-        return Response.json(
-          serverMessageSchema.parse({
-            v: protocolVersion,
-            type: "roomCreated",
-            roomCode,
-          }),
+        return withCors(
+          Response.json(
+            serverMessageSchema.parse({
+              v: protocolVersion,
+              type: "roomCreated",
+              roomCode,
+            }),
+          ),
         );
       }
 
-      return Response.json(
-        { error: "Unique room code could not be allocated" },
-        { status: 503 },
+      return withCors(
+        Response.json(
+          { error: "Unique room code could not be allocated" },
+          { status: 503 },
+        ),
       );
     }
 
@@ -89,6 +104,19 @@ const worker = {
     return Response.json({ error: "Not found" }, { status: 404 });
   },
 } satisfies ExportedHandler<Env>;
+
+function withCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(corsHeaders)) {
+    headers.set(key, value);
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 export default worker;
 export { MatchRoom };

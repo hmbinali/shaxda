@@ -1,9 +1,19 @@
 import {
+  applyAction,
+  createInitialState,
+  deserialize,
+  getActingPlayer,
+  serialize,
+} from "@shaxda/game-engine";
+import type { SerializedGameState } from "@shaxda/game-engine";
+import {
   echoBroadcastServerMessageSchema,
   guestIdSchema,
   joinedServerMessageSchema,
+  presenceServerMessageSchema,
   protocolVersion,
   serverMessageSchema,
+  stateServerMessageSchema,
 } from "@shaxda/shared";
 import { roomInboundSchema, roomInitRequestSchema } from "./protocol";
 import type { PlayerSlot, RoomInboundMessage } from "./protocol";
@@ -16,6 +26,8 @@ type RoomState = {
   createdAt: number;
   lastActivityAt: number;
   slots: Partial<Record<PlayerSlot, string>>;
+  displayNames: Partial<Record<PlayerSlot, string>>;
+  gameState: SerializedGameState;
 };
 
 type SocketAttachment = {
@@ -45,7 +57,7 @@ export class MatchRoom implements DurableObject {
       );
     }
 
-    const room = await this.ctx.storage.get<RoomState>(ROOM_STATE_KEY);
+    const room = await this.readRoom();
     if (!room) {
       return Response.json({ error: "Room not found" }, { status: 404 });
     }
@@ -70,17 +82,18 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
-    const room = await this.ctx.storage.get<RoomState>(ROOM_STATE_KEY);
+    const room = await this.refreshStoredActivity();
     if (!room) {
       this.sendError(ws, "roomNotFound", "Room not found.");
       return;
     }
 
-    await this.refreshActivity(room);
-
     switch (parsed.message.type) {
       case "joinRoom":
         await this.handleJoin(ws, room, parsed.message);
+        return;
+      case "gameAction":
+        await this.handleGameAction(ws, room, parsed.message);
         return;
       case "ping":
         ws.send(
@@ -110,7 +123,7 @@ export class MatchRoom implements DurableObject {
   }
 
   async alarm(): Promise<void> {
-    const room = await this.ctx.storage.get<RoomState>(ROOM_STATE_KEY);
+    const room = await this.readRoom();
     if (!room) {
       await this.ctx.storage.deleteAlarm();
       return;
@@ -140,7 +153,7 @@ export class MatchRoom implements DurableObject {
       );
     }
 
-    const existingRoom = await this.ctx.storage.get<RoomState>(ROOM_STATE_KEY);
+    const existingRoom = await this.readRoom();
     if (existingRoom) {
       return Response.json(
         { error: "Room code already exists" },
@@ -154,6 +167,8 @@ export class MatchRoom implements DurableObject {
       createdAt: now,
       lastActivityAt: now,
       slots: {},
+      displayNames: {},
+      gameState: serialize(createInitialState("A")),
     };
 
     await this.ctx.storage.put(ROOM_STATE_KEY, room);
@@ -172,11 +187,15 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
-    const slot = await this.assignSlot(room, message.guestId);
-    if (!slot) {
+    const updated = this.assignSlot(room, message.guestId, message.displayName);
+    if (!updated) {
       this.sendError(ws, "roomFull", "Room already has two guests.");
       return;
     }
+
+    await this.persistRoom(updated.room);
+    const { slot } = updated;
+    const state = deserialize(updated.room.gameState);
 
     ws.serializeAttachment({
       guestId: message.guestId,
@@ -187,12 +206,69 @@ export class MatchRoom implements DurableObject {
         joinedServerMessageSchema.parse({
           v: protocolVersion,
           type: "joined",
-          roomCode: room.roomCode,
+          roomCode: updated.room.roomCode,
           guestId: message.guestId,
           slot,
         }),
       ),
     );
+    this.broadcastPresence(updated.room);
+    ws.send(
+      JSON.stringify(
+        stateServerMessageSchema.parse({
+          v: protocolVersion,
+          type: "state",
+          roomCode: updated.room.roomCode,
+          state,
+        }),
+      ),
+    );
+  }
+
+  private async handleGameAction(
+    ws: WebSocket,
+    room: RoomState,
+    message: Extract<RoomInboundMessage, { type: "gameAction" }>,
+  ): Promise<void> {
+    if (message.roomCode !== room.roomCode) {
+      this.sendError(ws, "roomMismatch", "Room code does not match this room.");
+      return;
+    }
+
+    const attachment = socketAttachment(ws);
+    if (!attachment) {
+      this.sendError(ws, "notJoined", "Join the room before playing.");
+      return;
+    }
+
+    if (!room.slots.A || !room.slots.B) {
+      this.sendError(ws, "waitingForOpponent", "Wait for an opponent.");
+      return;
+    }
+
+    if (message.action.player !== attachment.slot) {
+      this.sendError(ws, "notYourTurn", "It is not your turn.");
+      return;
+    }
+
+    const state = deserialize(room.gameState);
+    if (getActingPlayer(state) !== attachment.slot) {
+      this.sendError(ws, "notYourTurn", "It is not your turn.");
+      return;
+    }
+
+    const result = applyAction(state, message.action);
+    if (!result.ok) {
+      this.sendError(ws, result.error, "Action rejected by game rules.");
+      return;
+    }
+
+    const updatedRoom = {
+      ...room,
+      gameState: serialize(result.state),
+    };
+    await this.persistRoom(updatedRoom);
+    this.broadcastState(updatedRoom);
   }
 
   private handleEcho(
@@ -232,52 +308,127 @@ export class MatchRoom implements DurableObject {
     }
   }
 
-  private async assignSlot(
+  private assignSlot(
     room: RoomState,
     guestId: string,
-  ): Promise<PlayerSlot | null> {
+    displayName: string | undefined,
+  ): { room: RoomState; slot: PlayerSlot } | null {
     if (room.slots.A === guestId) {
-      return "A";
+      return {
+        room: this.withDisplayName(room, "A", displayName),
+        slot: "A",
+      };
     }
 
     if (room.slots.B === guestId) {
-      return "B";
+      return {
+        room: this.withDisplayName(room, "B", displayName),
+        slot: "B",
+      };
     }
 
     if (!room.slots.A) {
-      const updatedRoom = {
-        ...room,
-        slots: { ...room.slots, A: guestId },
+      return {
+        room: this.withDisplayName(
+          {
+            ...room,
+            slots: { ...room.slots, A: guestId },
+          },
+          "A",
+          displayName,
+        ),
+        slot: "A",
       };
-      await this.ctx.storage.put(ROOM_STATE_KEY, updatedRoom);
-      return "A";
     }
 
     if (!room.slots.B) {
-      const updatedRoom = {
-        ...room,
-        slots: { ...room.slots, B: guestId },
+      return {
+        room: this.withDisplayName(
+          {
+            ...room,
+            slots: { ...room.slots, B: guestId },
+          },
+          "B",
+          displayName,
+        ),
+        slot: "B",
       };
-      await this.ctx.storage.put(ROOM_STATE_KEY, updatedRoom);
-      return "B";
     }
 
     return null;
   }
 
-  private async refreshStoredActivity(): Promise<void> {
-    const room = await this.ctx.storage.get<RoomState>(ROOM_STATE_KEY);
-    if (room) {
-      await this.refreshActivity(room);
+  private withDisplayName(
+    room: RoomState,
+    slot: PlayerSlot,
+    displayName: string | undefined,
+  ): RoomState {
+    if (displayName === undefined) {
+      return room;
+    }
+
+    return {
+      ...room,
+      displayNames: { ...room.displayNames, [slot]: displayName },
+    };
+  }
+
+  private broadcastPresence(room: RoomState): void {
+    const message = JSON.stringify(
+      presenceServerMessageSchema.parse({
+        v: protocolVersion,
+        type: "presence",
+        roomCode: room.roomCode,
+        players: {
+          A: room.slots.A ? presencePlayer(room.displayNames.A) : null,
+          B: room.slots.B ? presencePlayer(room.displayNames.B) : null,
+        },
+        started: Boolean(room.slots.A && room.slots.B),
+      }),
+    );
+
+    this.broadcastToJoinedSockets(message);
+  }
+
+  private broadcastState(room: RoomState): void {
+    const message = JSON.stringify(
+      stateServerMessageSchema.parse({
+        v: protocolVersion,
+        type: "state",
+        roomCode: room.roomCode,
+        state: deserialize(room.gameState),
+      }),
+    );
+
+    this.broadcastToJoinedSockets(message);
+  }
+
+  private broadcastToJoinedSockets(message: string): void {
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socketAttachment(socket)) {
+        socket.send(message);
+      }
     }
   }
 
-  private async refreshActivity(room: RoomState): Promise<void> {
+  private async refreshStoredActivity(): Promise<RoomState | null> {
+    const room = await this.readRoom();
+    return room ? this.refreshActivity(room) : null;
+  }
+
+  private async refreshActivity(room: RoomState): Promise<RoomState> {
     const updatedRoom = { ...room, lastActivityAt: Date.now() };
-    await this.ctx.storage.put(ROOM_STATE_KEY, updatedRoom);
-    await this.ctx.storage.setAlarm(
-      updatedRoom.lastActivityAt + IDLE_TIMEOUT_MS,
-    );
+    await this.persistRoom(updatedRoom);
+    return updatedRoom;
+  }
+
+  private async persistRoom(room: RoomState): Promise<void> {
+    await this.ctx.storage.put(ROOM_STATE_KEY, room);
+    await this.ctx.storage.setAlarm(room.lastActivityAt + IDLE_TIMEOUT_MS);
+  }
+
+  private async readRoom(): Promise<RoomState | null> {
+    return (await this.ctx.storage.get<RoomState>(ROOM_STATE_KEY)) ?? null;
   }
 
   private sendError(ws: WebSocket, code: string, message: string): void {
@@ -292,6 +443,12 @@ export class MatchRoom implements DurableObject {
       ),
     );
   }
+}
+
+function presencePlayer(displayName: string | undefined): {
+  displayName?: string;
+} {
+  return displayName === undefined ? {} : { displayName };
 }
 
 function parseMessage(

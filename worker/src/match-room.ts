@@ -10,6 +10,8 @@ import {
   echoBroadcastServerMessageSchema,
   guestIdSchema,
   joinedServerMessageSchema,
+  matchEndedServerMessageSchema,
+  matchStatusServerMessageSchema,
   presenceServerMessageSchema,
   protocolVersion,
   serverMessageSchema,
@@ -20,6 +22,17 @@ import type { PlayerSlot, RoomInboundMessage } from "./protocol";
 
 const ROOM_STATE_KEY = "room";
 const IDLE_TIMEOUT_MS = 60 * 60 * 1_000;
+const DISCONNECT_GRACE_MS = 45_000;
+const IDLE_NUDGE_MS = 60_000;
+const IDLE_CLAIM_MS = 180_000;
+const PLAYER_SLOTS = ["A", "B"] as const;
+
+type OnlineMatchEndReason = "opponentAbandoned" | "opponentIdleTimeout";
+
+type ConnectionState = {
+  connected: boolean;
+  disconnectedAt: number | null;
+};
 
 type RoomState = {
   roomCode: string;
@@ -28,6 +41,12 @@ type RoomState = {
   slots: Partial<Record<PlayerSlot, string>>;
   displayNames: Partial<Record<PlayerSlot, string>>;
   gameState: SerializedGameState;
+  connections: Partial<Record<PlayerSlot, ConnectionState>>;
+  turnStartedAt: number | null;
+  nudgedTurnAt: number | null;
+  claimableBy: PlayerSlot | null;
+  claimReason: OnlineMatchEndReason | null;
+  onlineEndReason: OnlineMatchEndReason | null;
 };
 
 type SocketAttachment = {
@@ -95,6 +114,9 @@ export class MatchRoom implements DurableObject {
       case "gameAction":
         await this.handleGameAction(ws, room, parsed.message);
         return;
+      case "claimWin":
+        await this.handleClaimWin(ws, room, parsed.message);
+        return;
       case "ping":
         ws.send(
           JSON.stringify(
@@ -113,13 +135,11 @@ export class MatchRoom implements DurableObject {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
-    await this.refreshStoredActivity();
-    ws.serializeAttachment(null);
+    await this.handleSocketDisconnect(ws);
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
-    await this.refreshStoredActivity();
-    ws.serializeAttachment(null);
+    await this.handleSocketDisconnect(ws);
   }
 
   async alarm(): Promise<void> {
@@ -130,16 +150,21 @@ export class MatchRoom implements DurableObject {
     }
 
     const now = Date.now();
-    if (now - room.lastActivityAt < IDLE_TIMEOUT_MS) {
-      await this.ctx.storage.setAlarm(room.lastActivityAt + IDLE_TIMEOUT_MS);
+    if (now - room.lastActivityAt >= IDLE_TIMEOUT_MS) {
+      for (const socket of this.ctx.getWebSockets()) {
+        socket.close(1001, "Room expired.");
+      }
+
+      await this.ctx.storage.deleteAll();
       return;
     }
 
-    for (const socket of this.ctx.getWebSockets()) {
-      socket.close(1001, "Room expired.");
-    }
-
-    await this.ctx.storage.deleteAll();
+    const updatedRoom = this.reconcileClaimability(
+      this.applyIdleNudge(room, now),
+      now,
+    );
+    await this.persistRoom(updatedRoom);
+    this.broadcastMatchStatus(updatedRoom);
   }
 
   private async initializeRoom(request: Request): Promise<Response> {
@@ -169,10 +194,15 @@ export class MatchRoom implements DurableObject {
       slots: {},
       displayNames: {},
       gameState: serialize(createInitialState("A")),
+      connections: {},
+      turnStartedAt: null,
+      nudgedTurnAt: null,
+      claimableBy: null,
+      claimReason: null,
+      onlineEndReason: null,
     };
 
-    await this.ctx.storage.put(ROOM_STATE_KEY, room);
-    await this.ctx.storage.setAlarm(now + IDLE_TIMEOUT_MS);
+    await this.persistRoom(room);
 
     return Response.json({ ok: true });
   }
@@ -193,36 +223,54 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
-    await this.persistRoom(updated.room);
     const { slot } = updated;
-    const state = deserialize(updated.room.gameState);
-
     ws.serializeAttachment({
       guestId: message.guestId,
       slot,
     } satisfies SocketAttachment);
+
+    const now = Date.now();
+    const updatedRoom = this.reconcileClaimability(
+      this.ensureTurnStarted(
+        this.markSlotConnected(updated.room, slot, now),
+        now,
+      ),
+      now,
+    );
+    const state = deserialize(updatedRoom.gameState);
+    await this.persistRoom(updatedRoom);
+
     ws.send(
       JSON.stringify(
         joinedServerMessageSchema.parse({
           v: protocolVersion,
           type: "joined",
-          roomCode: updated.room.roomCode,
+          roomCode: updatedRoom.roomCode,
           guestId: message.guestId,
           slot,
         }),
       ),
     );
-    this.broadcastPresence(updated.room);
+    this.broadcastPresence(updatedRoom);
+    this.broadcastMatchStatus(updatedRoom);
     ws.send(
       JSON.stringify(
         stateServerMessageSchema.parse({
           v: protocolVersion,
           type: "state",
-          roomCode: updated.room.roomCode,
+          roomCode: updatedRoom.roomCode,
           state,
         }),
       ),
     );
+    if (updatedRoom.onlineEndReason !== null && state.winner !== null) {
+      this.sendMatchEnded(
+        ws,
+        updatedRoom,
+        state.winner,
+        updatedRoom.onlineEndReason,
+      );
+    }
   }
 
   private async handleGameAction(
@@ -263,12 +311,65 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
+    const now = Date.now();
     const updatedRoom = {
       ...room,
       gameState: serialize(result.state),
+      turnStartedAt: result.state.phase === "gameOver" ? null : now,
+      nudgedTurnAt: null,
+      claimableBy: null,
+      claimReason: null,
+      onlineEndReason: null,
     };
     await this.persistRoom(updatedRoom);
     this.broadcastState(updatedRoom);
+    this.broadcastMatchStatus(updatedRoom);
+  }
+
+  private async handleClaimWin(
+    ws: WebSocket,
+    room: RoomState,
+    message: Extract<RoomInboundMessage, { type: "claimWin" }>,
+  ): Promise<void> {
+    if (message.roomCode !== room.roomCode) {
+      this.sendError(ws, "roomMismatch", "Room code does not match this room.");
+      return;
+    }
+
+    const attachment = socketAttachment(ws);
+    if (!attachment) {
+      this.sendError(ws, "notJoined", "Join the room before claiming a win.");
+      return;
+    }
+
+    const now = Date.now();
+    const reason = this.claimReasonFor(room, attachment.slot, now);
+    if (reason === null) {
+      this.sendError(ws, "notClaimable", "Claim win is not available.");
+      return;
+    }
+
+    const state = deserialize(room.gameState);
+    const opponent = otherSlot(attachment.slot);
+    const result = applyAction(state, { type: "resign", player: opponent });
+    if (!result.ok || result.state.winner === null) {
+      this.sendError(ws, "notClaimable", "Claim win is not available.");
+      return;
+    }
+
+    const updatedRoom: RoomState = {
+      ...room,
+      gameState: serialize(result.state),
+      turnStartedAt: null,
+      nudgedTurnAt: null,
+      claimableBy: attachment.slot,
+      claimReason: reason,
+      onlineEndReason: reason,
+    };
+    await this.persistRoom(updatedRoom);
+    this.broadcastState(updatedRoom);
+    this.broadcastMatchStatus(updatedRoom);
+    this.broadcastMatchEnded(updatedRoom, result.state.winner, reason);
   }
 
   private handleEcho(
@@ -373,6 +474,158 @@ export class MatchRoom implements DurableObject {
     };
   }
 
+  private async handleSocketDisconnect(ws: WebSocket): Promise<void> {
+    const room = await this.readRoom();
+    const attachment = socketAttachment(ws);
+    ws.serializeAttachment(null);
+    if (!room || !attachment) {
+      return;
+    }
+
+    const now = Date.now();
+    const liveConnections = this.liveConnections();
+    const connections = { ...room.connections };
+    for (const slot of PLAYER_SLOTS) {
+      if (!room.slots[slot]) {
+        continue;
+      }
+
+      if (liveConnections[slot]) {
+        connections[slot] = { connected: true, disconnectedAt: null };
+        continue;
+      }
+
+      const existing = room.connections[slot];
+      connections[slot] = {
+        connected: false,
+        disconnectedAt: existing?.disconnectedAt ?? now,
+      };
+    }
+
+    const updatedRoom = this.reconcileClaimability(
+      { ...room, lastActivityAt: now, connections },
+      now,
+    );
+    await this.persistRoom(updatedRoom);
+    this.broadcastMatchStatus(updatedRoom);
+  }
+
+  private markSlotConnected(
+    room: RoomState,
+    slot: PlayerSlot,
+    now: number,
+  ): RoomState {
+    const connections = {
+      ...room.connections,
+      [slot]: { connected: true, disconnectedAt: null },
+    };
+    let updatedRoom: RoomState = { ...room, lastActivityAt: now, connections };
+
+    if (
+      updatedRoom.claimReason === "opponentAbandoned" &&
+      updatedRoom.claimableBy === otherSlot(slot)
+    ) {
+      updatedRoom = {
+        ...updatedRoom,
+        claimableBy: null,
+        claimReason: null,
+      };
+    }
+
+    return updatedRoom;
+  }
+
+  private ensureTurnStarted(room: RoomState, now: number): RoomState {
+    const state = deserialize(room.gameState);
+    if (
+      room.turnStartedAt !== null ||
+      !room.slots.A ||
+      !room.slots.B ||
+      state.phase === "gameOver"
+    ) {
+      return room;
+    }
+
+    return { ...room, turnStartedAt: now };
+  }
+
+  private applyIdleNudge(room: RoomState, now: number): RoomState {
+    if (!this.isActiveMatch(room) || room.turnStartedAt === null) {
+      return room;
+    }
+
+    const state = deserialize(room.gameState);
+    const actingPlayer = getActingPlayer(state);
+    if (
+      room.nudgedTurnAt !== room.turnStartedAt &&
+      room.connections[actingPlayer]?.connected === true &&
+      now - room.turnStartedAt >= IDLE_NUDGE_MS
+    ) {
+      return { ...room, nudgedTurnAt: room.turnStartedAt };
+    }
+
+    return room;
+  }
+
+  private reconcileClaimability(room: RoomState, now: number): RoomState {
+    for (const claimant of PLAYER_SLOTS) {
+      const reason = this.claimReasonFor(room, claimant, now);
+      if (reason !== null) {
+        return { ...room, claimableBy: claimant, claimReason: reason };
+      }
+    }
+
+    if (room.onlineEndReason !== null) {
+      return room;
+    }
+
+    return { ...room, claimableBy: null, claimReason: null };
+  }
+
+  private claimReasonFor(
+    room: RoomState,
+    claimant: PlayerSlot,
+    now: number,
+  ): OnlineMatchEndReason | null {
+    if (
+      !this.isActiveMatch(room) ||
+      room.connections[claimant]?.connected !== true
+    ) {
+      return null;
+    }
+
+    const opponent = otherSlot(claimant);
+    const opponentConnection = room.connections[opponent];
+    if (
+      opponentConnection?.connected === false &&
+      opponentConnection.disconnectedAt !== null &&
+      now - opponentConnection.disconnectedAt >= DISCONNECT_GRACE_MS
+    ) {
+      return "opponentAbandoned";
+    }
+
+    if (
+      opponentConnection?.connected === true &&
+      room.turnStartedAt !== null &&
+      now - room.turnStartedAt >= IDLE_CLAIM_MS
+    ) {
+      const state = deserialize(room.gameState);
+      if (getActingPlayer(state) === opponent) {
+        return "opponentIdleTimeout";
+      }
+    }
+
+    return null;
+  }
+
+  private isActiveMatch(room: RoomState): boolean {
+    if (!room.slots.A || !room.slots.B) {
+      return false;
+    }
+
+    return deserialize(room.gameState).phase !== "gameOver";
+  }
+
   private broadcastPresence(room: RoomState): void {
     const message = JSON.stringify(
       presenceServerMessageSchema.parse({
@@ -403,6 +656,82 @@ export class MatchRoom implements DurableObject {
     this.broadcastToJoinedSockets(message);
   }
 
+  private broadcastMatchStatus(room: RoomState): void {
+    const message = JSON.stringify(this.matchStatus(room));
+    this.broadcastToJoinedSockets(message);
+  }
+
+  private broadcastMatchEnded(
+    room: RoomState,
+    winner: PlayerSlot,
+    reason: OnlineMatchEndReason,
+  ): void {
+    const message = JSON.stringify(
+      matchEndedServerMessageSchema.parse({
+        v: protocolVersion,
+        type: "matchEnded",
+        roomCode: room.roomCode,
+        winner,
+        reason,
+      }),
+    );
+
+    this.broadcastToJoinedSockets(message);
+  }
+
+  private sendMatchEnded(
+    ws: WebSocket,
+    room: RoomState,
+    winner: PlayerSlot,
+    reason: OnlineMatchEndReason,
+  ): void {
+    ws.send(
+      JSON.stringify(
+        matchEndedServerMessageSchema.parse({
+          v: protocolVersion,
+          type: "matchEnded",
+          roomCode: room.roomCode,
+          winner,
+          reason,
+        }),
+      ),
+    );
+  }
+
+  private matchStatus(
+    room: RoomState,
+  ): ReturnType<typeof matchStatusServerMessageSchema.parse> {
+    const idleSlot = this.currentIdleSlot(room);
+
+    return matchStatusServerMessageSchema.parse({
+      v: protocolVersion,
+      type: "matchStatus",
+      roomCode: room.roomCode,
+      connections: {
+        A: room.connections.A?.connected === true,
+        B: room.connections.B?.connected === true,
+      },
+      idleSlot,
+      claimableBy: room.claimableBy,
+      claimReason: room.claimReason,
+    });
+  }
+
+  private currentIdleSlot(room: RoomState): PlayerSlot | null {
+    if (
+      !this.isActiveMatch(room) ||
+      room.turnStartedAt === null ||
+      room.nudgedTurnAt !== room.turnStartedAt
+    ) {
+      return null;
+    }
+
+    const actingPlayer = getActingPlayer(deserialize(room.gameState));
+    return room.connections[actingPlayer]?.connected === true
+      ? actingPlayer
+      : null;
+  }
+
   private broadcastToJoinedSockets(message: string): void {
     for (const socket of this.ctx.getWebSockets()) {
       if (socketAttachment(socket)) {
@@ -424,11 +753,104 @@ export class MatchRoom implements DurableObject {
 
   private async persistRoom(room: RoomState): Promise<void> {
     await this.ctx.storage.put(ROOM_STATE_KEY, room);
-    await this.ctx.storage.setAlarm(room.lastActivityAt + IDLE_TIMEOUT_MS);
+    await this.scheduleAlarm(room);
   }
 
   private async readRoom(): Promise<RoomState | null> {
-    return (await this.ctx.storage.get<RoomState>(ROOM_STATE_KEY)) ?? null;
+    const stored =
+      await this.ctx.storage.get<Partial<RoomState>>(ROOM_STATE_KEY);
+    return stored ? this.normalizeRoom(stored) : null;
+  }
+
+  private async scheduleAlarm(room: RoomState): Promise<void> {
+    const deadlines = [room.lastActivityAt + IDLE_TIMEOUT_MS];
+
+    if (this.isActiveMatch(room)) {
+      for (const slot of PLAYER_SLOTS) {
+        const connection = room.connections[slot];
+        const claimant = otherSlot(slot);
+        if (
+          room.slots[claimant] &&
+          room.connections[claimant]?.connected === true &&
+          connection?.connected === false &&
+          connection.disconnectedAt !== null &&
+          !(
+            room.claimableBy === claimant &&
+            room.claimReason === "opponentAbandoned"
+          )
+        ) {
+          deadlines.push(connection.disconnectedAt + DISCONNECT_GRACE_MS);
+        }
+      }
+
+      if (room.turnStartedAt !== null) {
+        const actingPlayer = getActingPlayer(deserialize(room.gameState));
+        const claimant = otherSlot(actingPlayer);
+        if (room.connections[actingPlayer]?.connected === true) {
+          if (room.nudgedTurnAt !== room.turnStartedAt) {
+            deadlines.push(room.turnStartedAt + IDLE_NUDGE_MS);
+          }
+          if (
+            room.connections[claimant]?.connected === true &&
+            !(
+              room.claimableBy === claimant &&
+              room.claimReason === "opponentIdleTimeout"
+            )
+          ) {
+            deadlines.push(room.turnStartedAt + IDLE_CLAIM_MS);
+          }
+        }
+      }
+    }
+
+    await this.ctx.storage.setAlarm(Math.min(...deadlines));
+  }
+
+  private normalizeRoom(stored: Partial<RoomState>): RoomState {
+    const liveConnections = this.liveConnections();
+    const slots = stored.slots ?? {};
+    const connections: Partial<Record<PlayerSlot, ConnectionState>> = {};
+
+    for (const slot of PLAYER_SLOTS) {
+      const existing = stored.connections?.[slot];
+      if (existing) {
+        connections[slot] = existing;
+        continue;
+      }
+
+      if (slots[slot]) {
+        connections[slot] = liveConnections[slot]
+          ? { connected: true, disconnectedAt: null }
+          : { connected: false, disconnectedAt: null };
+      }
+    }
+
+    return {
+      roomCode: stored.roomCode ?? "",
+      createdAt: stored.createdAt ?? Date.now(),
+      lastActivityAt: stored.lastActivityAt ?? Date.now(),
+      slots,
+      displayNames: stored.displayNames ?? {},
+      gameState: stored.gameState ?? serialize(createInitialState("A")),
+      connections,
+      turnStartedAt: stored.turnStartedAt ?? null,
+      nudgedTurnAt: stored.nudgedTurnAt ?? null,
+      claimableBy: stored.claimableBy ?? null,
+      claimReason: stored.claimReason ?? null,
+      onlineEndReason: stored.onlineEndReason ?? null,
+    };
+  }
+
+  private liveConnections(): Record<PlayerSlot, boolean> {
+    const connections = { A: false, B: false };
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment = socketAttachment(socket);
+      if (attachment) {
+        connections[attachment.slot] = true;
+      }
+    }
+
+    return connections;
   }
 
   private sendError(ws: WebSocket, code: string, message: string): void {
@@ -449,6 +871,10 @@ function presencePlayer(displayName: string | undefined): {
   displayName?: string;
 } {
   return displayName === undefined ? {} : { displayName };
+}
+
+function otherSlot(slot: PlayerSlot): PlayerSlot {
+  return slot === "A" ? "B" : "A";
 }
 
 function parseMessage(

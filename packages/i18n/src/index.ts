@@ -130,6 +130,7 @@ export const messages = {
       leave: "Ka bax",
       newRoom: "Qol cusub",
       waiting: "Sug ciyaaryahanka kale.",
+      claimWin: "Qaado guusha",
       youLabel: "Adiga",
       opponentLabel: "Ka soo horjeeda",
       emptySlot: "Weli lama gelin",
@@ -139,9 +140,25 @@ export const messages = {
       connection: {
         idle: "Aan bilaaban",
         connecting: "Wuu xirmayaa",
+        reconnecting: "Dib ayuu u xirmayaa",
         connected: "Wuu xiran yahay",
         closed: "Wuu go'ay",
         error: "Khalad xiriir",
+      },
+      notices: {
+        reconnecting: "Xiriirkii wuu go'ay; dib ayaa loo xirmayaa.",
+        opponentDisconnected:
+          "Ciyaaryahanka kale xiriirkii wuu go'ay. Sug inuu soo noqdo.",
+        idleNudge: "Wareeggaaga waa la sugayaa.",
+        claimAvailable:
+          "Ciyaaryahanka kale ma joogo; guusha waad qaadan kartaa.",
+      },
+      result: {
+        reasons: {
+          opponentAbandoned: "Ciyaaryahanka kale wuu baxay; waad guuleysatay.",
+          opponentIdleTimeout:
+            "Ciyaaryahanka kale wuu hakaday; waad guuleysatay.",
+        },
       },
       invalid: {
         gameOver: "Ciyaartu way dhammaatay.",
@@ -169,6 +186,7 @@ export const messages = {
         alreadyRemovedInitial: "Dhagax bilow ah horay ayaad u saartay.",
         notSpaceMaking: "Dhaqaaqaas meel bannayn sharci ah ma aha.",
         unsupportedAction: "Tallaabadaas lama taageero.",
+        notClaimable: "Guusha hadda lama qaadan karo.",
       },
       form: {
         namePlaceholder: "Magacaaga",

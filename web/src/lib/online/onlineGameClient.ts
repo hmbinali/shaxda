@@ -8,7 +8,7 @@ import type { ServerMessage } from "@shaxda/shared";
 import { httpOrigin, wsOrigin } from "./workerOrigin";
 
 export type OnlineConnectionStatus =
-  "idle" | "connecting" | "connected" | "closed" | "error";
+  "idle" | "connecting" | "reconnecting" | "connected" | "closed" | "error";
 
 export interface JoinRoomOptions {
   roomCode: string;
@@ -30,8 +30,14 @@ export interface OnlineGameClientOptions extends OnlineGameClientCallbacks {
 }
 
 export class OnlineGameClient {
+  static readonly reconnectDelaysMs = [1_000, 2_000, 4_000, 8_000, 10_000];
+
   #socket: WebSocket | null = null;
   #roomCode: string | null = null;
+  #joinOptions: JoinRoomOptions | null = null;
+  #intentionalClose = false;
+  #reconnectAttempt = 0;
+  #reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   #httpBase: string;
   #wsBase: string;
   #fetch: typeof fetch;
@@ -69,10 +75,17 @@ export class OnlineGameClient {
   }
 
   connect(options: JoinRoomOptions): void {
-    this.close();
+    this.cancelReconnect();
+    this.closeSocket();
     this.#roomCode = options.roomCode;
+    this.#joinOptions = { ...options };
+    this.#intentionalClose = false;
+    this.#reconnectAttempt = 0;
     this.emitStatus("connecting");
+    this.openSocket(options);
+  }
 
+  private openSocket(options: JoinRoomOptions): void {
     const socket = new this.#WebSocketCtor(
       `${this.#wsBase}/rooms/${encodeURIComponent(options.roomCode)}/ws`,
     );
@@ -82,6 +95,7 @@ export class OnlineGameClient {
       if (this.#socket !== socket) {
         return;
       }
+      this.#reconnectAttempt = 0;
       this.emitStatus("connected");
       socket.send(JSON.stringify(buildJoinMessage(options)));
     });
@@ -105,6 +119,10 @@ export class OnlineGameClient {
         return;
       }
       this.#socket = null;
+      if (!this.#intentionalClose) {
+        this.scheduleReconnect();
+        return;
+      }
       this.emitStatus("closed");
     });
 
@@ -112,8 +130,14 @@ export class OnlineGameClient {
       if (this.#socket !== socket) {
         return;
       }
-      this.emitStatus("error");
       this.emitError(new Error("WebSocket connection failed."));
+      this.#socket = null;
+      socket.close();
+      if (!this.#intentionalClose) {
+        this.scheduleReconnect();
+        return;
+      }
+      this.emitStatus("error");
     });
   }
 
@@ -136,11 +160,30 @@ export class OnlineGameClient {
     return true;
   }
 
+  sendClaimWin(roomCode = this.#roomCode): boolean {
+    if (
+      this.#socket === null ||
+      roomCode === null ||
+      this.#socket.readyState !== this.#WebSocketCtor.OPEN
+    ) {
+      return false;
+    }
+
+    const message = clientMessageSchema.parse({
+      v: protocolVersion,
+      type: "claimWin",
+      roomCode,
+    });
+    this.#socket.send(JSON.stringify(message));
+    return true;
+  }
+
   close(): void {
-    const socket = this.#socket;
-    this.#socket = null;
+    this.#intentionalClose = true;
+    this.cancelReconnect();
+    this.closeSocket();
     this.#roomCode = null;
-    socket?.close();
+    this.#joinOptions = null;
   }
 
   setCallbacks(callbacks: OnlineGameClientCallbacks): void {
@@ -153,6 +196,43 @@ export class OnlineGameClient {
 
   private emitError(error: Error): void {
     this.#callbacks.onError?.(error);
+  }
+
+  private scheduleReconnect(): void {
+    if (this.#joinOptions === null || this.#intentionalClose) {
+      return;
+    }
+
+    if (this.#reconnectAttempt >= OnlineGameClient.reconnectDelaysMs.length) {
+      this.emitStatus("error");
+      this.emitError(new Error("WebSocket reconnect failed."));
+      return;
+    }
+
+    const delay = OnlineGameClient.reconnectDelaysMs[this.#reconnectAttempt];
+    this.#reconnectAttempt += 1;
+    this.emitStatus("reconnecting");
+    this.cancelReconnect();
+    this.#reconnectTimer = setTimeout(() => {
+      this.#reconnectTimer = null;
+      if (this.#joinOptions === null || this.#intentionalClose) {
+        return;
+      }
+      this.openSocket(this.#joinOptions);
+    }, delay);
+  }
+
+  private cancelReconnect(): void {
+    if (this.#reconnectTimer !== null) {
+      clearTimeout(this.#reconnectTimer);
+      this.#reconnectTimer = null;
+    }
+  }
+
+  private closeSocket(): void {
+    const socket = this.#socket;
+    this.#socket = null;
+    socket?.close();
   }
 }
 

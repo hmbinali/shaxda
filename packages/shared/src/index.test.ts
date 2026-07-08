@@ -230,6 +230,68 @@ describe("WebSocket protocol schemas", () => {
       payload: "hello",
     });
   });
+
+  it("accepts O2 resilience messages", () => {
+    expect(
+      clientMessageSchema.parse({
+        v: protocolVersion,
+        type: "claimWin",
+        roomCode: "ROOM-1",
+      }),
+    ).toEqual({
+      v: 1,
+      type: "claimWin",
+      roomCode: "ROOM-1",
+    });
+
+    expect(
+      serverMessageSchema.parse({
+        v: protocolVersion,
+        type: "matchStatus",
+        roomCode: "ROOM-1",
+        connections: { A: true, B: false },
+        idleSlot: null,
+        claimableBy: "A",
+        claimReason: "opponentAbandoned",
+      }),
+    ).toEqual({
+      v: 1,
+      type: "matchStatus",
+      roomCode: "ROOM-1",
+      connections: { A: true, B: false },
+      idleSlot: null,
+      claimableBy: "A",
+      claimReason: "opponentAbandoned",
+    });
+
+    expect(
+      serverMessageSchema.parse({
+        v: protocolVersion,
+        type: "matchEnded",
+        roomCode: "ROOM-1",
+        winner: "A",
+        reason: "opponentIdleTimeout",
+      }),
+    ).toEqual({
+      v: 1,
+      type: "matchEnded",
+      roomCode: "ROOM-1",
+      winner: "A",
+      reason: "opponentIdleTimeout",
+    });
+
+    expect(
+      serverMessageSchema.parse({
+        v: protocolVersion,
+        type: "error",
+        code: "notClaimable",
+        message: "Claim win is not available.",
+      }),
+    ).toMatchObject({
+      type: "error",
+      code: "notClaimable",
+    });
+  });
 });
 
 describe("fixture action scripts", () => {

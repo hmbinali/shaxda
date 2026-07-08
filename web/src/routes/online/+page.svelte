@@ -4,6 +4,7 @@
     Flag,
     LogOut,
     Plus,
+    Trophy,
     Volume2,
     VolumeX,
   } from "@lucide/svelte";
@@ -246,6 +247,50 @@
           </p>
         {/if}
 
+        {#if controller.connectionStatus === "reconnecting"}
+          <p
+            class="mb-3 rounded border border-amber-700/25 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
+            role="status"
+          >
+            {copy.notices.reconnecting}
+          </p>
+        {/if}
+
+        {#if controller.started && controller.opponentConnected === false && controller.state.phase !== "gameOver"}
+          <p
+            class="mb-3 rounded border border-amber-700/25 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
+            role="status"
+          >
+            {copy.notices.opponentDisconnected}
+          </p>
+        {/if}
+
+        {#if controller.isIdlePlayer && controller.state.phase !== "gameOver"}
+          <p
+            class="mb-3 rounded border border-board-700/25 bg-white/70 px-3 py-2 text-sm font-medium text-board-900"
+            role="status"
+          >
+            {copy.notices.idleNudge}
+          </p>
+        {/if}
+
+        {#if controller.canClaimWin}
+          <div
+            class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-green-700/25 bg-green-50 px-3 py-2 text-sm font-medium text-green-900"
+            role="status"
+          >
+            <span>{copy.notices.claimAvailable}</span>
+            <button
+              class="inline-flex items-center gap-2 rounded bg-green-900 px-3 py-2 text-sm font-semibold text-white hover:bg-green-800"
+              type="button"
+              onclick={() => controller.claimWin()}
+            >
+              <Trophy size={16} aria-hidden="true" />
+              {copy.claimWin}
+            </button>
+          </div>
+        {/if}
+
         {#if controller.roomCode === null}
           <section class="rounded border border-board-700/20 bg-white/60 p-4">
             <form
@@ -442,7 +487,11 @@
                 {gameCopy.result.winnerLabel}: {playerName(status.winner)}
               </h2>
             {/if}
-            {#if status.endReason !== null}
+            {#if controller.onlineEndReason !== null}
+              <p class="mt-2 text-sm leading-6 text-board-100">
+                {copy.result.reasons[controller.onlineEndReason]}
+              </p>
+            {:else if status.endReason !== null}
               <p class="mt-2 text-sm leading-6 text-board-100">
                 {gameCopy.result.reasons[status.endReason]}
               </p>

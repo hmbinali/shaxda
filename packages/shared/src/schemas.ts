@@ -147,6 +147,12 @@ export const gameActionClientMessageSchema = z.object({
   action: gameActionSchema,
 });
 
+export const claimWinClientMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("claimWin"),
+  roomCode: roomCodeSchema,
+});
+
 export const echoClientMessageSchema = z.object({
   ...envelopeBase,
   type: z.literal("echo"),
@@ -164,6 +170,7 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
   createRoomClientMessageSchema,
   joinRoomClientMessageSchema,
   gameActionClientMessageSchema,
+  claimWinClientMessageSchema,
   echoClientMessageSchema,
   pingClientMessageSchema,
 ]);
@@ -204,6 +211,32 @@ export const stateServerMessageSchema = z.object({
   state: gameStateSchema,
 });
 
+export const onlineMatchEndReasonSchema = z.enum([
+  "opponentAbandoned",
+  "opponentIdleTimeout",
+]);
+
+export const matchStatusServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("matchStatus"),
+  roomCode: roomCodeSchema,
+  connections: z.object({
+    A: z.boolean(),
+    B: z.boolean(),
+  }),
+  idleSlot: playerSlotSchema.nullable(),
+  claimableBy: playerSlotSchema.nullable(),
+  claimReason: onlineMatchEndReasonSchema.nullable(),
+});
+
+export const matchEndedServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("matchEnded"),
+  roomCode: roomCodeSchema,
+  winner: playerSlotSchema,
+  reason: onlineMatchEndReasonSchema,
+});
+
 export const echoBroadcastServerMessageSchema = z.object({
   ...envelopeBase,
   type: z.literal("echoBroadcast"),
@@ -230,6 +263,8 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
   joinedServerMessageSchema,
   presenceServerMessageSchema,
   stateServerMessageSchema,
+  matchStatusServerMessageSchema,
+  matchEndedServerMessageSchema,
   echoBroadcastServerMessageSchema,
   errorServerMessageSchema,
   pongServerMessageSchema,

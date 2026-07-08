@@ -103,6 +103,61 @@ describe("OnlineGameController", () => {
     expect(game.feedback?.cues).toEqual(["invalid"]);
   });
 
+  it("tracks match status and sends claim-win", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    client.message({
+      v: protocolVersion,
+      type: "matchStatus",
+      roomCode: "ROOM-1",
+      connections: { A: true, B: false },
+      idleSlot: null,
+      claimableBy: "A",
+      claimReason: "opponentAbandoned",
+    });
+
+    expect(game.opponentConnected).toBe(false);
+    expect(game.canClaimWin).toBe(true);
+
+    game.claimWin();
+
+    expect(client.claims).toEqual(["ROOM-1"]);
+  });
+
+  it("tracks idle status, reconnecting, and online end reasons", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    client.status("reconnecting");
+    client.message({
+      v: protocolVersion,
+      type: "matchStatus",
+      roomCode: "ROOM-1",
+      connections: { A: true, B: true },
+      idleSlot: "A",
+      claimableBy: null,
+      claimReason: null,
+    });
+    client.message({
+      v: protocolVersion,
+      type: "matchEnded",
+      roomCode: "ROOM-1",
+      winner: "B",
+      reason: "opponentIdleTimeout",
+    });
+
+    expect(game.connectionStatus).toBe("reconnecting");
+    expect(game.isIdlePlayer).toBe(true);
+    expect(game.onlineEndReason).toBe("opponentIdleTimeout");
+  });
+
   it("does not apply rejected actions to later state updates", () => {
     const client = new FakeClient();
     const game = createOnlineGameController({
@@ -242,6 +297,7 @@ function expectDisplayedInitialState(
 class FakeClient {
   callbacks: OnlineGameClientCallbacks = {};
   actions: GameAction[] = [];
+  claims: (string | null)[] = [];
   joined: JoinRoomOptions | null = null;
 
   async createRoom(): Promise<string> {
@@ -254,6 +310,11 @@ class FakeClient {
 
   sendGameAction(action: GameAction): boolean {
     this.actions.push(action);
+    return true;
+  }
+
+  sendClaimWin(roomCode: string | null): boolean {
+    this.claims.push(roomCode);
     return true;
   }
 

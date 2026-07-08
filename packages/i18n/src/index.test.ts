@@ -50,4 +50,11 @@ describe("i18n scaffold", () => {
       "resignation",
     ]);
   });
+
+  it("covers online resilience result reasons", () => {
+    expect(Object.keys(messages.so.onlineGame.result.reasons).sort()).toEqual([
+      "opponentAbandoned",
+      "opponentIdleTimeout",
+    ]);
+  });
 });

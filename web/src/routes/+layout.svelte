@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import AnalyticsBeacon from "$lib/analytics/AnalyticsBeacon.svelte";
   import { createPwaController, setPwaController } from "$lib/pwa/pwa.svelte";
   import "../app.css";
 
@@ -104,5 +105,7 @@
     }
   });
 </script>
+
+<AnalyticsBeacon />
 
 {@render children()}

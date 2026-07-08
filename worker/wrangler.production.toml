@@ -1,0 +1,30 @@
+name = "shaxda-worker"
+main = "src/index.ts"
+compatibility_date = "2026-07-05"
+workers_dev = false
+
+[observability]
+enabled = true
+
+[vars]
+ALLOWED_ORIGIN = "https://shaxda.so"
+
+[[routes]]
+pattern = "api.shaxda.so"
+custom_domain = true
+
+[[durable_objects.bindings]]
+name = "MATCH_ROOM"
+class_name = "MatchRoom"
+
+[[durable_objects.bindings]]
+name = "MATCH_COORDINATOR"
+class_name = "RoomCoordinator"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MatchRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["RoomCoordinator"]

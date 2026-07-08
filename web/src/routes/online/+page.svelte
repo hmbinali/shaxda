@@ -176,6 +176,16 @@
       ? copy.errors[code as keyof typeof copy.errors]
       : copy.invalid.actionRejected;
   }
+
+  function onlineResultReason(): string | null {
+    if (controller.onlineEndReason === null || status.winner === null) {
+      return null;
+    }
+
+    const perspective =
+      status.winner === controller.mySlot ? "winner" : "loser";
+    return copy.result.reasons[controller.onlineEndReason][perspective];
+  }
 </script>
 
 <PageMeta title={copy.title} description={copy.description} path="/online" />
@@ -489,7 +499,7 @@
             {/if}
             {#if controller.onlineEndReason !== null}
               <p class="mt-2 text-sm leading-6 text-board-100">
-                {copy.result.reasons[controller.onlineEndReason]}
+                {onlineResultReason()}
               </p>
             {:else if status.endReason !== null}
               <p class="mt-2 text-sm leading-6 text-board-100">

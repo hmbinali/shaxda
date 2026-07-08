@@ -155,9 +155,14 @@ export const messages = {
       },
       result: {
         reasons: {
-          opponentAbandoned: "Ciyaaryahanka kale wuu baxay; waad guuleysatay.",
-          opponentIdleTimeout:
-            "Ciyaaryahanka kale wuu hakaday; waad guuleysatay.",
+          opponentAbandoned: {
+            winner: "Ciyaaryahanka kale wuu baxay; waad guuleysatay.",
+            loser: "Xiriirkaaga wuu go'ay; ciyaaryahanka kale ayaa guuleystay.",
+          },
+          opponentIdleTimeout: {
+            winner: "Ciyaaryahanka kale wuu hakaday; waad guuleysatay.",
+            loser: "Waad hakaday; ciyaaryahanka kale ayaa guuleystay.",
+          },
         },
       },
       invalid: {

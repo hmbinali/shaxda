@@ -56,5 +56,9 @@ describe("i18n scaffold", () => {
       "opponentAbandoned",
       "opponentIdleTimeout",
     ]);
+    for (const reason of Object.values(messages.so.onlineGame.result.reasons)) {
+      expect(reason.winner.length).toBeGreaterThan(0);
+      expect(reason.loser.length).toBeGreaterThan(0);
+    }
   });
 });

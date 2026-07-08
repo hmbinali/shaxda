@@ -182,6 +182,21 @@ export const joinedServerMessageSchema = z.object({
   slot: playerSlotSchema,
 });
 
+const presencePlayerSchema = z.object({
+  displayName: guestDisplayNameSchema.optional(),
+});
+
+export const presenceServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("presence"),
+  roomCode: roomCodeSchema,
+  players: z.object({
+    A: presencePlayerSchema.nullable(),
+    B: presencePlayerSchema.nullable(),
+  }),
+  started: z.boolean(),
+});
+
 export const stateServerMessageSchema = z.object({
   ...envelopeBase,
   type: z.literal("state"),
@@ -213,6 +228,7 @@ export const pongServerMessageSchema = z.object({
 export const serverMessageSchema = z.discriminatedUnion("type", [
   roomCreatedServerMessageSchema,
   joinedServerMessageSchema,
+  presenceServerMessageSchema,
   stateServerMessageSchema,
   echoBroadcastServerMessageSchema,
   errorServerMessageSchema,

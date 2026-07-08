@@ -159,6 +159,30 @@ describe("WebSocket protocol schemas", () => {
     });
   });
 
+  it("accepts presence broadcasts with display names", () => {
+    expect(
+      serverMessageSchema.parse({
+        v: protocolVersion,
+        type: "presence",
+        roomCode: "ROOM-1",
+        players: {
+          A: { displayName: "Ayaan" },
+          B: null,
+        },
+        started: false,
+      }),
+    ).toEqual({
+      v: 1,
+      type: "presence",
+      roomCode: "ROOM-1",
+      players: {
+        A: { displayName: "Ayaan" },
+        B: null,
+      },
+      started: false,
+    });
+  });
+
   it("accepts room spike echo and join messages", () => {
     expect(
       clientMessageSchema.parse({

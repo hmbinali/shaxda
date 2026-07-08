@@ -1,5 +1,6 @@
 import {
   echoClientMessageSchema,
+  gameActionClientMessageSchema,
   joinRoomClientMessageSchema,
   playerSlotSchema,
   pingClientMessageSchema,
@@ -13,6 +14,7 @@ export const roomInitRequestSchema = z.object({
 
 export const roomInboundSchema = z.discriminatedUnion("type", [
   joinRoomClientMessageSchema,
+  gameActionClientMessageSchema,
   pingClientMessageSchema,
   echoClientMessageSchema,
 ]);

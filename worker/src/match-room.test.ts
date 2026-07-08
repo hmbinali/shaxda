@@ -6,7 +6,20 @@ import {
   SELF,
 } from "cloudflare:test";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { protocolVersion, serverMessageSchema } from "@shaxda/shared";
+import { serialize } from "@shaxda/game-engine";
+import type {
+  GameAction,
+  GameState,
+  PlayerId,
+  PointId,
+} from "@shaxda/game-engine";
+import {
+  a2ConformanceActionScripts,
+  fullGameActionScripts,
+  protocolVersion,
+  serverMessageSchema,
+} from "@shaxda/shared";
+import type { ServerMessage } from "@shaxda/shared";
 
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -79,22 +92,49 @@ describe("match room hibernation spike", () => {
     const second = await connectRoom(roomCode);
     const third = await connectRoom(roomCode);
 
-    sendJson(first, joinRoom(roomCode, "guest-id-a"));
-    await expect(nextJson(first)).resolves.toMatchObject({
+    const firstJoin = await joinAndWait(first, roomCode, "guest-id-a", "Ayaan");
+    expect(firstJoin.joined).toMatchObject({
       type: "joined",
       guestId: "guest-id-a",
       slot: "A",
     });
+    expect(firstJoin.presence).toMatchObject({
+      type: "presence",
+      players: { A: { displayName: "Ayaan" }, B: null },
+      started: false,
+    });
+    expect(firstJoin.state).toMatchObject({
+      type: "state",
+      state: { phase: "placement", currentPlayer: "A" },
+    });
 
-    sendJson(second, joinRoom(roomCode, "guest-id-b"));
-    await expect(nextJson(second)).resolves.toMatchObject({
+    const firstPresenceAfterSecondJoin = waitForMessage(first, "presence");
+    const secondJoin = await joinAndWait(
+      second,
+      roomCode,
+      "guest-id-b",
+      "Cabdi",
+    );
+    expect(secondJoin.joined).toMatchObject({
       type: "joined",
       guestId: "guest-id-b",
       slot: "B",
     });
+    expect(secondJoin.presence).toMatchObject({
+      type: "presence",
+      players: {
+        A: { displayName: "Ayaan" },
+        B: { displayName: "Cabdi" },
+      },
+      started: true,
+    });
+    await expect(firstPresenceAfterSecondJoin).resolves.toMatchObject({
+      type: "presence",
+      started: true,
+    });
 
     sendJson(third, joinRoom(roomCode, "guest-id-c"));
-    await expect(nextJson(third)).resolves.toMatchObject({
+    await expect(waitForMessage(third, "error")).resolves.toMatchObject({
       type: "error",
       code: "roomFull",
     });
@@ -108,23 +148,48 @@ describe("match room hibernation spike", () => {
     const roomCode = await createRoom();
     const first = await connectRoom(roomCode);
 
-    sendJson(first, joinRoom(roomCode, "guest-id-a"));
-    await expect(nextJson(first)).resolves.toMatchObject({
-      type: "joined",
-      slot: "A",
+    await expect(
+      joinAndWait(first, roomCode, "guest-id-a"),
+    ).resolves.toMatchObject({
+      joined: {
+        type: "joined",
+        slot: "A",
+      },
     });
     first.close();
 
     const reconnected = await connectRoom(roomCode);
     sendJson(reconnected, joinRoom(roomCode, "guest-id-a"));
 
-    await expect(nextJson(reconnected)).resolves.toMatchObject({
+    await expect(waitForMessage(reconnected, "joined")).resolves.toMatchObject({
       type: "joined",
       guestId: "guest-id-a",
       slot: "A",
     });
 
     reconnected.close();
+  });
+
+  it("rejects illegal moves and keeps authoritative state", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    const firstPresenceAfterSecondJoin = waitForMessage(first, "presence");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await firstPresenceAfterSecondJoin;
+
+    const errorPromise = waitForMessage(first, "error");
+    sendAction(first, roomCode, { type: "place", player: "B", point: "O1" });
+
+    await expect(errorPromise).resolves.toMatchObject({
+      type: "error",
+      code: "notYourTurn",
+    });
+
+    first.close();
+    second.close();
   });
 
   it("responds to ping with the shared pong shape", async () => {
@@ -170,13 +235,11 @@ describe("match room hibernation spike", () => {
     const first = await connectRoom(roomCode);
     const second = await connectRoom(roomCode);
 
-    sendJson(first, joinRoom(roomCode, "guest-id-a"));
-    await nextJson(first);
-    sendJson(second, joinRoom(roomCode, "guest-id-b"));
-    await nextJson(second);
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
 
-    const firstBroadcast = nextJson(first);
-    const secondBroadcast = nextJson(second);
+    const firstBroadcast = waitForMessage(first, "echoBroadcast");
+    const secondBroadcast = waitForMessage(second, "echoBroadcast");
     sendJson(first, {
       v: protocolVersion,
       type: "echo",
@@ -184,14 +247,14 @@ describe("match room hibernation spike", () => {
       payload: "hello",
     });
 
-    expect(serverMessageSchema.parse(await firstBroadcast)).toEqual({
+    expect(await firstBroadcast).toEqual({
       v: protocolVersion,
       type: "echoBroadcast",
       roomCode,
       fromGuestId: "guest-id-a",
       payload: "hello",
     });
-    expect(serverMessageSchema.parse(await secondBroadcast)).toEqual({
+    expect(await secondBroadcast).toEqual({
       v: protocolVersion,
       type: "echoBroadcast",
       roomCode,
@@ -210,18 +273,16 @@ describe("match room hibernation spike", () => {
     const unjoined = await connectRoom(roomCode);
     const rejected = await connectRoom(roomCode);
 
-    sendJson(first, joinRoom(roomCode, "guest-id-a"));
-    await nextJson(first);
-    sendJson(second, joinRoom(roomCode, "guest-id-b"));
-    await nextJson(second);
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
     sendJson(rejected, joinRoom(roomCode, "guest-id-c"));
-    await expect(nextJson(rejected)).resolves.toMatchObject({
+    await expect(waitForMessage(rejected, "error")).resolves.toMatchObject({
       type: "error",
       code: "roomFull",
     });
 
-    const firstBroadcast = nextJson(first);
-    const secondBroadcast = nextJson(second);
+    const firstBroadcast = waitForMessage(first, "echoBroadcast");
+    const secondBroadcast = waitForMessage(second, "echoBroadcast");
     sendJson(first, {
       v: protocolVersion,
       type: "echo",
@@ -254,6 +315,138 @@ describe("match room hibernation spike", () => {
     second.close();
     unjoined.close();
     rejected.close();
+  });
+
+  it("replays placement through initial removal with authoritative state broadcasts", async () => {
+    const script = fullGameActionScripts.find(
+      (candidate) => candidate.name === "placement-through-initial-removal",
+    );
+    expect(script).toBeDefined();
+    if (!script) {
+      return;
+    }
+
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+
+    let latestState: GameState | null = null;
+    for (const action of script.actions) {
+      const socket = action.player === "A" ? first : second;
+      const firstStatePromise = waitForMessage(first, "state");
+      const secondStatePromise = waitForMessage(second, "state");
+      sendAction(socket, roomCode, action);
+      const firstState = await firstStatePromise;
+      const secondState = await secondStatePromise;
+      expect(firstState.state).toEqual(secondState.state);
+      latestState = firstState.state;
+    }
+
+    expect(latestState).toEqual(script.expectedFinalState);
+
+    first.close();
+    second.close();
+  });
+
+  it("syncs movement jare and capture from an engine fixture", async () => {
+    const script = a2ConformanceActionScripts.find(
+      (candidate) => candidate.name === "movement-jare-pending-capture",
+    );
+    expect(script).toBeDefined();
+    if (!script) {
+      return;
+    }
+
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await replaceStoredGameState(roomCode, script.initialState);
+
+    const action = script.actions[0];
+    const firstPendingPromise = waitForMessage(first, "state");
+    const secondPendingPromise = waitForMessage(second, "state");
+    sendAction(first, roomCode, action);
+    const pending = await firstPendingPromise;
+    await secondPendingPromise;
+    expect(pending.state).toEqual(script.expectedFinalState);
+    expect(pending.state.phase).toBe("capture");
+
+    const capturePoint = firstPointOwnedBy(pending.state, "B");
+    const firstCapturePromise = waitForMessage(first, "state");
+    const secondCapturePromise = waitForMessage(second, "state");
+    sendAction(first, roomCode, {
+      type: "capture",
+      player: "A",
+      point: capturePoint,
+    });
+
+    const firstCaptureState = await firstCapturePromise;
+    const secondCaptureState = await secondCapturePromise;
+    expect(firstCaptureState.state).toEqual(secondCaptureState.state);
+    expect(firstCaptureState.state.phase).not.toBe("capture");
+    expect(firstCaptureState.state.pendingCapture).toBeNull();
+
+    first.close();
+    second.close();
+  });
+
+  it("resends current state when the same guest rejoins", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+
+    const firstStatePromise = waitForMessage(first, "state");
+    const secondStatePromise = waitForMessage(second, "state");
+    sendAction(first, roomCode, { type: "place", player: "A", point: "O1" });
+    await firstStatePromise;
+    await secondStatePromise;
+    first.close();
+
+    const reconnected = await connectRoom(roomCode);
+    const rejoin = await joinAndWait(reconnected, roomCode, "guest-id-a");
+
+    expect(rejoin.joined).toMatchObject({ type: "joined", slot: "A" });
+    expect(rejoin.state).toMatchObject({
+      type: "state",
+      state: { board: { O1: "A" } },
+    });
+
+    reconnected.close();
+    second.close();
+  });
+
+  it("broadcasts resignation as a game-over state", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+
+    const firstStatePromise = waitForMessage(first, "state");
+    const secondStatePromise = waitForMessage(second, "state");
+    sendAction(first, roomCode, { type: "resign", player: "A" });
+
+    await expect(firstStatePromise).resolves.toMatchObject({
+      type: "state",
+      state: { phase: "gameOver", winner: "B", endReason: "resignation" },
+    });
+    await expect(secondStatePromise).resolves.toMatchObject({
+      type: "state",
+      state: { phase: "gameOver", winner: "B", endReason: "resignation" },
+    });
+
+    first.close();
+    second.close();
   });
 
   it("cleans room storage when the alarm runs after idle expiry", async () => {
@@ -329,13 +522,65 @@ function sendJson(socket: WebSocket, message: unknown): void {
   socket.send(JSON.stringify(message));
 }
 
-function joinRoom(roomCode: string, guestId: string): unknown {
+function sendAction(
+  socket: WebSocket,
+  roomCode: string,
+  action: GameAction,
+): void {
+  sendJson(socket, {
+    v: protocolVersion,
+    type: "gameAction",
+    roomCode,
+    action,
+  });
+}
+
+function joinRoom(
+  roomCode: string,
+  guestId: string,
+  displayName?: string,
+): unknown {
   return {
     v: protocolVersion,
     type: "joinRoom",
     roomCode,
     guestId,
+    ...(displayName ? { displayName } : {}),
   };
+}
+
+async function joinAndWait(
+  socket: WebSocket,
+  roomCode: string,
+  guestId: string,
+  displayName?: string,
+): Promise<{
+  joined: Extract<ServerMessage, { type: "joined" }>;
+  presence: Extract<ServerMessage, { type: "presence" }>;
+  state: Extract<ServerMessage, { type: "state" }>;
+}> {
+  sendJson(socket, joinRoom(roomCode, guestId, displayName));
+
+  const joined = await waitForMessage(socket, "joined");
+  const presence = await waitForMessage(socket, "presence");
+  const state = await waitForMessage(socket, "state");
+
+  return { joined, presence, state };
+}
+
+async function waitForMessage<Type extends ServerMessage["type"]>(
+  socket: WebSocket,
+  type: Type,
+  timeoutMs = 1_000,
+): Promise<Extract<ServerMessage, { type: Type }>> {
+  for (;;) {
+    const message = serverMessageSchema.parse(
+      await nextJson(socket, timeoutMs),
+    );
+    if (message.type === type) {
+      return message as Extract<ServerMessage, { type: Type }>;
+    }
+  }
 }
 
 function nextJson(socket: WebSocket, timeoutMs = 1_000): Promise<unknown> {
@@ -357,6 +602,30 @@ function nextJson(socket: WebSocket, timeoutMs = 1_000): Promise<unknown> {
 
 function roomStub(roomCode: string): DurableObjectStub {
   return testEnv.MATCH_ROOM.get(testEnv.MATCH_ROOM.idFromName(roomCode));
+}
+
+async function replaceStoredGameState(
+  roomCode: string,
+  state: GameState,
+): Promise<void> {
+  await runInDurableObject(roomStub(roomCode), async (_instance, storage) => {
+    const room = await storage.storage.get<Record<string, unknown>>("room");
+    expect(room).toBeDefined();
+    await storage.storage.put("room", {
+      ...room,
+      gameState: serialize(state),
+    });
+  });
+}
+
+function firstPointOwnedBy(state: GameState, player: PlayerId): PointId {
+  for (const [point, owner] of Object.entries(state.board)) {
+    if (owner === player) {
+      return point as PointId;
+    }
+  }
+
+  throw new Error(`No point owned by player ${player}.`);
 }
 
 function roomCodeBytes(roomCode: string): Uint8Array {

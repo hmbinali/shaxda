@@ -37,6 +37,20 @@ describe("buildBoardView", () => {
     expect(legalHintPointIds(view.points)).toEqual(expectedHints);
   });
 
+  it("exposes the pieces with at least one legal movement", () => {
+    const state = gameFixtures.movement;
+    const expectedMovablePoints = new Set(
+      legalActions(state)
+        .filter(
+          (action): action is Extract<GameAction, { type: "move" }> =>
+            action.type === "move",
+        )
+        .map((action) => action.from),
+    );
+
+    expect(buildBoardView(state).movablePoints).toEqual(expectedMovablePoints);
+  });
+
   it("marks legal movement hints for blocked-player space-making", () => {
     const state = gameFixtures.blockedPlayer;
     const view = buildBoardView(state, { selected: "O2" });

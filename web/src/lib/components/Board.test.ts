@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/svelte";
+import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import { gameFixtures } from "@shaxda/shared";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
@@ -136,7 +136,7 @@ describe("Board", () => {
     expect(captureBurst).toHaveAttribute("pointer-events", "none");
   });
 
-  it("remounts nonce-driven animation elements so CSS can replay", async () => {
+  it("replays consecutive invalid shakes without remounting the SVG", async () => {
     const { container, rerender } = render(Board, {
       props: {
         state: gameFixtures.movement,
@@ -149,19 +149,12 @@ describe("Board", () => {
     });
 
     const initialSvg = boardSvg(container);
-    const initialMoveAnimation = moveAnimation(container);
+    const shell = container.querySelector('[data-testid="board"]');
 
-    await rerender({
-      state: gameFixtures.movement,
-      lastAction: {
-        action: { type: "move", player: "B", from: "O1", to: "O8" },
-        nonce: 8,
-      },
-      invalidNonce: 1,
+    await waitFor(() => expect(shell).toHaveClass("shaxda-invalid-shake"));
+    await fireEvent.animationEnd(initialSvg, {
+      animationName: "shaxda-invalid-shake",
     });
-
-    expect(moveAnimation(container)).not.toBe(initialMoveAnimation);
-    expect(boardSvg(container)).toBe(initialSvg);
 
     await rerender({
       state: gameFixtures.movement,
@@ -172,7 +165,9 @@ describe("Board", () => {
       invalidNonce: 2,
     });
 
-    expect(boardSvg(container)).not.toBe(initialSvg);
+    await waitFor(() => expect(shell).toHaveClass("shaxda-invalid-shake"));
+    expect(shell).toHaveAttribute("data-invalid-shake", "2");
+    expect(boardSvg(container)).toBe(initialSvg);
   });
 
   it("keeps static board points non-interactive by default", () => {
@@ -217,7 +212,7 @@ describe("Board", () => {
     expect(reducedMotionBlock).toContain(".shaxda-move-ghost");
     expect(reducedMotionBlock).toContain(".shaxda-capture-burst");
     expect(reducedMotionBlock).toContain(
-      "[data-invalid-shake] .shaxda-board-svg",
+      ".shaxda-invalid-shake .shaxda-board-svg",
     );
     expect(reducedMotionBlock).toContain("animation: none !important");
     expect(reducedMotionBlock).toContain("display: none");
@@ -242,16 +237,6 @@ function screenClass(container: HTMLElement, selector: string): string {
 
 function boardSvg(container: HTMLElement): Element {
   const element = container.querySelector(".shaxda-board-svg");
-
-  expect(element).not.toBeNull();
-
-  return element as Element;
-}
-
-function moveAnimation(container: HTMLElement): Element {
-  const element = container.querySelector(
-    '[data-testid="board-move-animation"]',
-  );
 
   expect(element).not.toBeNull();
 

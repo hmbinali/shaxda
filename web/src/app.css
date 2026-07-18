@@ -106,7 +106,7 @@ select {
   transform-origin: center;
 }
 
-[data-invalid-shake] .shaxda-board-svg {
+.shaxda-invalid-shake .shaxda-board-svg {
   animation: shaxda-invalid-shake 220ms ease-in-out;
 }
 
@@ -202,7 +202,7 @@ select {
   .shaxda-jare-line-active,
   .shaxda-move-ghost,
   .shaxda-capture-burst,
-  [data-invalid-shake] .shaxda-board-svg {
+  .shaxda-invalid-shake .shaxda-board-svg {
     animation: none !important;
   }
 

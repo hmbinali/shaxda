@@ -56,6 +56,22 @@ describe("game announcements", () => {
     );
   });
 
+  it("announces the first jare formed during placement", () => {
+    const announcement = buildAnnouncement(
+      {
+        action: { type: "place", player: "A", point: "O3" },
+        nonce: 1,
+        formedJare: true,
+      },
+      buildGameStatus(gameFixtures.midPlacement),
+      playerName,
+    );
+
+    expect(announcement).toContain(
+      `${copy.announce.placed} O3. ${copy.announce.jareFormed}.`,
+    );
+  });
+
   it("announces the winner after an action ends the game", () => {
     const result = applyAction(gameFixtures.capturePending, {
       type: "capture",

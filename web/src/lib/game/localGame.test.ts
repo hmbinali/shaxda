@@ -46,6 +46,7 @@ describe("LocalGameController", () => {
 
     expect(game.state.firstAdvantage).toBe("A");
     expect(game.feedback?.cues).toEqual(["place", "jare"]);
+    expect(game.lastAction?.formedJare).toBe(true);
   });
 
   it("does not emit jare feedback for no-jare first-advantage fallback", () => {

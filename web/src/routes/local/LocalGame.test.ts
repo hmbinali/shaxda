@@ -39,6 +39,18 @@ describe("/local", () => {
     );
   });
 
+  it("announces the first jare formed during placement", async () => {
+    const { container } = render(LocalGamePage);
+
+    for (const pointId of ["O1", "M1", "O2", "M3", "O3"]) {
+      await fireEvent.click(point(container, pointId));
+    }
+
+    expect(screen.getByTestId("game-announcer")).toHaveTextContent(
+      `${copy.playerNames.A} ${copy.announce.placed} O3. ${copy.announce.jareFormed}.`,
+    );
+  });
+
   it("shows invalid feedback for illegal taps", async () => {
     const { container } = render(LocalGamePage);
 

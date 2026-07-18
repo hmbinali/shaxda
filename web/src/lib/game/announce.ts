@@ -5,6 +5,7 @@ import type { GameStatus } from "./status";
 export interface AnnouncedAction {
   action: GameAction;
   nonce: number;
+  formedJare?: boolean;
 }
 
 export type PlayerName = (player: PlayerId) => string;
@@ -21,7 +22,7 @@ export function buildAnnouncement(
   }
 
   return joinAnnouncementParts([
-    actionAnnouncement(lastAction.action, status, playerName),
+    actionAnnouncement(lastAction, status, playerName),
     statusAnnouncement(status, playerName),
   ]);
 }
@@ -37,19 +38,25 @@ export function buildStateSummary(
 }
 
 function actionAnnouncement(
-  action: GameAction,
+  lastAction: AnnouncedAction,
   status: GameStatus,
   playerName: PlayerName,
 ): string {
+  const { action, formedJare = false } = lastAction;
   const name = playerName(action.player);
 
   switch (action.type) {
     case "place":
-      return `${name} ${copy.announce.placed} ${action.point}.`;
+      return joinAnnouncementParts([
+        `${name} ${copy.announce.placed} ${action.point}.`,
+        formedJare ? `${copy.announce.jareFormed}.` : "",
+      ]);
     case "move":
       return joinAnnouncementParts([
         `${name} ${copy.announce.moved} ${action.from} ${copy.announce.movedTo} ${action.to}.`,
-        status.phase === "capture" ? `${copy.announce.jareFormed}.` : "",
+        formedJare || status.phase === "capture"
+          ? `${copy.announce.jareFormed}.`
+          : "",
       ]);
     case "capture":
       return `${name} ${copy.announce.captured} ${action.point}.`;

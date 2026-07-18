@@ -44,6 +44,7 @@ export interface OnlineGameFeedback {
 export interface ActionFeedback {
   action: GameAction;
   nonce: number;
+  formedJare: boolean;
 }
 
 export interface OnlineGameControllerOptions {
@@ -245,10 +246,13 @@ export class OnlineGameController {
     }
 
     if (action !== null) {
-      this.lastAction = { action, nonce: (this.#actionNonce += 1) };
-      this.emitFeedback(
-        classifyActionFeedback(previousState, action, nextState),
-      );
+      const cues = classifyActionFeedback(previousState, action, nextState);
+      this.lastAction = {
+        action,
+        nonce: (this.#actionNonce += 1),
+        formedJare: cues.includes("jare"),
+      };
+      this.emitFeedback(cues);
       if (pendingAction !== null) {
         this.#pendingAction = null;
       }

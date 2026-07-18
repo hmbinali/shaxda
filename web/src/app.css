@@ -72,9 +72,7 @@ select {
 .shaxda-piece {
   transform-box: fill-box;
   transform-origin: center;
-  transition:
-    filter 160ms ease,
-    transform 160ms ease;
+  transition: transform 160ms ease;
 }
 
 .shaxda-piece:hover {
@@ -136,12 +134,10 @@ select {
   0%,
   100% {
     opacity: 0.62;
-    stroke-width: 1.1;
   }
 
   50% {
     opacity: 1;
-    stroke-width: 1.45;
   }
 }
 

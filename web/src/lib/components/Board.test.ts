@@ -17,6 +17,9 @@ describe("Board", () => {
       container.querySelectorAll('[data-testid="board-piece"]'),
     ).toHaveLength(4);
     expect(
+      container.querySelectorAll('[data-testid="board-piece-shadow"]'),
+    ).toHaveLength(4);
+    expect(
       container.querySelectorAll('[data-testid="board-hit-target"]'),
     ).toHaveLength(24);
     expect(
@@ -94,6 +97,25 @@ describe("Board", () => {
     expect(
       container.querySelectorAll('[data-testid="board-piece-b-ring"]'),
     ).toHaveLength(2);
+  });
+
+  it("uses baked shadows and underlays without SVG filters", () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.movement,
+        selected: "O8",
+      },
+    });
+    const css = readFileSync("src/app.css", "utf8");
+    const selectedKeyframes = css.slice(
+      css.indexOf("@keyframes shaxda-selected-glow"),
+      css.indexOf("@keyframes shaxda-valid-pulse"),
+    );
+
+    expect(container.querySelector("filter")).not.toBeInTheDocument();
+    expect(container.querySelector("feDropShadow")).not.toBeInTheDocument();
+    expect(container.querySelector("feGaussianBlur")).not.toBeInTheDocument();
+    expect(selectedKeyframes).not.toContain("stroke-width");
   });
 
   it("renders wooden board layers and completed jare highlights", () => {

@@ -306,43 +306,6 @@
           class="shaxda-wood-grain-line"
         />
       </pattern>
-      <filter
-        id="shaxda-piece-shadow"
-        x="-35%"
-        y="-25%"
-        width="170%"
-        height="170%"
-      >
-        <feDropShadow
-          dx="0"
-          dy="0.9"
-          stdDeviation="0.8"
-          flood-color="#1d120c"
-          flood-opacity="0.28"
-        />
-      </filter>
-      <filter
-        id="shaxda-board-shadow"
-        x="-10%"
-        y="-8%"
-        width="120%"
-        height="120%"
-      >
-        <feDropShadow
-          dx="0"
-          dy="1.4"
-          stdDeviation="1.2"
-          flood-color="#24130a"
-          flood-opacity="0.24"
-        />
-      </filter>
-      <filter id="shaxda-glow" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur stdDeviation="1.3" result="blur" />
-        <feMerge>
-          <feMergeNode in="blur" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
     </defs>
 
     <rect
@@ -352,7 +315,6 @@
       height="97"
       rx="3.5"
       fill="url(#shaxda-board-surface)"
-      filter="url(#shaxda-board-shadow)"
       data-testid="board-wood-surface"
       aria-hidden="true"
       pointer-events="none"
@@ -553,6 +515,15 @@
 
           {#if point.occupant}
             <circle
+              data-testid="board-piece-shadow"
+              cx={point.x + 0.65}
+              cy={point.y + 0.9}
+              r={PIECE_RADIUS}
+              class="fill-board-900/25"
+              aria-hidden="true"
+              pointer-events="none"
+            />
+            <circle
               data-testid="board-piece"
               cx={point.x}
               cy={point.y}
@@ -560,7 +531,6 @@
               fill={pieceFill(point.occupant)}
               class={`shaxda-piece ${pieceStrokeClass(point.occupant)}`}
               stroke-width="0.65"
-              filter="url(#shaxda-piece-shadow)"
               aria-hidden="true"
               pointer-events="none"
             />
@@ -664,7 +634,6 @@
           class={`shaxda-move-ghost ${pieceStrokeClass(moveFeedback.action.player)}`}
           stroke-width="0.65"
           style={moveAnimationStyle(moveFeedback.action)}
-          filter="url(#shaxda-piece-shadow)"
           pointer-events="none"
           aria-hidden="true"
         />

@@ -115,6 +115,23 @@ export const messages = {
             "Bannaynta keliya waxay samayn lahayd jare qasab ah.",
         },
       },
+      // TODO(translation-review): A native/fluent Somali reviewer must verify
+      // these composable screen-reader announcement fragments before release.
+      announce: {
+        placed: "wuxuu dhagax dhigay barta",
+        moved: "wuxuu dhagax ka dhaqaajiyay barta",
+        movedTo: "una dhaqaajiyay barta",
+        jareFormed: "wuxuuna sameeyay jare",
+        captured: "wuxuu qabtay dhagaxa yaal barta",
+        removedInitial: "wuxuu saaray dhagaxa bilowga ee barta",
+        turnPrefix: "Wareegga",
+        phasePrefix: "Wejiga",
+        spaceMaking: "Meel ayaa loo bannaynayaa ciyaaryahanka xanniban.",
+        winner: "Guuleystay",
+        draw: "Ciyaartu waa barbaro.",
+        resigned: "wuu is dhiibay",
+        stateSynced: "Xaaladda ciyaarta waa la waafajiyay.",
+      },
     },
     onlineGame: {
       title: "Ciyaar marti ah",

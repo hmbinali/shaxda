@@ -18,6 +18,7 @@
     saveSoundPreference,
   } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
+  import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
   import GameResultCard from "$components/game/GameResultCard.svelte";
   import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
   import PlayerPiecesCard from "$components/game/PlayerPiecesCard.svelte";
@@ -297,6 +298,13 @@
 </script>
 
 <PageMeta title={copy.title} description={copy.description} path="/online" />
+
+<GameAnnouncer
+  lastAction={controller.lastAction}
+  {status}
+  {playerName}
+  stateSyncNonce={controller.stateSyncNonce}
+/>
 
 <section
   class="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:px-8"

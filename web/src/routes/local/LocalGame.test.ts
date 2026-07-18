@@ -34,6 +34,9 @@ describe("/local", () => {
     const saved = window.localStorage.getItem(LOCAL_GAME_STORAGE_KEY);
     expect(saved).not.toBeNull();
     expect(deserialize(saved ?? "").board.O1).toBe("A");
+    expect(screen.getByTestId("game-announcer")).toHaveTextContent(
+      `${copy.playerNames.A} ${copy.announce.placed} O1`,
+    );
   });
 
   it("shows invalid feedback for illegal taps", async () => {

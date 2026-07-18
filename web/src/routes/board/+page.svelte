@@ -21,7 +21,9 @@
   <meta name="description" content={copy.intro} />
 </svelte:head>
 
-<main class="min-h-screen bg-board-50 px-4 py-6 text-board-900 sm:px-6 lg:px-8">
+<section
+  class="min-h-full bg-board-50 px-4 py-6 text-board-900 sm:px-6 lg:px-8"
+>
   <section class="mx-auto max-w-7xl">
     <div
       class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
@@ -75,4 +77,4 @@
       {/each}
     </div>
   </section>
-</main>
+</section>

@@ -9,8 +9,18 @@ test.describe("Q1 mobile responsive smoke", () => {
       page.getByRole("heading", { name: "Shaxda", exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "Ciyaar qalabkan" }),
+      page.locator("#main-content").getByRole("link", {
+        name: "Ciyaar qalabkan",
+      }),
     ).toBeVisible();
+
+    const menuButton = page.getByRole("button", { name: "Fur hagaha" });
+    await menuButton.click();
+    const drawer = page.getByRole("dialog", { name: "Hagaha bogga" });
+    await expect(drawer).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(menuButton).toBeFocused();
 
     await page.goto("/local");
     await expect(

@@ -243,6 +243,15 @@ export const siteContent = {
       localPlay: "Ciyaar qalabkan",
       onlinePlay: "Ciyaar marti ah",
     },
+    sidebar: {
+      account: "Akoonka",
+      accountPlaceholder: "Marti — dhawaan",
+      skipToContent: "U bood nuxurka",
+      openMenu: "Fur hagaha",
+      closeMenu: "Xir hagaha",
+      expandSidebar: "Ballaari hagaha",
+      collapseSidebar: "Isku koob astaamo",
+    },
     footer: {
       tagline: "Shaxda Soomaali keliya, si fudud loogu barto loona ciyaaro.",
       reviewNote:

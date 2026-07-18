@@ -95,13 +95,145 @@ test.describe("C1 public content", () => {
     page,
   }) => {
     await page.goto("/");
+    const main = page.locator("#main-content");
 
     await expect(
-      page.getByRole("link", { name: "Ciyaar qalabkan" }),
+      main.getByRole("link", { name: "Ciyaar qalabkan" }),
     ).toHaveAttribute("href", "/local");
     await expect(
-      page.getByRole("link", { name: "Ciyaar marti ah" }),
+      main.getByRole("link", { name: "Ciyaar marti ah" }),
     ).toHaveAttribute("href", "/online");
+  });
+
+  test("desktop sidebar starts games directly and persists across navigation", async ({
+    page,
+  }) => {
+    await page.goto("/learn");
+    const navigation = page.getByRole("navigation", { name: "Hagaha bogga" });
+    const sidebar = navigation.locator("xpath=ancestor::aside");
+
+    await expect(
+      navigation.getByRole("link", { name: "Baro" }),
+    ).toHaveAttribute("aria-current", "page");
+    await sidebar.evaluate((element) => {
+      element.setAttribute("data-persistence-check", "present");
+    });
+
+    await navigation.getByRole("link", { name: "Ciyaar qalabkan" }).click();
+
+    await expect(page).toHaveURL(/\/local$/);
+    await expect(
+      page.getByRole("heading", { name: "Ciyaar qalabkan", exact: true }),
+    ).toBeVisible();
+    await expect(sidebar).toHaveAttribute("data-persistence-check", "present");
+    await expect(
+      navigation.getByRole("link", { name: "Ciyaar qalabkan" }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  test("desktop sidebar collapses responsively and remembers its state", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/learn");
+
+    const sidebar = page.getByTestId("desktop-sidebar");
+    const main = page.locator("#main-content");
+    const expandedWidth = await sidebar.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+    const mainWidthBefore = await main.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+    const expandedAccount = page.getByTestId("desktop-account-expanded");
+    const accountWidthBefore = await expandedAccount.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+
+    expect(expandedWidth).toBeGreaterThanOrEqual(256);
+    expect(expandedWidth).toBeLessThanOrEqual(288);
+
+    await page.getByRole("button", { name: "Isku koob astaamo" }).click();
+    await expect(sidebar).toHaveAttribute("data-collapsed", "true");
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeLessThanOrEqual(72.5);
+    await expect(expandedAccount).toHaveAttribute("aria-hidden", "true");
+    await expect(page.getByTestId("desktop-account-compact")).toHaveAttribute(
+      "aria-hidden",
+      "false",
+    );
+    const accountWidthAfter = await expandedAccount.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+    expect(accountWidthAfter).toBeCloseTo(accountWidthBefore, 0);
+
+    const mainWidthAfter = await main.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+    expect(mainWidthAfter).toBeGreaterThan(mainWidthBefore + 150);
+
+    for (const name of [
+      "Hoy",
+      "Ciyaar qalabkan",
+      "Ciyaar marti ah",
+      "Baro",
+      "Xeerarka",
+      "Asturnaanta",
+      "Shuruudaha",
+    ]) {
+      await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+    }
+
+    const localLink = page.getByRole("link", {
+      name: "Ciyaar qalabkan",
+      exact: true,
+    });
+    await localLink.focus();
+    await expect(localLink).toHaveAttribute("data-tooltip", "Ciyaar qalabkan");
+
+    await page.reload();
+    await expect(sidebar).toHaveAttribute("data-collapsed", "true");
+    await expect(
+      page.getByRole("button", { name: "Ballaari hagaha" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Ballaari hagaha" }).click();
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeGreaterThanOrEqual(255.5);
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeLessThanOrEqual(256.5);
+    await page.setViewportSize({ width: 1920, height: 1000 });
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeGreaterThanOrEqual(287.5);
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeLessThanOrEqual(288.5);
+  });
+
+  test("offers a keyboard skip link to the main content", async ({ page }) => {
+    await page.goto("/");
+
+    await page.keyboard.press("Tab");
+
+    const skipLink = page.getByRole("link", { name: "U bood nuxurka" });
+    await expect(skipLink).toBeFocused();
+    await skipLink.press("Enter");
+    await expect(page.locator("#main-content")).toBeFocused();
   });
 
   test("homepage does not prerender an empty PWA notice region", async ({

@@ -168,6 +168,44 @@ test.describe("L1 local game", () => {
       .not.toBeNull();
   });
 
+  test("supports roving keyboard play and announces the resulting action", async ({
+    page,
+  }) => {
+    await page.goto("/local");
+
+    const tabStops = page.locator('[data-testid="board-point"][tabindex="0"]');
+    await expect(tabStops).toHaveCount(1);
+    await expect(tabStops).toHaveAttribute("data-point-id", "O1");
+
+    await tabStops.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator('[data-point-id="O2"]')).toBeFocused();
+    await page.keyboard.press("Home");
+    await expect(page.locator('[data-point-id="O1"]')).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(page.locator('[data-point-id="O1"]')).toHaveAttribute(
+      "data-occupant",
+      "A",
+    );
+    await expect(page.getByTestId("game-announcer")).toContainText(
+      "Ciyaaryahan A wuxuu dhagax dhigay barta O1",
+    );
+
+    await page.evaluate(({ key, value }) => localStorage.setItem(key, value), {
+      key: storageKey,
+      value: movementJareState,
+    });
+    await page.reload();
+
+    const movablePiece = page.locator('[data-point-id="O4"]');
+    await movablePiece.focus();
+    await page.keyboard.press("Enter");
+    await expect(movablePiece).toHaveAttribute("data-selected", "true");
+    await page.keyboard.press("Escape");
+    await expect(movablePiece).not.toHaveAttribute("data-selected");
+  });
+
   test("persists the local sound preference", async ({ page }) => {
     await page.goto("/local");
 
@@ -225,6 +263,30 @@ test.describe("L1 local game", () => {
       "data-occupant",
       "A",
     );
+    await page.getByTestId("board-move-animation").evaluate(async (element) => {
+      await Promise.all(
+        element.getAnimations().map((animation) => animation.finished),
+      );
+    });
+    const pieceBox = await page
+      .locator('[data-point-id="O3"] [data-testid="board-piece"]')
+      .boundingBox();
+    const hitBox = await page
+      .locator('[data-point-id="O3"] [data-testid="board-hit-target"]')
+      .boundingBox();
+
+    expect(pieceBox).not.toBeNull();
+    expect(hitBox).not.toBeNull();
+    expect(
+      Math.hypot(
+        (pieceBox?.x ?? 0) +
+          (pieceBox?.width ?? 0) / 2 -
+          ((hitBox?.x ?? 0) + (hitBox?.width ?? 0) / 2),
+        (pieceBox?.y ?? 0) +
+          (pieceBox?.height ?? 0) / 2 -
+          ((hitBox?.y ?? 0) + (hitBox?.height ?? 0) / 2),
+      ),
+    ).toBeLessThan((hitBox?.width ?? 0) / 2);
     await expect(page.locator('[data-point-id="O5"]')).toHaveAttribute(
       "data-capture-target",
       "true",

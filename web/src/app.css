@@ -9,6 +9,17 @@
   --color-board-100: #ead8c2;
   --color-board-700: #6e4327;
   --color-board-900: #332016;
+  --color-surface: var(--color-board-50);
+  --color-surface-tint: var(--color-board-100);
+  --color-ink: #221813;
+  --color-ink-muted: var(--color-board-700);
+  --color-accent: #991b1b;
+  --color-danger: #b91c1c;
+  --color-warning: #92400e;
+  --color-success: #047857;
+  --color-jare: #92610a;
+  --color-focus: #1e40af;
+  --color-selected: #0369a1;
 }
 
 html {
@@ -19,8 +30,8 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  background: #f8f1e8;
-  color: #221813;
+  background: var(--color-surface);
+  color: var(--color-ink);
 }
 
 button,
@@ -38,6 +49,20 @@ select {
   border-radius: 0.75rem;
 }
 
+.shaxda-focus-ring,
+.shaxda-focus-ring-underlay {
+  opacity: 0;
+}
+
+.shaxda-board-point:focus-visible {
+  outline: none;
+}
+
+.shaxda-board-point:focus-visible .shaxda-focus-ring,
+.shaxda-board-point:focus-visible .shaxda-focus-ring-underlay {
+  opacity: 1;
+}
+
 .shaxda-wood-grain-line {
   fill: none;
   stroke: rgb(110 67 39 / 0.2);
@@ -45,16 +70,18 @@ select {
   stroke-width: 0.42;
 }
 
-.shaxda-piece {
+.shaxda-piece-group {
   transform-box: fill-box;
   transform-origin: center;
-  transition:
-    filter 160ms ease,
-    transform 160ms ease;
+  transition: transform 160ms ease;
 }
 
-.shaxda-piece:hover {
-  transform: translateY(-0.15px);
+.shaxda-piece-slide {
+  animation: shaxda-piece-slide 220ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+
+.shaxda-piece-pop {
+  animation: shaxda-piece-pop 160ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
 }
 
 .shaxda-selected-glow {
@@ -71,23 +98,24 @@ select {
 
 .shaxda-jare-line {
   fill: none;
-  stroke: rgb(250 204 21 / 0.62);
+  stroke: var(--color-jare);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2.2;
 }
 
-.shaxda-jare-line-active {
-  stroke: rgb(34 197 94 / 0.86);
-  stroke-width: 2.7;
-  animation: shaxda-jare-active 1.15s ease-in-out infinite;
+.shaxda-jare-line-underlay {
+  fill: none;
+  stroke: var(--color-board-50);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4.1;
 }
 
-.shaxda-move-ghost {
-  animation: shaxda-move-piece 260ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
-  opacity: 0;
-  transform-box: fill-box;
-  transform-origin: center;
+.shaxda-jare-line-active {
+  stroke: var(--color-success);
+  stroke-width: 2.7;
+  animation: shaxda-jare-active 1.15s ease-in-out infinite;
 }
 
 .shaxda-capture-burst {
@@ -96,7 +124,7 @@ select {
   transform-origin: center;
 }
 
-[data-invalid-shake] .shaxda-board-svg {
+.shaxda-invalid-shake .shaxda-board-svg {
   animation: shaxda-invalid-shake 220ms ease-in-out;
 }
 
@@ -104,12 +132,10 @@ select {
   0%,
   100% {
     opacity: 0.62;
-    stroke-width: 1.1;
   }
 
   50% {
     opacity: 1;
-    stroke-width: 1.45;
   }
 }
 
@@ -146,15 +172,25 @@ select {
   }
 }
 
-@keyframes shaxda-move-piece {
+@keyframes shaxda-piece-slide {
   0% {
-    opacity: 0.96;
-    transform: translate(var(--move-x), var(--move-y)) scale(0.96);
+    transform: translate(var(--move-x), var(--move-y));
   }
 
   100% {
-    opacity: 0;
-    transform: translate(0, 0) scale(1.02);
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes shaxda-piece-pop {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.6);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -190,18 +226,18 @@ select {
   .shaxda-valid-pulse,
   .shaxda-target-ring,
   .shaxda-jare-line-active,
-  .shaxda-move-ghost,
+  .shaxda-piece-slide,
+  .shaxda-piece-pop,
   .shaxda-capture-burst,
-  [data-invalid-shake] .shaxda-board-svg {
+  .shaxda-invalid-shake .shaxda-board-svg {
     animation: none !important;
   }
 
-  .shaxda-move-ghost,
   .shaxda-capture-burst {
     display: none;
   }
 
-  .shaxda-piece {
+  .shaxda-piece-group {
     transition: none;
   }
 }

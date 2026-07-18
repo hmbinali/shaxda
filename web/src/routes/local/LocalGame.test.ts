@@ -34,6 +34,21 @@ describe("/local", () => {
     const saved = window.localStorage.getItem(LOCAL_GAME_STORAGE_KEY);
     expect(saved).not.toBeNull();
     expect(deserialize(saved ?? "").board.O1).toBe("A");
+    expect(screen.getByTestId("game-announcer")).toHaveTextContent(
+      `${copy.playerNames.A} ${copy.announce.placed} O1`,
+    );
+  });
+
+  it("announces the first jare formed during placement", async () => {
+    const { container } = render(LocalGamePage);
+
+    for (const pointId of ["O1", "M1", "O2", "M3", "O3"]) {
+      await fireEvent.click(point(container, pointId));
+    }
+
+    expect(screen.getByTestId("game-announcer")).toHaveTextContent(
+      `${copy.playerNames.A} ${copy.announce.placed} O3. ${copy.announce.jareFormed}.`,
+    );
   });
 
   it("shows invalid feedback for illegal taps", async () => {

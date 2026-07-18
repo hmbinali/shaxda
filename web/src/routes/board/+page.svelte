@@ -48,7 +48,7 @@
         {copy.selectedPoint}
       </span>
       <span class="inline-flex items-center gap-2">
-        <span class="h-3 w-3 rounded-full bg-emerald-800"></span>
+        <span class="h-3 w-3 rounded-full bg-success"></span>
         {copy.legalHint}
       </span>
       <span class="inline-flex items-center gap-2">
@@ -56,12 +56,18 @@
         ></span>
         {copy.captureTarget}
       </span>
+      <span class="inline-flex items-center gap-2">
+        <span class="h-3 w-3 rounded-full border-2 border-dotted border-warning"
+        ></span>
+        {copy.removalTarget}
+      </span>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each fixtureEntries as [key, state] (key)}
         <article
           class="rounded border border-board-700/20 bg-white/55 p-4 shadow-sm"
+          data-fixture={key}
         >
           <div class="mb-3 min-h-20">
             <h2 class="text-xl font-semibold tracking-normal">

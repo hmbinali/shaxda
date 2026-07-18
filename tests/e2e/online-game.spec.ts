@@ -34,6 +34,12 @@ test.describe("O1 guest online game", () => {
         "data-occupant",
         "A",
       );
+      await expect(joiner.getByTestId("board-place-animation")).toHaveClass(
+        /shaxda-piece-pop/,
+      );
+      await expect(joiner.getByTestId("game-announcer")).toContainText(
+        "Ayaan wuxuu dhagax dhigay barta O1",
+      );
 
       await creator.reload();
 

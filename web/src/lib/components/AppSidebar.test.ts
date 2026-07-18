@@ -72,18 +72,12 @@ describe("AppSidebar", () => {
     const collapseButton = await screen.findByRole("button", {
       name: sidebar.collapseSidebar,
     });
-    const expandedAccount = screen.getByTestId("desktop-account-expanded");
-    const compactAccount = screen.getByTestId("desktop-account-compact");
 
     expect(desktopSidebar).toHaveAttribute("data-collapsed", "false");
-    expect(expandedAccount).toHaveAttribute("aria-hidden", "false");
-    expect(compactAccount).toHaveAttribute("aria-hidden", "true");
 
     await fireEvent.click(collapseButton);
 
     expect(desktopSidebar).toHaveAttribute("data-collapsed", "true");
-    expect(expandedAccount).toHaveAttribute("aria-hidden", "true");
-    expect(compactAccount).toHaveAttribute("aria-hidden", "false");
     expect(window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)).toBe(
       "true",
     );

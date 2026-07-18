@@ -147,6 +147,9 @@ describe("/online", () => {
         copy.result.reasons.opponentAbandoned.loser,
       ),
     );
+    expect(screen.getByTestId("game-announcer")).toHaveTextContent(
+      `${messages.so.localGame.announce.winner}: Bilan`,
+    );
     expect(screen.getByTestId("online-game-result")).not.toHaveTextContent(
       copy.result.reasons.opponentAbandoned.winner,
     );

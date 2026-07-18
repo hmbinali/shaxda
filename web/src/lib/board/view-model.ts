@@ -41,6 +41,7 @@ export interface BoardView {
   points: BoardPointView[];
   lines: typeof BOARD_LINES;
   jareLines: BoardJareLineView[];
+  movablePoints: Set<PointId>;
 }
 
 export function buildBoardView(
@@ -48,13 +49,15 @@ export function buildBoardView(
   options: BoardViewOptions = {},
 ): BoardView {
   const selected = options.selected ?? null;
-  const legalHintPoints = getLegalHintPoints(state, selected);
-  const captureTargetPoints = getCaptureTargetPoints(state);
-  const removalTargetPoints = getRemovalTargetPoints(state);
+  const actions = legalActions(state);
+  const legalHintPoints = getLegalHintPoints(state, selected, actions);
+  const captureTargetPoints = getCaptureTargetPoints(state, actions);
+  const removalTargetPoints = getRemovalTargetPoints(state, actions);
 
   return {
     lines: BOARD_LINES,
     jareLines: buildJareLineViews(state),
+    movablePoints: getMovablePoints(actions),
     points: POINT_IDS.map((id) => {
       const coord = POINT_COORDS[id];
 
@@ -119,13 +122,14 @@ function getActivePendingCaptureLineIds(state: GameState): Set<string> {
 function getLegalHintPoints(
   state: GameState,
   selected: PointId | null,
+  actions: readonly GameAction[],
 ): Set<PointId> {
   if (state.phase !== "movement" || selected === null) {
     return new Set();
   }
 
   return new Set(
-    legalActions(state)
+    actions
       .filter(
         (action): action is Extract<GameAction, { type: "move" }> =>
           action.type === "move" && action.from === selected,
@@ -134,13 +138,16 @@ function getLegalHintPoints(
   );
 }
 
-function getCaptureTargetPoints(state: GameState): Set<PointId> {
+function getCaptureTargetPoints(
+  state: GameState,
+  actions: readonly GameAction[],
+): Set<PointId> {
   if (state.phase !== "capture" || state.pendingCapture === null) {
     return new Set();
   }
 
   return new Set(
-    legalActions(state)
+    actions
       .filter((action) => action.type === "capture")
       .filter((action) => isCaptureByPendingPlayer(action.player, state))
       .map((action) => action.point),
@@ -151,14 +158,28 @@ function isCaptureByPendingPlayer(player: PlayerId, state: GameState): boolean {
   return player === state.pendingCapture?.player;
 }
 
-function getRemovalTargetPoints(state: GameState): Set<PointId> {
+function getRemovalTargetPoints(
+  state: GameState,
+  actions: readonly GameAction[],
+): Set<PointId> {
   if (state.phase !== "initialRemoval") {
     return new Set();
   }
 
   return new Set(
-    legalActions(state)
+    actions
       .filter((action) => action.type === "removeInitial")
       .map((action) => action.point),
+  );
+}
+
+function getMovablePoints(actions: readonly GameAction[]): Set<PointId> {
+  return new Set(
+    actions
+      .filter(
+        (action): action is Extract<GameAction, { type: "move" }> =>
+          action.type === "move",
+      )
+      .map((action) => action.from),
   );
 }

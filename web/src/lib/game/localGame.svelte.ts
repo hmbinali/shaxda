@@ -36,6 +36,7 @@ export interface LocalGameFeedback {
 export interface ActionFeedback {
   action: GameAction;
   nonce: number;
+  formedJare: boolean;
 }
 
 export interface LocalGameControllerOptions {
@@ -137,10 +138,13 @@ export class LocalGameController {
     this.state = result.state;
     this.selected = null;
     this.invalid = null;
-    this.lastAction = { action, nonce: (this.#actionNonce += 1) };
-    this.emitFeedback(
-      classifyActionFeedback(previousState, action, this.state),
-    );
+    const cues = classifyActionFeedback(previousState, action, this.state);
+    this.lastAction = {
+      action,
+      nonce: (this.#actionNonce += 1),
+      formedJare: cues.includes("jare"),
+    };
+    this.emitFeedback(cues);
 
     if (this.state.phase === "gameOver") {
       clearSavedLocalGame(this.#storage);

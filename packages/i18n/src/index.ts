@@ -52,6 +52,12 @@ export const messages = {
       selectedPoint: "Bar la doortay",
       legalHint: "Meel sharci ah",
       captureTarget: "Dhagax la qaban karo",
+      // TODO(translation-review): A native/fluent Somali reviewer must verify
+      // these board-navigation labels and instructions before release.
+      removalTarget: "Dhagax bilow ah oo la saari karo",
+      movablePiece: "Dhagax dhaqaaqi kara",
+      keyboardHelp:
+        "Isticmaal fallaadhaha si aad looxa ugu dhex socoto, Enter ama Space si aad u ciyaarto, Escape si aad doorashada uga baxdo.",
       playerPiece: {
         A: "Dhagaxa ciyaaryahan A",
         B: "Dhagaxa ciyaaryahan B",
@@ -114,6 +120,23 @@ export const messages = {
           forcedJareSpaceMaking:
             "Bannaynta keliya waxay samayn lahayd jare qasab ah.",
         },
+      },
+      // TODO(translation-review): A native/fluent Somali reviewer must verify
+      // these composable screen-reader announcement fragments before release.
+      announce: {
+        placed: "wuxuu dhagax dhigay barta",
+        moved: "wuxuu dhagax ka dhaqaajiyay barta",
+        movedTo: "una dhaqaajiyay barta",
+        jareFormed: "wuxuuna sameeyay jare",
+        captured: "wuxuu qabtay dhagaxa yaal barta",
+        removedInitial: "wuxuu saaray dhagaxa bilowga ee barta",
+        turnPrefix: "Wareegga",
+        phasePrefix: "Wejiga",
+        spaceMaking: "Meel ayaa loo bannaynayaa ciyaaryahanka xanniban.",
+        winner: "Guuleystay",
+        draw: "Ciyaartu waa barbaro.",
+        resigned: "wuu is dhiibay",
+        stateSynced: "Xaaladda ciyaarta waa la waafajiyay.",
       },
     },
     onlineGame: {
@@ -244,8 +267,6 @@ export const siteContent = {
       onlinePlay: "Ciyaar marti ah",
     },
     sidebar: {
-      account: "Akoonka",
-      accountPlaceholder: "Marti — dhawaan",
       skipToContent: "U bood nuxurka",
       openMenu: "Fur hagaha",
       closeMenu: "Xir hagaha",

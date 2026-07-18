@@ -16,6 +16,7 @@ import {
   type GameStatus,
 } from "$lib/game/status";
 import type { SoundCue } from "$lib/audio/sound";
+import { inferOpponentAction } from "./inferAction";
 import {
   OnlineGameClient,
   type OnlineConnectionStatus,
@@ -65,6 +66,7 @@ export class OnlineGameController {
   invalidNonce = $state(0);
   lastAction = $state<ActionFeedback | null>(null);
   feedback = $state<OnlineGameFeedback | null>(null);
+  stateSyncNonce = $state(0);
   lastServerError = $state<string | null>(null);
   status = $derived(buildGameStatus(this.state));
   started = $derived(this.presence.A !== null && this.presence.B !== null);
@@ -231,7 +233,9 @@ export class OnlineGameController {
 
   private receiveState(nextState: GameState): void {
     const previousState = this.state;
-    const action = this.#pendingAction;
+    const pendingAction = this.#pendingAction;
+    const action =
+      pendingAction ?? inferOpponentAction(previousState, nextState);
     this.state = nextState;
     this.selected = null;
     this.invalid = null;
@@ -245,9 +249,13 @@ export class OnlineGameController {
       this.emitFeedback(
         classifyActionFeedback(previousState, action, nextState),
       );
-      this.#pendingAction = null;
+      if (pendingAction !== null) {
+        this.#pendingAction = null;
+      }
       return;
     }
+
+    this.stateSyncNonce += 1;
 
     if (previousState.phase !== "gameOver" && nextState.phase === "gameOver") {
       this.emitFeedback(["win"]);
@@ -277,6 +285,7 @@ export class OnlineGameController {
     this.invalid = null;
     this.lastAction = null;
     this.feedback = null;
+    this.stateSyncNonce = 0;
     this.lastServerError = null;
     this.#pendingAction = null;
   }

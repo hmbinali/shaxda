@@ -85,6 +85,45 @@ describe("OnlineGameController", () => {
     expect(game.feedback?.cues).toEqual(["place"]);
   });
 
+  it("infers an action from a remote state without a pending action", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    client.message({
+      v: protocolVersion,
+      type: "state",
+      roomCode: "ABCDEFGH",
+      state: firstPlacementState(),
+    });
+
+    expect(game.lastAction).toMatchObject({
+      action: { type: "place", player: "A", point: "O1" },
+    });
+    expect(game.feedback?.cues).toEqual(["place"]);
+  });
+
+  it("marks unmatched remote snapshots for a summarized announcement", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    const initialSyncNonce = game.stateSyncNonce;
+    client.message({
+      v: protocolVersion,
+      type: "state",
+      roomCode: "ABCDEFGH",
+      state: gameFixtures.movement,
+    });
+
+    expect(game.lastAction).toBeNull();
+    expect(game.stateSyncNonce).toBe(initialSyncNonce + 1);
+  });
+
   it("surfaces server errors as invalid feedback", () => {
     const client = new FakeClient();
     const game = createOnlineGameController({
@@ -291,6 +330,7 @@ function expectDisplayedInitialState(
   expect(game.invalid).toBeNull();
   expect(game.lastAction).toBeNull();
   expect(game.feedback).toBeNull();
+  expect(game.stateSyncNonce).toBe(0);
   expect(game.lastServerError).toBeNull();
 }
 

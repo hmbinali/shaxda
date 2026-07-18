@@ -18,7 +18,11 @@
     saveSoundPreference,
   } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
+  import GameResultCard from "$components/game/GameResultCard.svelte";
+  import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
+  import PlayerPiecesCard from "$components/game/PlayerPiecesCard.svelte";
   import PageMeta from "$components/PageMeta.svelte";
+  import Button from "$components/ui/Button.svelte";
   import {
     getOrCreateGuestId,
     loadGuestDisplayName,
@@ -45,7 +49,6 @@
   const gameCopy = messages.so.localGame;
   const controller = createOnlineGameController();
   const soundPlayer = new SoundPlayer();
-  const players = ["A", "B"] as const;
 
   let guestId = $state("");
   let displayName = $state("");
@@ -313,12 +316,7 @@
       </div>
 
       <div class="flex flex-wrap gap-2">
-        <button
-          class="inline-flex items-center gap-2 rounded border border-board-700/30 bg-white/50 px-4 py-2 text-sm font-semibold text-board-900 hover:bg-board-100/65"
-          type="button"
-          aria-pressed={soundEnabled}
-          onclick={toggleSound}
-        >
+        <Button ariaPressed={soundEnabled} onclick={toggleSound}>
           {#if soundEnabled}
             <Volume2 size={16} aria-hidden="true" />
             {gameCopy.controls.soundOff}
@@ -326,25 +324,20 @@
             <VolumeX size={16} aria-hidden="true" />
             {gameCopy.controls.soundOn}
           {/if}
-        </button>
+        </Button>
         {#if controller.roomCode !== null}
-          <button
-            class="inline-flex items-center gap-2 rounded border border-board-700/30 bg-white/50 px-4 py-2 text-sm font-semibold text-board-900 hover:bg-board-100/65"
-            type="button"
-            onclick={leaveRoom}
-          >
+          <Button onclick={leaveRoom}>
             <LogOut size={16} aria-hidden="true" />
             {copy.leave}
-          </button>
-          <button
-            class="inline-flex items-center gap-2 rounded bg-board-900 px-4 py-2 text-sm font-semibold text-board-50 hover:bg-board-700 disabled:cursor-not-allowed disabled:opacity-55"
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
             disabled={controller.state.phase === "gameOver"}
             onclick={() => controller.resign()}
           >
             <Flag size={16} aria-hidden="true" />
             {gameCopy.controls.resign}
-          </button>
+          </Button>
         {/if}
       </div>
     </div>
@@ -392,14 +385,14 @@
         role="status"
       >
         <span>{copy.notices.claimAvailable}</span>
-        <button
-          class="inline-flex items-center gap-2 rounded bg-green-900 px-3 py-2 text-sm font-semibold text-white hover:bg-green-800"
-          type="button"
+        <Button
+          variant="success"
+          size="compact"
           onclick={() => controller.claimWin()}
         >
           <Trophy size={16} aria-hidden="true" />
           {copy.claimWin}
-        </button>
+        </Button>
       </div>
     {/if}
 
@@ -437,26 +430,24 @@
           {/if}
 
           <div class="flex flex-wrap gap-2">
-            <button
-              class="inline-flex items-center gap-2 rounded bg-board-900 px-4 py-2 text-sm font-semibold text-board-50 hover:bg-board-700 disabled:cursor-not-allowed disabled:opacity-55"
+            <Button
+              variant="primary"
               type="submit"
               disabled={busy ||
                 guestId.length === 0 ||
                 (turnstileRequired && !turnstileToken)}
-              data-testid="create-room"
+              testId="create-room"
             >
               <Plus size={16} aria-hidden="true" />
               {copy.createRoom}
-            </button>
-            <button
-              class="inline-flex items-center gap-2 rounded border border-board-700/30 bg-white/50 px-4 py-2 text-sm font-semibold text-board-900 hover:bg-board-100/65 disabled:cursor-not-allowed disabled:opacity-55"
-              type="button"
+            </Button>
+            <Button
               disabled={busy || guestId.length === 0}
               onclick={joinRoom}
-              data-testid="join-room"
+              testId="join-room"
             >
               {copy.joinRoom}
-            </button>
+            </Button>
           </div>
         </form>
       </section>
@@ -481,14 +472,10 @@
                 value={shareLink}
                 data-testid="share-link"
               />
-              <button
-                class="inline-flex items-center gap-2 rounded border border-board-700/30 bg-white/50 px-3 py-2 text-sm font-semibold text-board-900 hover:bg-board-100/65"
-                type="button"
-                onclick={() => void copyShareLink()}
-              >
+              <Button size="compact" onclick={() => void copyShareLink()}>
                 <Clipboard size={16} aria-hidden="true" />
                 {copied ? copy.copied : copy.copyLink}
-              </button>
+              </Button>
             </div>
           </div>
         {/if}
@@ -511,108 +498,47 @@
   </div>
 
   <aside class="grid content-start gap-4">
-    <section class="rounded border border-board-700/20 bg-white/60 p-4">
-      <dl class="grid gap-3 text-sm">
-        <div>
-          <dt class="font-semibold text-board-900">
-            {copy.connectionLabel}
-          </dt>
-          <dd class="mt-1 text-board-700">
-            {copy.connection[controller.connectionStatus]}
-          </dd>
-        </div>
-        {#if controller.roomCode !== null}
-          <div>
-            <dt class="font-semibold text-board-900">{copy.roomLabel}</dt>
-            <dd class="mt-1 font-mono text-board-700">
-              {controller.roomCode}
-            </dd>
-          </div>
-        {/if}
-        <div>
-          <dt class="font-semibold text-board-900">
-            {gameCopy.phaseLabel}
-          </dt>
-          <dd class="mt-1 text-board-700">
-            {gameCopy.phases[status.phase]}
-          </dd>
-        </div>
-        <div>
-          <dt class="font-semibold text-board-900">{gameCopy.turnLabel}</dt>
-          <dd class="mt-1 text-board-700">
-            {playerName(status.currentPlayer)}
-          </dd>
-        </div>
-        <div>
-          <dt class="font-semibold text-board-900">
-            {gameCopy.actingLabel}
-          </dt>
-          <dd class="mt-1 text-board-700">
-            {playerName(status.actingPlayer)}
-          </dd>
-        </div>
-      </dl>
-    </section>
+    <GameStatusPanel
+      {status}
+      {playerName}
+      leadingFields={[
+        {
+          label: copy.connectionLabel,
+          value: copy.connection[controller.connectionStatus],
+        },
+        ...(controller.roomCode === null
+          ? []
+          : [
+              {
+                label: copy.roomLabel,
+                value: controller.roomCode,
+                monospaced: true,
+              },
+            ]),
+      ]}
+      showFirstAdvantage={false}
+      showTurnsSinceCapture={false}
+    />
 
-    <section class="rounded border border-board-700/20 bg-white/60 p-4">
-      <h2 class="text-base font-semibold tracking-normal">
-        {gameCopy.piecesLabel}
-      </h2>
-      <div class="mt-3 grid gap-3">
-        {#each players as player (player)}
-          <article class="rounded border border-board-700/15 bg-board-50 p-3">
-            <h3 class="font-semibold">
-              {controller.presence[player] === null
-                ? copy.emptySlot
-                : playerSeatLabel(player)}
-            </h3>
-            <dl class="mt-2 grid grid-cols-3 gap-2 text-sm text-board-700">
-              <div>
-                <dt>{gameCopy.inHandLabel}</dt>
-                <dd class="font-semibold text-board-900">
-                  {status.players[player].inHand}
-                </dd>
-              </div>
-              <div>
-                <dt>{gameCopy.onBoardLabel}</dt>
-                <dd class="font-semibold text-board-900">
-                  {status.players[player].onBoard}
-                </dd>
-              </div>
-              <div>
-                <dt>{gameCopy.capturedLabel}</dt>
-                <dd class="font-semibold text-board-900">
-                  {status.players[player].captured}
-                </dd>
-              </div>
-            </dl>
-          </article>
-        {/each}
-      </div>
-    </section>
+    <PlayerPiecesCard
+      {status}
+      playerName={(player) =>
+        controller.presence[player] === null
+          ? copy.emptySlot
+          : playerSeatLabel(player)}
+    />
 
     {#if status.phase === "gameOver"}
-      <section
-        class="rounded border border-board-700/20 bg-board-900 p-4 text-board-50"
-        data-testid="online-game-result"
-      >
-        {#if status.winner === null}
-          <h2 class="text-lg font-semibold">{gameCopy.result.drawLabel}</h2>
-        {:else}
-          <h2 class="text-lg font-semibold">
-            {gameCopy.result.winnerLabel}: {playerName(status.winner)}
-          </h2>
-        {/if}
-        {#if controller.onlineEndReason !== null}
-          <p class="mt-2 text-sm leading-6 text-board-100">
-            {onlineResultReason()}
-          </p>
-        {:else if status.endReason !== null}
-          <p class="mt-2 text-sm leading-6 text-board-100">
-            {gameCopy.result.reasons[status.endReason]}
-          </p>
-        {/if}
-      </section>
+      <GameResultCard
+        {status}
+        {playerName}
+        reason={controller.onlineEndReason !== null
+          ? onlineResultReason()
+          : status.endReason === null
+            ? null
+            : gameCopy.result.reasons[status.endReason]}
+        testId="online-game-result"
+      />
     {/if}
   </aside>
 </section>

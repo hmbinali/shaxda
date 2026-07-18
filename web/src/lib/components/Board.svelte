@@ -354,6 +354,8 @@
       fill="url(#shaxda-board-surface)"
       filter="url(#shaxda-board-shadow)"
       data-testid="board-wood-surface"
+      aria-hidden="true"
+      pointer-events="none"
     />
     <rect
       x="1.5"
@@ -364,6 +366,8 @@
       fill="url(#shaxda-wood-grain)"
       class="opacity-45"
       data-testid="board-wood-grain"
+      aria-hidden="true"
+      pointer-events="none"
     />
     <rect
       x="4"
@@ -373,9 +377,11 @@
       rx="2.5"
       class="fill-transparent stroke-board-50/40"
       stroke-width="0.65"
+      aria-hidden="true"
+      pointer-events="none"
     />
 
-    <g data-testid="board-lines">
+    <g data-testid="board-lines" aria-hidden="true" pointer-events="none">
       {#each view.lines as line (`${line.a}-${line.b}`)}
         <line
           x1={POINT_COORDS[line.a].x}
@@ -399,8 +405,14 @@
       {/each}
     </g>
 
-    <g data-testid="board-jare-lines">
+    <g data-testid="board-jare-lines" aria-hidden="true" pointer-events="none">
       {#each view.jareLines.filter((line) => line.isCompleted) as line (line.id)}
+        <polyline
+          points={line.points
+            .map((point) => `${POINT_COORDS[point].x},${POINT_COORDS[point].y}`)
+            .join(" ")}
+          class="shaxda-jare-line-underlay"
+        />
         <polyline
           data-testid="board-jare-line"
           data-jare-line-id={line.id}
@@ -414,7 +426,6 @@
           class={line.isActivePendingCapture
             ? "shaxda-jare-line shaxda-jare-line-active"
             : "shaxda-jare-line"}
-          filter="url(#shaxda-glow)"
         />
       {/each}
     </g>
@@ -462,6 +473,15 @@
             cx={point.x}
             cy={point.y}
             r={PIECE_RADIUS + 3.15}
+            class="shaxda-focus-ring-underlay fill-transparent stroke-board-50"
+            stroke-width="2.9"
+            aria-hidden="true"
+            pointer-events="none"
+          />
+          <circle
+            cx={point.x}
+            cy={point.y}
+            r={PIECE_RADIUS + 3.15}
             class="shaxda-focus-ring fill-transparent stroke-focus"
             stroke-width="1.35"
             aria-hidden="true"
@@ -475,26 +495,50 @@
             r={SOCKET_RADIUS}
             class="fill-board-900/20 stroke-board-50/35"
             stroke-width="0.7"
+            aria-hidden="true"
+            pointer-events="none"
           />
 
           {#if point.isLegalHint}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={SOCKET_RADIUS + 1.8}
+              class="fill-transparent stroke-board-50"
+              stroke-width="2"
+              aria-hidden="true"
+              pointer-events="none"
+            />
             <circle
               data-testid="board-legal-hint"
               cx={point.x}
               cy={point.y}
               r={SOCKET_RADIUS + 1.8}
-              class="shaxda-valid-pulse fill-emerald-500/20 stroke-emerald-700/80"
-              stroke-width="0.75"
+              class="shaxda-valid-pulse fill-success/15 stroke-success"
+              stroke-width="1"
+              aria-hidden="true"
+              pointer-events="none"
             />
             <circle
               cx={point.x}
               cy={point.y}
               r={LEGAL_HINT_RADIUS}
-              class="fill-emerald-800"
+              class="fill-success"
+              aria-hidden="true"
+              pointer-events="none"
             />
           {/if}
 
           {#if point.isSelected}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={PIECE_RADIUS + 2.4}
+              class="fill-transparent stroke-board-50"
+              stroke-width="2.6"
+              aria-hidden="true"
+              pointer-events="none"
+            />
             <circle
               data-testid="board-selected-ring"
               cx={point.x}
@@ -502,7 +546,8 @@
               r={PIECE_RADIUS + 2.4}
               class="shaxda-selected-glow fill-transparent stroke-sky-700"
               stroke-width="1.15"
-              filter="url(#shaxda-glow)"
+              aria-hidden="true"
+              pointer-events="none"
             />
           {/if}
 
@@ -516,30 +561,91 @@
               class={`shaxda-piece ${pieceStrokeClass(point.occupant)}`}
               stroke-width="0.65"
               filter="url(#shaxda-piece-shadow)"
+              aria-hidden="true"
+              pointer-events="none"
             />
+            {#if point.occupant === "A"}
+              <circle
+                data-testid="board-piece-a-dot"
+                cx={point.x}
+                cy={point.y}
+                r="0.85"
+                class="fill-board-900/80"
+                aria-hidden="true"
+                pointer-events="none"
+              />
+            {:else}
+              <circle
+                data-testid="board-piece-b-ring"
+                cx={point.x}
+                cy={point.y}
+                r="2.45"
+                class="fill-transparent stroke-board-50/75"
+                stroke-width="0.55"
+                aria-hidden="true"
+                pointer-events="none"
+              />
+            {/if}
           {/if}
 
           {#if point.isCaptureTarget}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={PIECE_RADIUS + 2.1}
+              class="fill-transparent stroke-board-50"
+              stroke-width="2.7"
+              aria-hidden="true"
+              pointer-events="none"
+            />
             <circle
               data-testid="board-capture-target"
               cx={point.x}
               cy={point.y}
               r={PIECE_RADIUS + 2.1}
-              class="shaxda-target-ring fill-transparent stroke-red-700"
+              class="shaxda-target-ring fill-transparent stroke-danger"
               stroke-width="1.25"
               stroke-dasharray="1.8 1.3"
+              aria-hidden="true"
+              pointer-events="none"
             />
+            {#each [[-5.7, -5.7, -4.35, -4.35], [5.7, -5.7, 4.35, -4.35], [5.7, 5.7, 4.35, 4.35], [-5.7, 5.7, -4.35, 4.35]] as tick (`${tick[0]}-${tick[1]}`)}
+              <line
+                data-testid="board-capture-tick"
+                x1={point.x + tick[0]}
+                y1={point.y + tick[1]}
+                x2={point.x + tick[2]}
+                y2={point.y + tick[3]}
+                class="stroke-danger"
+                stroke-width="1.15"
+                stroke-linecap="round"
+                aria-hidden="true"
+                pointer-events="none"
+              />
+            {/each}
           {/if}
 
           {#if point.isRemovalTarget}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={PIECE_RADIUS + 2.1}
+              class="fill-transparent stroke-board-50"
+              stroke-width="2.7"
+              aria-hidden="true"
+              pointer-events="none"
+            />
             <circle
               data-testid="board-removal-target"
               cx={point.x}
               cy={point.y}
               r={PIECE_RADIUS + 2.1}
-              class="shaxda-target-ring fill-transparent stroke-amber-700"
+              class="shaxda-target-ring fill-transparent stroke-warning"
               stroke-width="1.2"
-              stroke-dasharray="1.6 1.2"
+              stroke-dasharray="0.1 1.7"
+              stroke-linecap="round"
+              aria-hidden="true"
+              pointer-events="none"
             />
           {/if}
         </g>
@@ -560,6 +666,7 @@
           style={moveAnimationStyle(moveFeedback.action)}
           filter="url(#shaxda-piece-shadow)"
           pointer-events="none"
+          aria-hidden="true"
         />
       {/key}
     {/if}
@@ -574,6 +681,7 @@
         class="shaxda-capture-burst fill-red-500/15 stroke-red-800"
         stroke-width="1.2"
         pointer-events="none"
+        aria-hidden="true"
       />
     {/if}
   </svg>

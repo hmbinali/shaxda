@@ -45,6 +45,9 @@ describe("Board", () => {
     expect(
       screenClass(container, '[data-testid="board-legal-hint"]'),
     ).toContain("shaxda-valid-pulse");
+    expect(
+      screenClass(container, '[data-testid="board-legal-hint"]'),
+    ).toContain("stroke-success");
   });
 
   it("renders capture target state for a pending capture fixture", () => {
@@ -59,6 +62,38 @@ describe("Board", () => {
     expect(
       container.querySelectorAll('[data-testid="board-capture-target"]'),
     ).toHaveLength(3);
+    expect(
+      container.querySelectorAll('[data-testid="board-capture-tick"]'),
+    ).toHaveLength(12);
+    expect(
+      container.querySelector('[data-testid="board-capture-target"]'),
+    ).toHaveAttribute("stroke-dasharray", "1.8 1.3");
+  });
+
+  it("renders dotted initial-removal targets", () => {
+    const { container } = render(Board, {
+      props: { state: gameFixtures.initialRemoval },
+    });
+    const removalTarget = container.querySelector(
+      '[data-testid="board-removal-target"]',
+    );
+
+    expect(removalTarget).toHaveClass("stroke-warning");
+    expect(removalTarget).toHaveAttribute("stroke-dasharray", "0.1 1.7");
+    expect(removalTarget).toHaveAttribute("stroke-linecap", "round");
+  });
+
+  it("uses redundant piece glyphs for player identity", () => {
+    const { container } = render(Board, {
+      props: { state: gameFixtures.midPlacement },
+    });
+
+    expect(
+      container.querySelectorAll('[data-testid="board-piece-a-dot"]'),
+    ).toHaveLength(2);
+    expect(
+      container.querySelectorAll('[data-testid="board-piece-b-ring"]'),
+    ).toHaveLength(2);
   });
 
   it("renders wooden board layers and completed jare highlights", () => {
@@ -80,6 +115,10 @@ describe("Board", () => {
     expect(jareLine).not.toBeNull();
     expect(jareLine).toHaveAttribute("data-owner", "A");
     expect(jareLine).toHaveClass("shaxda-jare-line");
+    expect(jareLine).not.toHaveAttribute("filter");
+    expect(
+      container.querySelector(".shaxda-jare-line-underlay"),
+    ).toBeInTheDocument();
   });
 
   it("renders the active pending-capture jare line", () => {
@@ -140,6 +179,7 @@ describe("Board", () => {
     expect(captureBurst).toHaveAttribute("data-feedback-nonce", "8");
     expect(captureBurst).toHaveClass("shaxda-capture-burst");
     expect(captureBurst).toHaveAttribute("pointer-events", "none");
+    expect(captureBurst).toHaveAttribute("aria-hidden", "true");
   });
 
   it("replays consecutive invalid shakes without remounting the SVG", async () => {

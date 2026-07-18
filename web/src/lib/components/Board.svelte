@@ -9,6 +9,7 @@
   import { messages } from "@shaxda/i18n";
   import { tick } from "svelte";
   import {
+    HIT_RADIUS,
     LEGAL_HINT_RADIUS,
     PIECE_RADIUS,
     POINT_COORDS,
@@ -444,6 +445,15 @@
             ? (event) => handlePointKeydown(event, point.id)
             : undefined}
         >
+          <circle
+            data-testid="board-hit-target"
+            cx={point.x}
+            cy={point.y}
+            r={HIT_RADIUS}
+            fill="transparent"
+            aria-hidden="true"
+            pointer-events="all"
+          />
           <title>
             {accessiblePointLabel(point)}
           </title>

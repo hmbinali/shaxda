@@ -14,6 +14,7 @@ export interface BoardLine {
 export const BOARD_VIEWBOX_SIZE = 100;
 export const BOARD_CENTER = BOARD_VIEWBOX_SIZE / 2;
 export const SOCKET_RADIUS = 2.6;
+export const HIT_RADIUS = 6.2;
 export const PIECE_RADIUS = 4.2;
 export const LEGAL_HINT_RADIUS = 1.55;
 

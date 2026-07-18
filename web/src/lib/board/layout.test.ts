@@ -1,6 +1,6 @@
 import { JARE_LINES, POINT_IDS } from "@shaxda/game-engine";
 import { describe, expect, it } from "vitest";
-import { BOARD_CENTER, BOARD_LINES, POINT_COORDS } from "./layout";
+import { BOARD_CENTER, BOARD_LINES, HIT_RADIUS, POINT_COORDS } from "./layout";
 import type { BoardLine } from "./layout";
 
 describe("board layout", () => {
@@ -56,6 +56,19 @@ describe("board layout", () => {
       expect(POINT_COORDS[line.a]).toBeDefined();
       expect(POINT_COORDS[line.b]).toBeDefined();
     }
+  });
+
+  it("keeps enlarged hit targets from overlapping", () => {
+    const distances = POINT_IDS.flatMap((point, index) =>
+      POINT_IDS.slice(index + 1).map((otherPoint) => {
+        const a = POINT_COORDS[point];
+        const b = POINT_COORDS[otherPoint];
+
+        return Math.hypot(a.x - b.x, a.y - b.y);
+      }),
+    );
+
+    expect(HIT_RADIUS * 2).toBeLessThan(Math.min(...distances));
   });
 });
 

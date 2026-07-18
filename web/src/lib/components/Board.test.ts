@@ -16,6 +16,12 @@ describe("Board", () => {
     expect(
       container.querySelectorAll('[data-testid="board-piece"]'),
     ).toHaveLength(4);
+    expect(
+      container.querySelectorAll('[data-testid="board-hit-target"]'),
+    ).toHaveLength(24);
+    expect(
+      container.querySelector('[data-testid="board-hit-target"]'),
+    ).toHaveAttribute("r", "6.2");
     expect(point(container, "O1")).toHaveAttribute("data-occupant", "A");
     expect(point(container, "M1")).toHaveAttribute("data-occupant", "B");
   });

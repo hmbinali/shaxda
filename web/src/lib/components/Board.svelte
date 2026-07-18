@@ -385,6 +385,7 @@
             stroke-width="0.65"
             style={moveAnimationStyle(moveFeedback.action)}
             filter="url(#shaxda-piece-shadow)"
+            pointer-events="none"
           />
         {/key}
       {/if}
@@ -398,6 +399,7 @@
           r={PIECE_RADIUS + 0.6}
           class="shaxda-capture-burst fill-red-500/15 stroke-red-800"
           stroke-width="1.2"
+          pointer-events="none"
         />
       {/if}
     </svg>

@@ -63,7 +63,7 @@ const movementJareState = JSON.stringify({
     M2: null,
     M3: null,
     M4: null,
-    M5: null,
+    M5: "B",
     M6: null,
     M7: null,
     M8: null,
@@ -209,7 +209,9 @@ test.describe("L1 local game", () => {
     );
   });
 
-  test("moves into a jare and captures an opponent piece", async ({ page }) => {
+  test("moves into a jare, captures, and moves into the captured point", async ({
+    page,
+  }) => {
     await page.addInitScript(
       ({ key, value }) => localStorage.setItem(key, value),
       { key: storageKey, value: movementJareState },
@@ -233,6 +235,18 @@ test.describe("L1 local game", () => {
     await expect(page.locator('[data-point-id="O5"]')).toHaveAttribute(
       "data-occupant",
       "empty",
+    );
+
+    await page.locator('[data-point-id="O6"]').click();
+    await expect(page.locator('[data-point-id="O5"]')).toHaveAttribute(
+      "data-legal-hint",
+      "true",
+    );
+    await page.locator('[data-point-id="O5"]').click();
+
+    await expect(page.locator('[data-point-id="O5"]')).toHaveAttribute(
+      "data-occupant",
+      "B",
     );
   });
 

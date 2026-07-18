@@ -116,6 +116,7 @@ describe("Board", () => {
       "style",
       expect.stringContaining("--move-x:"),
     );
+    expect(moveAnimation).toHaveAttribute("pointer-events", "none");
 
     rerender({
       state: gameFixtures.capturePending,
@@ -132,6 +133,7 @@ describe("Board", () => {
 
     expect(captureBurst).toHaveAttribute("data-feedback-nonce", "8");
     expect(captureBurst).toHaveClass("shaxda-capture-burst");
+    expect(captureBurst).toHaveAttribute("pointer-events", "none");
   });
 
   it("remounts nonce-driven animation elements so CSS can replay", async () => {

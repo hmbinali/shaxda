@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { messages } from "@shaxda/i18n";
+  import { ADJACENCY } from "@shaxda/game-engine";
   import type {
     GameAction,
     GameState,
     PointId,
     PlayerId,
   } from "@shaxda/game-engine";
+  import { messages } from "@shaxda/i18n";
+  import { tick } from "svelte";
   import {
     LEGAL_HINT_RADIUS,
     PIECE_RADIUS,
@@ -34,7 +36,7 @@
   };
 
   let {
-    state,
+    state: gameState,
     selected = null,
     interactive = false,
     onSelectPoint,
@@ -42,11 +44,15 @@
     invalidNonce = 0,
   }: Props = $props();
 
-  const view = $derived(buildBoardView(state, { selected }));
+  const view = $derived(buildBoardView(gameState, { selected }));
   const copy = messages.so.boardGallery;
   const moveFeedback = $derived(getMoveFeedback(lastAction));
   const captureFeedback = $derived(getCaptureFeedback(lastAction));
+  let focusedPoint = $state<PointId>("O1");
   let boardShell: HTMLDivElement | null = null;
+  let boardSvg: SVGSVGElement | null = null;
+  let shouldPreserveBoardFocus = false;
+  let pointElements = $state<Partial<Record<PointId, SVGGElement>>>({});
 
   $effect(() => {
     const shell = boardShell;
@@ -66,6 +72,24 @@
     return () => cancelAnimationFrame(frame);
   });
 
+  $effect(() => {
+    void gameState;
+
+    if (!interactive || !shouldPreserveBoardFocus) {
+      return;
+    }
+
+    void tick().then(() => {
+      if (
+        shouldPreserveBoardFocus &&
+        boardSvg !== null &&
+        !boardSvg.contains(document.activeElement)
+      ) {
+        pointElements[focusedPoint]?.focus();
+      }
+    });
+  });
+
   function pieceLabel(player: PlayerId, point: PointId): string {
     return `${copy.playerPiece[player]} ${point}`;
   }
@@ -75,12 +99,118 @@
   }
 
   function handlePointKeydown(event: KeyboardEvent, point: PointId): void {
-    if (event.key !== "Enter" && event.key !== " ") {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      focusedPoint = point;
+      onSelectPoint?.(point);
       return;
     }
 
-    event.preventDefault();
+    if (event.key === "Escape") {
+      if (selected !== null) {
+        event.preventDefault();
+        onSelectPoint?.(selected);
+      }
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      focusPoint("O1");
+      return;
+    }
+
+    const direction = arrowDirection(event.key);
+
+    if (direction === null) {
+      return;
+    }
+
+    const neighbor = bestAlignedNeighbor(point, direction);
+
+    if (neighbor !== null) {
+      event.preventDefault();
+      focusPoint(neighbor);
+    }
+  }
+
+  function handlePointClick(point: PointId): void {
+    focusedPoint = point;
     onSelectPoint?.(point);
+  }
+
+  function handlePointFocus(point: PointId): void {
+    focusedPoint = point;
+    shouldPreserveBoardFocus = true;
+  }
+
+  function handleBoardFocusOut(event: FocusEvent): void {
+    if (
+      boardSvg === null ||
+      !(event.relatedTarget instanceof Node) ||
+      !boardSvg.contains(event.relatedTarget)
+    ) {
+      shouldPreserveBoardFocus = false;
+    }
+  }
+
+  function focusPoint(point: PointId): void {
+    focusedPoint = point;
+    pointElements[point]?.focus();
+  }
+
+  function arrowDirection(key: string): { x: number; y: number } | null {
+    switch (key) {
+      case "ArrowLeft":
+        return { x: -1, y: 0 };
+      case "ArrowRight":
+        return { x: 1, y: 0 };
+      case "ArrowUp":
+        return { x: 0, y: -1 };
+      case "ArrowDown":
+        return { x: 0, y: 1 };
+      default:
+        return null;
+    }
+  }
+
+  function bestAlignedNeighbor(
+    point: PointId,
+    direction: { x: number; y: number },
+  ): PointId | null {
+    const origin = POINT_COORDS[point];
+    let best: { point: PointId; alignment: number } | null = null;
+
+    for (const neighbor of ADJACENCY[point]) {
+      const destination = POINT_COORDS[neighbor];
+      const deltaX = destination.x - origin.x;
+      const deltaY = destination.y - origin.y;
+      const distance = Math.hypot(deltaX, deltaY);
+      const alignment =
+        (deltaX * direction.x + deltaY * direction.y) / distance;
+
+      if (alignment >= 0.5 && (best === null || alignment > best.alignment)) {
+        best = { point: neighbor, alignment };
+      }
+    }
+
+    return best?.point ?? null;
+  }
+
+  function accessiblePointLabel(point: (typeof view.points)[number]): string {
+    const labels = [
+      point.occupant
+        ? pieceLabel(point.occupant, point.id)
+        : pointLabel(point.id),
+    ];
+
+    if (point.isSelected) labels.push(copy.selectedPoint);
+    if (point.isLegalHint) labels.push(copy.legalHint);
+    if (point.isCaptureTarget) labels.push(copy.captureTarget);
+    if (point.isRemovalTarget) labels.push(copy.removalTarget);
+    if (view.movablePoints.has(point.id)) labels.push(copy.movablePiece);
+
+    return labels.join(". ");
   }
 
   function pieceFill(player: PlayerId): string {
@@ -128,11 +258,14 @@
   data-invalid-shake={invalidNonce > 0 ? invalidNonce : undefined}
 >
   <svg
+    bind:this={boardSvg}
     class="shaxda-board-svg h-full w-full overflow-visible"
     viewBox="0 0 100 100"
     preserveAspectRatio="xMidYMid meet"
     role="group"
     aria-label={copy.title}
+    aria-describedby={interactive ? "shaxda-board-keyboard-help" : undefined}
+    onfocusout={handleBoardFocusOut}
     onanimationend={handleBoardAnimationEnd}
   >
     <defs>
@@ -289,6 +422,8 @@
       {#each view.points as point (point.id)}
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <g
+          bind:this={pointElements[point.id]}
+          class="shaxda-board-point"
           data-testid="board-point"
           data-point-id={point.id}
           data-occupant={point.occupant ?? "empty"}
@@ -297,20 +432,31 @@
           data-capture-target={point.isCaptureTarget ? "true" : undefined}
           data-removal-target={point.isRemovalTarget ? "true" : undefined}
           role={interactive ? "button" : undefined}
-          tabindex={interactive ? 0 : undefined}
-          aria-label={point.occupant
-            ? pieceLabel(point.occupant, point.id)
-            : pointLabel(point.id)}
-          onclick={interactive ? () => onSelectPoint?.(point.id) : undefined}
+          tabindex={interactive
+            ? point.id === focusedPoint
+              ? 0
+              : -1
+            : undefined}
+          aria-label={accessiblePointLabel(point)}
+          onclick={interactive ? () => handlePointClick(point.id) : undefined}
+          onfocus={interactive ? () => handlePointFocus(point.id) : undefined}
           onkeydown={interactive
             ? (event) => handlePointKeydown(event, point.id)
             : undefined}
         >
           <title>
-            {point.occupant
-              ? pieceLabel(point.occupant, point.id)
-              : pointLabel(point.id)}
+            {accessiblePointLabel(point)}
           </title>
+
+          <circle
+            cx={point.x}
+            cy={point.y}
+            r={PIECE_RADIUS + 3.15}
+            class="shaxda-focus-ring fill-transparent stroke-focus"
+            stroke-width="1.35"
+            aria-hidden="true"
+            pointer-events="none"
+          />
 
           <circle
             data-testid="board-socket"
@@ -421,4 +567,9 @@
       />
     {/if}
   </svg>
+  {#if interactive}
+    <p id="shaxda-board-keyboard-help" class="sr-only">
+      {copy.keyboardHelp}
+    </p>
+  {/if}
 </div>

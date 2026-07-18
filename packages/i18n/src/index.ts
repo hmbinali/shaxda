@@ -52,6 +52,12 @@ export const messages = {
       selectedPoint: "Bar la doortay",
       legalHint: "Meel sharci ah",
       captureTarget: "Dhagax la qaban karo",
+      // TODO(translation-review): A native/fluent Somali reviewer must verify
+      // these board-navigation labels and instructions before release.
+      removalTarget: "Dhagax bilow ah oo la saari karo",
+      movablePiece: "Dhagax dhaqaaqi kara",
+      keyboardHelp:
+        "Isticmaal fallaadhaha si aad looxa ugu dhex socoto, Enter ama Space si aad u ciyaarto, Escape si aad doorashada uga baxdo.",
       playerPiece: {
         A: "Dhagaxa ciyaaryahan A",
         B: "Dhagaxa ciyaaryahan B",

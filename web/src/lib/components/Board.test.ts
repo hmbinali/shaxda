@@ -189,17 +189,111 @@ describe("Board", () => {
       },
     });
 
+    expect(point(container, "O1")).toHaveAttribute("role", "button");
+    expect(point(container, "O1")).toHaveAttribute("tabindex", "0");
+
     await fireEvent.click(point(container, "O1"));
     await fireEvent.keyDown(point(container, "O2"), { key: "Enter" });
     await fireEvent.keyDown(point(container, "O3"), { key: " " });
     await fireEvent.keyDown(point(container, "O4"), { key: "Escape" });
 
-    expect(point(container, "O1")).toHaveAttribute("role", "button");
-    expect(point(container, "O1")).toHaveAttribute("tabindex", "0");
+    expect(
+      container.querySelectorAll('[data-testid="board-point"][tabindex="0"]'),
+    ).toHaveLength(1);
     expect(onSelectPoint).toHaveBeenCalledTimes(3);
     expect(onSelectPoint).toHaveBeenNthCalledWith(1, "O1");
     expect(onSelectPoint).toHaveBeenNthCalledWith(2, "O2");
     expect(onSelectPoint).toHaveBeenNthCalledWith(3, "O3");
+  });
+
+  it("navigates carved-line neighbors with arrow keys and Home", async () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.emptyBoard,
+        interactive: true,
+      },
+    });
+
+    (point(container, "O1") as SVGGElement).focus();
+    await fireEvent.keyDown(point(container, "O1"), { key: "ArrowRight" });
+    expect(point(container, "O2")).toHaveFocus();
+
+    await fireEvent.keyDown(point(container, "O2"), { key: "Home" });
+    expect(point(container, "O1")).toHaveFocus();
+
+    await fireEvent.keyDown(point(container, "O1"), { key: "ArrowDown" });
+    expect(point(container, "O8")).toHaveFocus();
+    expect(point(container, "O8")).toHaveAttribute("tabindex", "0");
+    expect(point(container, "O1")).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("uses Escape to deselect the current piece", async () => {
+    const onSelectPoint = vi.fn();
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.movement,
+        selected: "O8",
+        interactive: true,
+        onSelectPoint,
+      },
+    });
+
+    await fireEvent.keyDown(point(container, "O8"), { key: "Escape" });
+
+    expect(onSelectPoint).toHaveBeenCalledWith("O8");
+  });
+
+  it("syncs the roving tab stop to pointer activation", async () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.emptyBoard,
+        interactive: true,
+      },
+    });
+
+    await fireEvent.click(point(container, "M4"));
+
+    expect(point(container, "M4")).toHaveAttribute("tabindex", "0");
+    expect(point(container, "O1")).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("retains focused-point focus across state updates", async () => {
+    const { container, rerender } = render(Board, {
+      props: {
+        state: gameFixtures.emptyBoard,
+        interactive: true,
+      },
+    });
+
+    (point(container, "O1") as SVGGElement).focus();
+    await rerender({
+      state: gameFixtures.midPlacement,
+      interactive: true,
+    });
+
+    await waitFor(() => expect(point(container, "O1")).toHaveFocus());
+  });
+
+  it("provides keyboard instructions and a distinct focus-visible cue", () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.emptyBoard,
+        interactive: true,
+      },
+    });
+    const svg = boardSvg(container);
+    const css = readFileSync("src/app.css", "utf8");
+
+    expect(svg).toHaveAttribute(
+      "aria-describedby",
+      "shaxda-board-keyboard-help",
+    );
+    expect(container.querySelector(".shaxda-focus-ring")).toHaveClass(
+      "stroke-focus",
+    );
+    expect(css).toContain(
+      ".shaxda-board-point:focus-visible .shaxda-focus-ring",
+    );
   });
 
   it("defines reduced-motion CSS that disables animated L2 effects", () => {

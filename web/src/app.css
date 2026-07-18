@@ -48,6 +48,18 @@ select {
   border-radius: 0.75rem;
 }
 
+.shaxda-focus-ring {
+  opacity: 0;
+}
+
+.shaxda-board-point:focus-visible {
+  outline: none;
+}
+
+.shaxda-board-point:focus-visible .shaxda-focus-ring {
+  opacity: 1;
+}
+
 .shaxda-wood-grain-line {
   fill: none;
   stroke: rgb(110 67 39 / 0.2);

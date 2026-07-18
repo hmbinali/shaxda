@@ -131,6 +131,87 @@ test.describe("C1 public content", () => {
     ).toHaveAttribute("aria-current", "page");
   });
 
+  test("desktop sidebar collapses responsively and remembers its state", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/learn");
+
+    const sidebar = page.getByTestId("desktop-sidebar");
+    const main = page.locator("#main-content");
+    const expandedWidth = await sidebar.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+    const mainWidthBefore = await main.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+
+    expect(expandedWidth).toBeGreaterThanOrEqual(256);
+    expect(expandedWidth).toBeLessThanOrEqual(288);
+
+    await page.getByRole("button", { name: "Isku koob astaamo" }).click();
+    await expect(sidebar).toHaveAttribute("data-collapsed", "true");
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeLessThanOrEqual(72.5);
+
+    const mainWidthAfter = await main.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+    expect(mainWidthAfter).toBeGreaterThan(mainWidthBefore + 150);
+
+    for (const name of [
+      "Hoy",
+      "Ciyaar qalabkan",
+      "Ciyaar marti ah",
+      "Baro",
+      "Xeerarka",
+      "Asturnaanta",
+      "Shuruudaha",
+    ]) {
+      await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+    }
+
+    const localLink = page.getByRole("link", {
+      name: "Ciyaar qalabkan",
+      exact: true,
+    });
+    await localLink.focus();
+    await expect(localLink).toHaveAttribute("data-tooltip", "Ciyaar qalabkan");
+
+    await page.reload();
+    await expect(sidebar).toHaveAttribute("data-collapsed", "true");
+    await expect(
+      page.getByRole("button", { name: "Ballaari hagaha" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Ballaari hagaha" }).click();
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeGreaterThanOrEqual(255.5);
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeLessThanOrEqual(256.5);
+    await page.setViewportSize({ width: 1920, height: 1000 });
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeGreaterThanOrEqual(287.5);
+    await expect
+      .poll(() =>
+        sidebar.evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeLessThanOrEqual(288.5);
+  });
+
   test("offers a keyboard skip link to the main content", async ({ page }) => {
     await page.goto("/");
 

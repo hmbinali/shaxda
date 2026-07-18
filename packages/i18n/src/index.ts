@@ -249,6 +249,8 @@ export const siteContent = {
       skipToContent: "U bood nuxurka",
       openMenu: "Fur hagaha",
       closeMenu: "Xir hagaha",
+      expandSidebar: "Ballaari hagaha",
+      collapseSidebar: "Isku koob astaamo",
     },
     footer: {
       tagline: "Shaxda Soomaali keliya, si fudud loogu barto loona ciyaaro.",

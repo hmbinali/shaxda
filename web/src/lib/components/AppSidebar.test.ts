@@ -1,6 +1,7 @@
 import { siteContent } from "@shaxda/i18n";
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SIDEBAR_COLLAPSED_STORAGE_KEY } from "$lib/sidebar/preferences";
 
 vi.mock("$app/state", () => ({
   page: {
@@ -15,15 +16,28 @@ const nav = siteContent.so.nav;
 
 describe("AppSidebar", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     Object.defineProperty(Element.prototype, "animate", {
       configurable: true,
-      value: vi.fn(
-        () =>
-          ({
-            cancel: vi.fn(),
-            finished: Promise.resolve(),
-          }) as unknown as Animation,
-      ),
+      value: vi.fn(() => {
+        const animation = {
+          cancel: vi.fn(),
+          finished: Promise.resolve(),
+        } as unknown as Animation;
+
+        Object.defineProperty(animation, "onfinish", {
+          configurable: true,
+          set: (callback: Animation["onfinish"]) => {
+            if (callback !== null) {
+              queueMicrotask(() =>
+                callback.call(animation, {} as AnimationPlaybackEvent),
+              );
+            }
+          },
+        });
+
+        return animation;
+      }),
     });
     vi.stubGlobal(
       "matchMedia",
@@ -49,6 +63,76 @@ describe("AppSidebar", () => {
     );
     expect(screen.getByRole("link", { name: nav.home })).not.toHaveAttribute(
       "aria-current",
+    );
+  });
+
+  it("collapses to an accessible icon rail and persists the preference", async () => {
+    render(AppSidebar);
+    const desktopSidebar = screen.getByTestId("desktop-sidebar");
+    const collapseButton = await screen.findByRole("button", {
+      name: sidebar.collapseSidebar,
+    });
+
+    expect(desktopSidebar).toHaveAttribute("data-collapsed", "false");
+
+    await fireEvent.click(collapseButton);
+
+    expect(desktopSidebar).toHaveAttribute("data-collapsed", "true");
+    expect(window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)).toBe(
+      "true",
+    );
+    expect(screen.getByRole("link", { name: nav.localPlay })).toHaveAttribute(
+      "data-tooltip",
+      nav.localPlay,
+    );
+    expect(screen.getByRole("link", { name: nav.privacy })).toHaveAttribute(
+      "data-tooltip",
+      nav.privacy,
+    );
+    expect(screen.getByRole("link", { name: nav.terms })).toHaveAttribute(
+      "data-tooltip",
+      nav.terms,
+    );
+
+    await fireEvent.click(
+      screen.getByRole("button", { name: sidebar.expandSidebar }),
+    );
+
+    expect(desktopSidebar).toHaveAttribute("data-collapsed", "false");
+    expect(window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)).toBe(
+      "false",
+    );
+  });
+
+  it("restores a valid collapsed preference after mounting", async () => {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "true");
+
+    render(AppSidebar);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("desktop-sidebar")).toHaveAttribute(
+        "data-collapsed",
+        "true",
+      ),
+    );
+    expect(
+      screen.getByRole("button", { name: sidebar.expandSidebar }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("ignores an invalid collapsed preference", async () => {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "sometimes");
+
+    render(AppSidebar);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: sidebar.collapseSidebar }),
+      ).toHaveAttribute("aria-expanded", "true"),
+    );
+    expect(screen.getByTestId("desktop-sidebar")).toHaveAttribute(
+      "data-collapsed",
+      "false",
     );
   });
 
@@ -84,5 +168,29 @@ describe("AppSidebar", () => {
         screen.queryByRole("dialog", { name: "Hagaha bogga" }),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  it("keeps the mobile drawer usable when reduced motion is requested", async () => {
+    vi.mocked(window.matchMedia).mockReturnValue({
+      matches: true,
+      media: "(prefers-reduced-motion: reduce)",
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    });
+    render(AppSidebar);
+
+    await fireEvent.click(
+      screen.getByRole("button", { name: sidebar.openMenu }),
+    );
+    const drawer = screen.getByRole("dialog", { name: "Hagaha bogga" });
+    expect(drawer).toHaveFocus();
+
+    await fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => expect(drawer).not.toBeInTheDocument());
   });
 });

@@ -9,6 +9,16 @@
   --color-board-100: #ead8c2;
   --color-board-700: #6e4327;
   --color-board-900: #332016;
+  --color-surface: var(--color-board-50);
+  --color-surface-tint: var(--color-board-100);
+  --color-ink: #221813;
+  --color-ink-muted: var(--color-board-700);
+  --color-accent: #991b1b;
+  --color-danger: #b91c1c;
+  --color-warning: #92400e;
+  --color-success: #047857;
+  --color-jare: #92610a;
+  --color-focus: #1e40af;
 }
 
 html {
@@ -19,8 +29,8 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  background: #f8f1e8;
-  color: #221813;
+  background: var(--color-surface);
+  color: var(--color-ink);
 }
 
 button,

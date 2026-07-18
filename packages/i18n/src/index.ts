@@ -267,8 +267,6 @@ export const siteContent = {
       onlinePlay: "Ciyaar marti ah",
     },
     sidebar: {
-      account: "Akoonka",
-      accountPlaceholder: "Marti — dhawaan",
       skipToContent: "U bood nuxurka",
       openMenu: "Fur hagaha",
       closeMenu: "Xir hagaha",

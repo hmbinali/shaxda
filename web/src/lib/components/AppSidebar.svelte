@@ -174,30 +174,74 @@
     </nav>
 
     <div class="sidebar-footer mt-auto border-t border-board-700/15 p-3">
-      <section
-        class="sidebar-account rounded-xl border border-board-700/15 bg-white/45 p-3"
-        aria-labelledby={`sidebar-account-heading-${instanceId}`}
-      >
-        <div class="sidebar-account-row flex items-center gap-3">
-          <span
-            class="grid size-9 shrink-0 place-items-center rounded-full bg-board-900 text-sm font-semibold text-board-50"
-            aria-hidden="true"
+      {#if instanceId === "desktop"}
+        <div class="sidebar-account-stage">
+          <section
+            class="sidebar-account-expanded rounded-xl border border-board-700/15 bg-white/45 p-3"
+            aria-hidden={desktopCollapsed}
+            aria-labelledby="sidebar-account-heading-desktop"
+            data-testid="desktop-account-expanded"
           >
-            M
-          </span>
-          <div class="sidebar-collapsible-copy sidebar-account-copy min-w-0">
-            <h2
-              id={`sidebar-account-heading-${instanceId}`}
-              class="text-sm font-semibold"
+            <div class="flex items-center gap-3">
+              <span
+                class="grid size-9 shrink-0 place-items-center rounded-full bg-board-900 text-sm font-semibold text-board-50"
+                aria-hidden="true"
+              >
+                M
+              </span>
+              <div class="min-w-0">
+                <h2
+                  id="sidebar-account-heading-desktop"
+                  class="text-sm font-semibold"
+                >
+                  {sidebar.account}
+                </h2>
+                <p class="mt-0.5 text-xs text-board-700">
+                  {sidebar.accountPlaceholder}
+                </p>
+              </div>
+            </div>
+          </section>
+          <section
+            class="sidebar-account-compact rounded-xl border border-board-700/15 bg-white/45"
+            aria-hidden={!desktopCollapsed}
+            aria-label={`${sidebar.account}: ${sidebar.accountPlaceholder}`}
+            data-testid="desktop-account-compact"
+          >
+            <span
+              class="grid size-9 place-items-center rounded-full bg-board-900 text-sm font-semibold text-board-50"
+              aria-hidden="true"
             >
-              {sidebar.account}
-            </h2>
-            <p class="mt-0.5 text-xs text-board-700">
-              {sidebar.accountPlaceholder}
-            </p>
-          </div>
+              M
+            </span>
+          </section>
         </div>
-      </section>
+      {:else}
+        <section
+          class="rounded-xl border border-board-700/15 bg-white/45 p-3"
+          aria-labelledby="sidebar-account-heading-mobile"
+        >
+          <div class="flex items-center gap-3">
+            <span
+              class="grid size-9 shrink-0 place-items-center rounded-full bg-board-900 text-sm font-semibold text-board-50"
+              aria-hidden="true"
+            >
+              M
+            </span>
+            <div class="min-w-0">
+              <h2
+                id="sidebar-account-heading-mobile"
+                class="text-sm font-semibold"
+              >
+                {sidebar.account}
+              </h2>
+              <p class="mt-0.5 text-xs text-board-700">
+                {sidebar.accountPlaceholder}
+              </p>
+            </div>
+          </div>
+        </section>
+      {/if}
 
       <div
         class="sidebar-footer-links mt-4 flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs"
@@ -255,7 +299,7 @@
   {@render sidebarContent("desktop")}
   <button
     type="button"
-    class="sidebar-toggle absolute right-0 top-6 z-30 inline-flex size-7 translate-x-1/2 items-center justify-center rounded-full border border-board-700/20 bg-board-50 text-board-700 shadow-sm outline-none transition-[color,background-color,box-shadow,transform] hover:bg-board-100 hover:text-board-900 hover:shadow-md focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2 motion-reduce:transition-none"
+    class="sidebar-toggle absolute right-0 top-5 z-30 inline-flex size-8 translate-x-1/2 items-center justify-center rounded-full border border-board-700/20 bg-board-50 text-board-700 shadow-sm outline-none transition-[color,background-color,box-shadow,transform] hover:bg-board-100 hover:text-board-900 hover:shadow-md focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2 motion-reduce:transition-none"
     aria-label={desktopCollapsed
       ? sidebar.expandSidebar
       : sidebar.collapseSidebar}
@@ -265,9 +309,9 @@
     onclick={toggleDesktopSidebar}
   >
     {#if desktopCollapsed}
-      <ChevronRight size={16} aria-hidden="true" />
+      <ChevronRight size={18} aria-hidden="true" />
     {:else}
-      <ChevronLeft size={16} aria-hidden="true" />
+      <ChevronLeft size={18} aria-hidden="true" />
     {/if}
   </button>
 </aside>
@@ -316,11 +360,17 @@
 
 <style>
   .desktop-sidebar {
-    width: clamp(16rem, 18vw, 18rem);
+    --sidebar-expanded-width: clamp(16rem, 18vw, 18rem);
+
+    width: var(--sidebar-expanded-width);
   }
 
   .desktop-sidebar.sidebar-ready {
     transition: width 240ms cubic-bezier(0.22, 0.72, 0.24, 1);
+  }
+
+  .desktop-sidebar.sidebar-ready[data-collapsed="true"] {
+    transition-delay: 70ms;
   }
 
   .desktop-sidebar[data-collapsed="true"] {
@@ -348,8 +398,47 @@
     white-space: nowrap;
   }
 
-  .sidebar-account-copy {
-    max-width: 11.5rem;
+  .sidebar-account-stage {
+    position: relative;
+    height: 4rem;
+  }
+
+  .sidebar-account-expanded,
+  .sidebar-account-compact {
+    position: absolute;
+    left: 0;
+    top: 0;
+    min-height: 4rem;
+  }
+
+  .sidebar-account-expanded {
+    width: calc(var(--sidebar-expanded-width) - 1.5rem);
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .sidebar-account-compact {
+    display: grid;
+    width: 3.25rem;
+    place-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(0.25rem);
+  }
+
+  .sidebar-ready .sidebar-account-expanded,
+  .sidebar-ready .sidebar-account-compact {
+    transition:
+      opacity 120ms ease,
+      transform 160ms cubic-bezier(0.22, 0.72, 0.24, 1);
+  }
+
+  .sidebar-ready .sidebar-account-expanded {
+    transition-delay: 150ms;
+  }
+
+  .sidebar-ready .sidebar-account-compact {
+    transition-duration: 70ms;
   }
 
   .sidebar-tagline {
@@ -400,13 +489,25 @@
     padding-inline: 0.625rem;
   }
 
-  .desktop-sidebar[data-collapsed="true"] .sidebar-account {
-    padding: 0.5rem;
+  .desktop-sidebar[data-collapsed="true"] .sidebar-account-expanded {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-0.25rem);
   }
 
-  .desktop-sidebar[data-collapsed="true"] .sidebar-account-row {
-    justify-content: center;
-    gap: 0;
+  .desktop-sidebar.sidebar-ready[data-collapsed="true"]
+    .sidebar-account-expanded {
+    transition-delay: 0ms;
+  }
+
+  .desktop-sidebar[data-collapsed="true"] .sidebar-account-compact {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .desktop-sidebar.sidebar-ready[data-collapsed="true"]
+    .sidebar-account-compact {
+    transition-delay: 190ms;
   }
 
   .desktop-sidebar[data-collapsed="true"] .sidebar-footer-links {
@@ -468,6 +569,8 @@
   @media (prefers-reduced-motion: reduce) {
     .desktop-sidebar,
     .sidebar-collapsible-copy,
+    .sidebar-account-expanded,
+    .sidebar-account-compact,
     .sidebar-tagline,
     .sidebar-tooltip::after {
       transition: none !important;

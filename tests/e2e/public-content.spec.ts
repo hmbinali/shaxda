@@ -145,6 +145,10 @@ test.describe("C1 public content", () => {
     const mainWidthBefore = await main.evaluate(
       (element) => element.getBoundingClientRect().width,
     );
+    const expandedAccount = page.getByTestId("desktop-account-expanded");
+    const accountWidthBefore = await expandedAccount.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
 
     expect(expandedWidth).toBeGreaterThanOrEqual(256);
     expect(expandedWidth).toBeLessThanOrEqual(288);
@@ -156,6 +160,15 @@ test.describe("C1 public content", () => {
         sidebar.evaluate((element) => element.getBoundingClientRect().width),
       )
       .toBeLessThanOrEqual(72.5);
+    await expect(expandedAccount).toHaveAttribute("aria-hidden", "true");
+    await expect(page.getByTestId("desktop-account-compact")).toHaveAttribute(
+      "aria-hidden",
+      "false",
+    );
+    const accountWidthAfter = await expandedAccount.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+    expect(accountWidthAfter).toBeCloseTo(accountWidthBefore, 0);
 
     const mainWidthAfter = await main.evaluate(
       (element) => element.getBoundingClientRect().width,

@@ -95,13 +95,51 @@ test.describe("C1 public content", () => {
     page,
   }) => {
     await page.goto("/");
+    const main = page.locator("#main-content");
 
     await expect(
-      page.getByRole("link", { name: "Ciyaar qalabkan" }),
+      main.getByRole("link", { name: "Ciyaar qalabkan" }),
     ).toHaveAttribute("href", "/local");
     await expect(
-      page.getByRole("link", { name: "Ciyaar marti ah" }),
+      main.getByRole("link", { name: "Ciyaar marti ah" }),
     ).toHaveAttribute("href", "/online");
+  });
+
+  test("desktop sidebar starts games directly and persists across navigation", async ({
+    page,
+  }) => {
+    await page.goto("/learn");
+    const navigation = page.getByRole("navigation", { name: "Hagaha bogga" });
+    const sidebar = navigation.locator("xpath=ancestor::aside");
+
+    await expect(
+      navigation.getByRole("link", { name: "Baro" }),
+    ).toHaveAttribute("aria-current", "page");
+    await sidebar.evaluate((element) => {
+      element.setAttribute("data-persistence-check", "present");
+    });
+
+    await navigation.getByRole("link", { name: "Ciyaar qalabkan" }).click();
+
+    await expect(page).toHaveURL(/\/local$/);
+    await expect(
+      page.getByRole("heading", { name: "Ciyaar qalabkan", exact: true }),
+    ).toBeVisible();
+    await expect(sidebar).toHaveAttribute("data-persistence-check", "present");
+    await expect(
+      navigation.getByRole("link", { name: "Ciyaar qalabkan" }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  test("offers a keyboard skip link to the main content", async ({ page }) => {
+    await page.goto("/");
+
+    await page.keyboard.press("Tab");
+
+    const skipLink = page.getByRole("link", { name: "U bood nuxurka" });
+    await expect(skipLink).toBeFocused();
+    await skipLink.press("Enter");
+    await expect(page.locator("#main-content")).toBeFocused();
   });
 
   test("homepage does not prerender an empty PWA notice region", async ({

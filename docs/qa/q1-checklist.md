@@ -29,6 +29,12 @@ Use this checklist before BETA1 sign-off. Q1 validates launch confidence only; d
 - Confirm visible focus styles are present on links, buttons, and inputs.
 - Confirm reduced-motion OS/browser settings do not block gameplay feedback or make the board unusable.
 - Confirm screen-reader labels are meaningful for form fields, status notices, and board points.
+- Complete a VoiceOver pass over one full local game, including placement, movement, jare, capture, blocked-player handling, and the result.
+- Complete a two-tab online VoiceOver pass and confirm opponent actions, reconnect/resync summaries, and the result are announced.
+- Play by keyboard with the board's single tab stop, arrow navigation, Enter/Space activation, Home, and Escape deselection.
+- Review selected, legal, capture, removal, jare, focus, and player-identity cues under deuteranopia and protanopia simulation.
+- Confirm a native/fluent Somali reviewer has approved the new board instructions, labels, and game-state announcements.
+- Profile a mid-game selection, move, and capture on a throttled mobile CPU and confirm the board has no continuous-animation long frames.
 
 ## Public Route Checks
 

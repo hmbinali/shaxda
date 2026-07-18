@@ -67,6 +67,7 @@
       {#each fixtureEntries as [key, state] (key)}
         <article
           class="rounded border border-board-700/20 bg-white/55 p-4 shadow-sm"
+          data-fixture={key}
         >
           <div class="mb-3 min-h-20">
             <h2 class="text-xl font-semibold tracking-normal">

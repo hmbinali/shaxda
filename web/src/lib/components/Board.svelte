@@ -551,7 +551,7 @@
               cx={point.x}
               cy={point.y}
               r={PIECE_RADIUS + 2.4}
-              class="shaxda-selected-glow fill-transparent stroke-sky-700"
+              class="shaxda-selected-glow fill-transparent stroke-selected"
               stroke-width="1.15"
               aria-hidden="true"
               pointer-events="none"

@@ -1,4 +1,9 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
+import {
+  applyAction,
+  type GameAction,
+  type GameState,
+} from "@shaxda/game-engine";
 import { gameFixtures } from "@shaxda/shared";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
@@ -157,14 +162,18 @@ describe("Board", () => {
     expect(activeLine).toHaveClass("shaxda-jare-line-active");
   });
 
-  it("renders movement, capture, and invalid animation markers from feedback", () => {
+  it("slides the full destination piece group from its source point", () => {
+    const action = {
+      type: "move",
+      player: "B",
+      from: "O8",
+      to: "O1",
+    } as const satisfies GameAction;
+    const movedState = apply(gameFixtures.movement, action);
     const { container, rerender } = render(Board, {
       props: {
-        state: gameFixtures.movement,
-        lastAction: {
-          action: { type: "move", player: "B", from: "O8", to: "O1" },
-          nonce: 7,
-        },
+        state: movedState,
+        lastAction: { action, nonce: 7 },
         invalidNonce: 2,
       },
     });
@@ -178,12 +187,21 @@ describe("Board", () => {
       "2",
     );
     expect(moveAnimation).toHaveAttribute("data-feedback-nonce", "7");
-    expect(moveAnimation).toHaveClass("shaxda-move-ghost");
+    expect(moveAnimation).toHaveClass(
+      "shaxda-piece-group",
+      "shaxda-piece-slide",
+    );
     expect(moveAnimation).toHaveAttribute(
       "style",
       expect.stringContaining("--move-x:"),
     );
     expect(moveAnimation).toHaveAttribute("pointer-events", "none");
+    expect(
+      moveAnimation?.querySelector('[data-testid="board-piece-shadow"]'),
+    ).toBeInTheDocument();
+    expect(
+      moveAnimation?.querySelector('[data-testid="board-piece-b-ring"]'),
+    ).toBeInTheDocument();
 
     rerender({
       state: gameFixtures.capturePending,
@@ -202,6 +220,32 @@ describe("Board", () => {
     expect(captureBurst).toHaveClass("shaxda-capture-burst");
     expect(captureBurst).toHaveAttribute("pointer-events", "none");
     expect(captureBurst).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("pops the full piece group after placement", () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.midPlacement,
+        lastAction: {
+          action: { type: "place", player: "B", point: "M3" },
+          nonce: 4,
+        },
+      },
+    });
+    const placeAnimation = container.querySelector(
+      '[data-testid="board-place-animation"]',
+    );
+
+    expect(placeAnimation).toHaveClass(
+      "shaxda-piece-group",
+      "shaxda-piece-pop",
+    );
+    expect(
+      placeAnimation?.querySelector('[data-testid="board-piece-shadow"]'),
+    ).toBeInTheDocument();
+    expect(
+      placeAnimation?.querySelector('[data-testid="board-piece-b-ring"]'),
+    ).toBeInTheDocument();
   });
 
   it("replays consecutive invalid shakes without remounting the SVG", async () => {
@@ -371,7 +415,8 @@ describe("Board", () => {
     );
 
     expect(reducedMotionBlock).toContain(".shaxda-valid-pulse");
-    expect(reducedMotionBlock).toContain(".shaxda-move-ghost");
+    expect(reducedMotionBlock).toContain(".shaxda-piece-slide");
+    expect(reducedMotionBlock).toContain(".shaxda-piece-pop");
     expect(reducedMotionBlock).toContain(".shaxda-capture-burst");
     expect(reducedMotionBlock).toContain(
       ".shaxda-invalid-shake .shaxda-board-svg",
@@ -403,4 +448,14 @@ function boardSvg(container: HTMLElement): Element {
   expect(element).not.toBeNull();
 
   return element as Element;
+}
+
+function apply(state: GameState, action: GameAction): GameState {
+  const result = applyAction(state, action);
+
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+
+  return result.state;
 }

@@ -69,14 +69,18 @@ select {
   stroke-width: 0.42;
 }
 
-.shaxda-piece {
+.shaxda-piece-group {
   transform-box: fill-box;
   transform-origin: center;
   transition: transform 160ms ease;
 }
 
-.shaxda-piece:hover {
-  transform: translateY(-0.15px);
+.shaxda-piece-slide {
+  animation: shaxda-piece-slide 220ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+
+.shaxda-piece-pop {
+  animation: shaxda-piece-pop 160ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
 }
 
 .shaxda-selected-glow {
@@ -111,13 +115,6 @@ select {
   stroke: var(--color-success);
   stroke-width: 2.7;
   animation: shaxda-jare-active 1.15s ease-in-out infinite;
-}
-
-.shaxda-move-ghost {
-  animation: shaxda-move-piece 260ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
-  opacity: 0;
-  transform-box: fill-box;
-  transform-origin: center;
 }
 
 .shaxda-capture-burst {
@@ -174,15 +171,25 @@ select {
   }
 }
 
-@keyframes shaxda-move-piece {
+@keyframes shaxda-piece-slide {
   0% {
-    opacity: 0.96;
-    transform: translate(var(--move-x), var(--move-y)) scale(0.96);
+    transform: translate(var(--move-x), var(--move-y));
   }
 
   100% {
-    opacity: 0;
-    transform: translate(0, 0) scale(1.02);
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes shaxda-piece-pop {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.6);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -218,18 +225,18 @@ select {
   .shaxda-valid-pulse,
   .shaxda-target-ring,
   .shaxda-jare-line-active,
-  .shaxda-move-ghost,
+  .shaxda-piece-slide,
+  .shaxda-piece-pop,
   .shaxda-capture-burst,
   .shaxda-invalid-shake .shaxda-board-svg {
     animation: none !important;
   }
 
-  .shaxda-move-ghost,
   .shaxda-capture-burst {
     display: none;
   }
 
-  .shaxda-piece {
+  .shaxda-piece-group {
     transition: none;
   }
 }

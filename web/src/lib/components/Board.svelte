@@ -26,8 +26,8 @@
     invalidNonce?: number;
   }
 
-  type MoveFeedback = {
-    action: Extract<GameAction, { type: "move" }>;
+  type PieceFeedback = {
+    action: Extract<GameAction, { type: "move" | "place" }>;
     nonce: number;
   };
 
@@ -47,7 +47,7 @@
 
   const view = $derived(buildBoardView(gameState, { selected }));
   const copy = messages.so.boardGallery;
-  const moveFeedback = $derived(getMoveFeedback(lastAction));
+  const pieceFeedback = $derived(getPieceFeedback(lastAction));
   const captureFeedback = $derived(getCaptureFeedback(lastAction));
   let focusedPoint = $state<PointId>("O1");
   let boardShell: HTMLDivElement | null = null;
@@ -222,10 +222,55 @@
     return player === "A" ? "stroke-board-900/45" : "stroke-board-50/35";
   }
 
-  function getMoveFeedback(feedback: Props["lastAction"]): MoveFeedback | null {
-    return feedback?.action.type === "move"
+  function getPieceFeedback(
+    feedback: Props["lastAction"],
+  ): PieceFeedback | null {
+    return feedback?.action.type === "move" || feedback?.action.type === "place"
       ? { action: feedback.action, nonce: feedback.nonce }
       : null;
+  }
+
+  function isPieceFeedbackDestination(point: PointId): boolean {
+    if (pieceFeedback === null) {
+      return false;
+    }
+
+    return pieceFeedback.action.type === "move"
+      ? pieceFeedback.action.to === point
+      : pieceFeedback.action.point === point;
+  }
+
+  function pieceAnimationKey(point: PointId): string {
+    return isPieceFeedbackDestination(point)
+      ? `${point}-${pieceFeedback?.nonce ?? 0}`
+      : point;
+  }
+
+  function pieceAnimationClass(point: PointId): string {
+    if (!isPieceFeedbackDestination(point) || pieceFeedback === null) {
+      return "shaxda-piece-group";
+    }
+
+    return pieceFeedback.action.type === "move"
+      ? "shaxda-piece-group shaxda-piece-slide"
+      : "shaxda-piece-group shaxda-piece-pop";
+  }
+
+  function pieceAnimationTestId(point: PointId): string | undefined {
+    if (!isPieceFeedbackDestination(point) || pieceFeedback === null) {
+      return undefined;
+    }
+
+    return pieceFeedback.action.type === "move"
+      ? "board-move-animation"
+      : "board-place-animation";
+  }
+
+  function pieceAnimationStyle(point: PointId): string | undefined {
+    return isPieceFeedbackDestination(point) &&
+      pieceFeedback?.action.type === "move"
+      ? moveAnimationStyle(pieceFeedback.action)
+      : undefined;
   }
 
   function getCaptureFeedback(
@@ -514,48 +559,53 @@
           {/if}
 
           {#if point.occupant}
-            <circle
-              data-testid="board-piece-shadow"
-              cx={point.x + 0.65}
-              cy={point.y + 0.9}
-              r={PIECE_RADIUS}
-              class="fill-board-900/25"
-              aria-hidden="true"
-              pointer-events="none"
-            />
-            <circle
-              data-testid="board-piece"
-              cx={point.x}
-              cy={point.y}
-              r={PIECE_RADIUS}
-              fill={pieceFill(point.occupant)}
-              class={`shaxda-piece ${pieceStrokeClass(point.occupant)}`}
-              stroke-width="0.65"
-              aria-hidden="true"
-              pointer-events="none"
-            />
-            {#if point.occupant === "A"}
-              <circle
-                data-testid="board-piece-a-dot"
-                cx={point.x}
-                cy={point.y}
-                r="0.85"
-                class="fill-board-900/80"
+            {#key pieceAnimationKey(point.id)}
+              <g
+                data-testid={pieceAnimationTestId(point.id)}
+                data-feedback-nonce={isPieceFeedbackDestination(point.id)
+                  ? pieceFeedback?.nonce
+                  : undefined}
+                class={pieceAnimationClass(point.id)}
+                style={pieceAnimationStyle(point.id)}
                 aria-hidden="true"
                 pointer-events="none"
-              />
-            {:else}
-              <circle
-                data-testid="board-piece-b-ring"
-                cx={point.x}
-                cy={point.y}
-                r="2.45"
-                class="fill-transparent stroke-board-50/75"
-                stroke-width="0.55"
-                aria-hidden="true"
-                pointer-events="none"
-              />
-            {/if}
+              >
+                <circle
+                  data-testid="board-piece-shadow"
+                  cx={point.x + 0.65}
+                  cy={point.y + 0.9}
+                  r={PIECE_RADIUS}
+                  class="fill-board-900/25"
+                />
+                <circle
+                  data-testid="board-piece"
+                  cx={point.x}
+                  cy={point.y}
+                  r={PIECE_RADIUS}
+                  fill={pieceFill(point.occupant)}
+                  class={`shaxda-piece ${pieceStrokeClass(point.occupant)}`}
+                  stroke-width="0.65"
+                />
+                {#if point.occupant === "A"}
+                  <circle
+                    data-testid="board-piece-a-dot"
+                    cx={point.x}
+                    cy={point.y}
+                    r="0.85"
+                    class="fill-board-900/80"
+                  />
+                {:else}
+                  <circle
+                    data-testid="board-piece-b-ring"
+                    cx={point.x}
+                    cy={point.y}
+                    r="2.45"
+                    class="fill-transparent stroke-board-50/75"
+                    stroke-width="0.55"
+                  />
+                {/if}
+              </g>
+            {/key}
           {/if}
 
           {#if point.isCaptureTarget}
@@ -621,24 +671,6 @@
         </g>
       {/each}
     </g>
-
-    {#if moveFeedback !== null}
-      {#key moveFeedback.nonce}
-        <circle
-          data-testid="board-move-animation"
-          data-feedback-nonce={moveFeedback.nonce}
-          cx={POINT_COORDS[moveFeedback.action.to].x}
-          cy={POINT_COORDS[moveFeedback.action.to].y}
-          r={PIECE_RADIUS}
-          fill={pieceFill(moveFeedback.action.player)}
-          class={`shaxda-move-ghost ${pieceStrokeClass(moveFeedback.action.player)}`}
-          stroke-width="0.65"
-          style={moveAnimationStyle(moveFeedback.action)}
-          pointer-events="none"
-          aria-hidden="true"
-        />
-      {/key}
-    {/if}
 
     {#if captureFeedback !== null}
       <circle

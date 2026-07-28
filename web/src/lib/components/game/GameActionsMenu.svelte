@@ -23,14 +23,14 @@
   .menu {
     position: absolute;
     z-index: 30;
-    top: 50%;
-    left: calc(50% - 1.375rem);
+    top: calc(50% - 1.25rem);
+    left: calc(50% - 1.25rem);
   }
 
   summary {
     display: grid;
-    width: 2.75rem;
-    height: 2.75rem;
+    width: 2.5rem;
+    height: 2.5rem;
     cursor: pointer;
     list-style: none;
     place-items: center;

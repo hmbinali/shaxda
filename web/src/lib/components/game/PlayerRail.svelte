@@ -14,6 +14,7 @@
     instruction: RailInstructionKey | null;
     rotate?: boolean;
     onResign?: (() => void) | null;
+    notice?: string | null;
   }
 
   let {
@@ -24,6 +25,7 @@
     instruction,
     rotate = false,
     onResign = null,
+    notice = null,
   }: Props = $props();
 
   const copy = messages.so.localGame;
@@ -62,6 +64,9 @@
           ? copy.tabletop.states[railState]
           : copy.tabletop.instructions[instruction]}
       </p>
+      {#if notice !== null}
+        <span class="rail-notice">{notice}</span>
+      {/if}
       {#if (railState === "acting" || railState === "spaceMaking") && status.turnsSinceCapture >= drawWarningThreshold}
         <span class="draw-warning" data-testid="draw-warning">
           {DRAW_TURN_LIMIT - status.turnsSinceCapture}
@@ -217,6 +222,16 @@
     color: #713f12;
     font-size: 0.6rem;
     font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .rail-notice {
+    display: block;
+    overflow: hidden;
+    color: #713f12;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 

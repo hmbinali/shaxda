@@ -21,6 +21,7 @@
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
   import GameResultCard from "$components/game/GameResultCard.svelte";
   import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
+  import OnlineTabletop from "$components/game/OnlineTabletop.svelte";
   import PlayerPiecesCard from "$components/game/PlayerPiecesCard.svelte";
   import PageMeta from "$components/PageMeta.svelte";
   import Button from "$components/ui/Button.svelte";
@@ -306,247 +307,266 @@
   stateSyncNonce={controller.stateSyncNonce}
 />
 
-<section
-  class="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:px-8"
-  data-testid="online-page"
->
-  <div>
-    <div
-      class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
-    >
-      <div>
-        <p class="text-sm font-semibold uppercase tracking-normal text-red-800">
-          {messages.so.appName}
-        </p>
-        <h1 class="mt-1 text-3xl font-semibold tracking-normal sm:text-5xl">
-          {copy.heading}
-        </h1>
-      </div>
-
-      <div class="flex flex-wrap gap-2">
-        <Button ariaPressed={soundEnabled} onclick={toggleSound}>
-          {#if soundEnabled}
-            <Volume2 size={16} aria-hidden="true" />
-            {gameCopy.controls.soundOff}
-          {:else}
-            <VolumeX size={16} aria-hidden="true" />
-            {gameCopy.controls.soundOn}
-          {/if}
-        </Button>
-        {#if controller.roomCode !== null}
-          <Button onclick={leaveRoom}>
-            <LogOut size={16} aria-hidden="true" />
-            {copy.leave}
-          </Button>
-          <Button
-            variant="primary"
-            disabled={controller.state.phase === "gameOver"}
-            onclick={() => controller.resign()}
-          >
-            <Flag size={16} aria-hidden="true" />
-            {gameCopy.controls.resign}
-          </Button>
-        {/if}
-      </div>
-    </div>
-
-    {#if invalidMessage !== null || formError !== null}
-      <p
-        class="mb-3 rounded border border-red-700/25 bg-red-50 px-3 py-2 text-sm font-medium text-red-800"
-        role="status"
-        data-testid="online-feedback"
-      >
-        {formError ?? invalidMessage}
-      </p>
-    {/if}
-
-    {#if controller.connectionStatus === "reconnecting"}
-      <p
-        class="mb-3 rounded border border-amber-700/25 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
-        role="status"
-      >
-        {copy.notices.reconnecting}
-      </p>
-    {/if}
-
-    {#if controller.started && controller.opponentConnected === false && controller.state.phase !== "gameOver"}
-      <p
-        class="mb-3 rounded border border-amber-700/25 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
-        role="status"
-      >
-        {copy.notices.opponentDisconnected}
-      </p>
-    {/if}
-
-    {#if controller.isIdlePlayer && controller.state.phase !== "gameOver"}
-      <p
-        class="mb-3 rounded border border-board-700/25 bg-white/70 px-3 py-2 text-sm font-medium text-board-900"
-        role="status"
-      >
-        {copy.notices.idleNudge}
-      </p>
-    {/if}
-
-    {#if controller.canClaimWin}
+{#if controller.started && controller.mySlot !== null}
+  <OnlineTabletop
+    {controller}
+    viewer={controller.mySlot}
+    {soundEnabled}
+    invalidMessage={formError ?? invalidMessage}
+    {playerName}
+    resultReason={controller.onlineEndReason !== null
+      ? onlineResultReason()
+      : status.endReason === null
+        ? null
+        : gameCopy.result.reasons[status.endReason]}
+    onToggleSound={toggleSound}
+    onLeave={leaveRoom}
+  />
+{:else}
+  <section
+    class="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:px-8"
+    data-testid="online-page"
+  >
+    <div>
       <div
-        class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-green-700/25 bg-green-50 px-3 py-2 text-sm font-medium text-green-900"
-        role="status"
+        class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
       >
-        <span>{copy.notices.claimAvailable}</span>
-        <Button
-          variant="success"
-          size="compact"
-          onclick={() => controller.claimWin()}
-        >
-          <Trophy size={16} aria-hidden="true" />
-          {copy.claimWin}
-        </Button>
-      </div>
-    {/if}
+        <div>
+          <p
+            class="text-sm font-semibold uppercase tracking-normal text-red-800"
+          >
+            {messages.so.appName}
+          </p>
+          <h1 class="mt-1 text-3xl font-semibold tracking-normal sm:text-5xl">
+            {copy.heading}
+          </h1>
+        </div>
 
-    {#if controller.roomCode === null}
-      <section class="rounded border border-board-700/20 bg-white/60 p-4">
-        <form
-          class="grid gap-4"
-          onsubmit={(event) => {
-            event.preventDefault();
-            void createRoom();
-          }}
-        >
-          <label class="grid gap-2 text-sm font-semibold text-board-900">
-            {copy.nameLabel}
-            <input
-              class="rounded border border-board-700/25 bg-white px-3 py-2 font-normal text-board-900"
-              bind:value={displayName}
-              maxlength="40"
-              placeholder={copy.form.namePlaceholder}
-            />
-          </label>
-
-          <label class="grid gap-2 text-sm font-semibold text-board-900">
-            {copy.roomCodeLabel}
-            <input
-              class="rounded border border-board-700/25 bg-white px-3 py-2 font-mono font-normal uppercase text-board-900"
-              bind:value={roomCodeInput}
-              maxlength="32"
-              placeholder={copy.form.codePlaceholder}
-            />
-          </label>
-
-          {#if turnstileRequired}
-            <div bind:this={turnstileContainer}></div>
-          {/if}
-
-          <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2">
+          <Button ariaPressed={soundEnabled} onclick={toggleSound}>
+            {#if soundEnabled}
+              <Volume2 size={16} aria-hidden="true" />
+              {gameCopy.controls.soundOff}
+            {:else}
+              <VolumeX size={16} aria-hidden="true" />
+              {gameCopy.controls.soundOn}
+            {/if}
+          </Button>
+          {#if controller.roomCode !== null}
+            <Button onclick={leaveRoom}>
+              <LogOut size={16} aria-hidden="true" />
+              {copy.leave}
+            </Button>
             <Button
               variant="primary"
-              type="submit"
-              disabled={busy ||
-                guestId.length === 0 ||
-                (turnstileRequired && !turnstileToken)}
-              testId="create-room"
+              disabled={controller.state.phase === "gameOver"}
+              onclick={() => controller.resign()}
             >
-              <Plus size={16} aria-hidden="true" />
-              {copy.createRoom}
+              <Flag size={16} aria-hidden="true" />
+              {gameCopy.controls.resign}
             </Button>
-            <Button
-              disabled={busy || guestId.length === 0}
-              onclick={joinRoom}
-              testId="join-room"
-            >
-              {copy.joinRoom}
-            </Button>
-          </div>
-        </form>
-      </section>
-    {:else if !controller.started}
-      <section
-        class="rounded border border-board-700/20 bg-white/60 p-4"
-        data-testid="online-lobby"
-      >
-        <p class="text-lg font-semibold text-board-900">{copy.waiting}</p>
-        <p class="mt-2 font-mono text-sm text-board-700">
-          {controller.roomCode}
+          {/if}
+        </div>
+      </div>
+
+      {#if invalidMessage !== null || formError !== null}
+        <p
+          class="mb-3 rounded border border-red-700/25 bg-red-50 px-3 py-2 text-sm font-medium text-red-800"
+          role="status"
+          data-testid="online-feedback"
+        >
+          {formError ?? invalidMessage}
         </p>
-        {#if shareLink.length > 0}
-          <div class="mt-4 grid gap-2">
-            <span class="text-sm font-semibold text-board-900">
-              {copy.shareLabel}
-            </span>
-            <div class="flex gap-2">
+      {/if}
+
+      {#if controller.connectionStatus === "reconnecting"}
+        <p
+          class="mb-3 rounded border border-amber-700/25 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
+          role="status"
+        >
+          {copy.notices.reconnecting}
+        </p>
+      {/if}
+
+      {#if controller.started && controller.opponentConnected === false && controller.state.phase !== "gameOver"}
+        <p
+          class="mb-3 rounded border border-amber-700/25 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
+          role="status"
+        >
+          {copy.notices.opponentDisconnected}
+        </p>
+      {/if}
+
+      {#if controller.isIdlePlayer && controller.state.phase !== "gameOver"}
+        <p
+          class="mb-3 rounded border border-board-700/25 bg-white/70 px-3 py-2 text-sm font-medium text-board-900"
+          role="status"
+        >
+          {copy.notices.idleNudge}
+        </p>
+      {/if}
+
+      {#if controller.canClaimWin}
+        <div
+          class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-green-700/25 bg-green-50 px-3 py-2 text-sm font-medium text-green-900"
+          role="status"
+        >
+          <span>{copy.notices.claimAvailable}</span>
+          <Button
+            variant="success"
+            size="compact"
+            onclick={() => controller.claimWin()}
+          >
+            <Trophy size={16} aria-hidden="true" />
+            {copy.claimWin}
+          </Button>
+        </div>
+      {/if}
+
+      {#if controller.roomCode === null}
+        <section class="rounded border border-board-700/20 bg-white/60 p-4">
+          <form
+            class="grid gap-4"
+            onsubmit={(event) => {
+              event.preventDefault();
+              void createRoom();
+            }}
+          >
+            <label class="grid gap-2 text-sm font-semibold text-board-900">
+              {copy.nameLabel}
               <input
-                class="min-w-0 flex-1 rounded border border-board-700/25 bg-white px-3 py-2 text-sm text-board-900"
-                readonly
-                value={shareLink}
-                data-testid="share-link"
+                class="rounded border border-board-700/25 bg-white px-3 py-2 font-normal text-board-900"
+                bind:value={displayName}
+                maxlength="40"
+                placeholder={copy.form.namePlaceholder}
               />
-              <Button size="compact" onclick={() => void copyShareLink()}>
-                <Clipboard size={16} aria-hidden="true" />
-                {copied ? copy.copied : copy.copyLink}
+            </label>
+
+            <label class="grid gap-2 text-sm font-semibold text-board-900">
+              {copy.roomCodeLabel}
+              <input
+                class="rounded border border-board-700/25 bg-white px-3 py-2 font-mono font-normal uppercase text-board-900"
+                bind:value={roomCodeInput}
+                maxlength="32"
+                placeholder={copy.form.codePlaceholder}
+              />
+            </label>
+
+            {#if turnstileRequired}
+              <div bind:this={turnstileContainer}></div>
+            {/if}
+
+            <div class="flex flex-wrap gap-2">
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={busy ||
+                  guestId.length === 0 ||
+                  (turnstileRequired && !turnstileToken)}
+                testId="create-room"
+              >
+                <Plus size={16} aria-hidden="true" />
+                {copy.createRoom}
+              </Button>
+              <Button
+                disabled={busy || guestId.length === 0}
+                onclick={joinRoom}
+                testId="join-room"
+              >
+                {copy.joinRoom}
               </Button>
             </div>
-          </div>
-        {/if}
-      </section>
-    {:else}
-      <div
-        class="rounded border border-board-700/20 bg-board-100/45 p-3 shadow-sm"
-        data-testid="online-board"
-      >
-        <Board
-          state={controller.state}
-          selected={controller.selected}
-          lastAction={controller.lastAction}
-          invalidNonce={controller.invalidNonce}
-          interactive={controller.canInteract}
-          onSelectPoint={(point) => controller.clickPoint(point)}
-        />
-      </div>
-    {/if}
-  </div>
+          </form>
+        </section>
+      {:else if !controller.started || controller.mySlot === null}
+        <section
+          class="rounded border border-board-700/20 bg-white/60 p-4"
+          data-testid="online-lobby"
+        >
+          <p class="text-lg font-semibold text-board-900">{copy.waiting}</p>
+          <p class="mt-2 font-mono text-sm text-board-700">
+            {controller.roomCode}
+          </p>
+          {#if shareLink.length > 0}
+            <div class="mt-4 grid gap-2">
+              <span class="text-sm font-semibold text-board-900">
+                {copy.shareLabel}
+              </span>
+              <div class="flex gap-2">
+                <input
+                  class="min-w-0 flex-1 rounded border border-board-700/25 bg-white px-3 py-2 text-sm text-board-900"
+                  readonly
+                  value={shareLink}
+                  data-testid="share-link"
+                />
+                <Button size="compact" onclick={() => void copyShareLink()}>
+                  <Clipboard size={16} aria-hidden="true" />
+                  {copied ? copy.copied : copy.copyLink}
+                </Button>
+              </div>
+            </div>
+          {/if}
+        </section>
+      {:else}
+        <div
+          class="rounded border border-board-700/20 bg-board-100/45 p-3 shadow-sm"
+          data-testid="online-board"
+        >
+          <Board
+            state={controller.state}
+            selected={controller.selected}
+            lastAction={controller.lastAction}
+            invalidNonce={controller.invalidNonce}
+            interactive={controller.canInteract}
+            onSelectPoint={(point) => controller.clickPoint(point)}
+          />
+        </div>
+      {/if}
+    </div>
 
-  <aside class="grid content-start gap-4">
-    <GameStatusPanel
-      {status}
-      {playerName}
-      leadingFields={[
-        {
-          label: copy.connectionLabel,
-          value: copy.connection[controller.connectionStatus],
-        },
-        ...(controller.roomCode === null
-          ? []
-          : [
-              {
-                label: copy.roomLabel,
-                value: controller.roomCode,
-                monospaced: true,
-              },
-            ]),
-      ]}
-      showFirstAdvantage={false}
-      showTurnsSinceCapture={false}
-    />
-
-    <PlayerPiecesCard
-      {status}
-      playerName={(player) =>
-        controller.presence[player] === null
-          ? copy.emptySlot
-          : playerSeatLabel(player)}
-    />
-
-    {#if status.phase === "gameOver"}
-      <GameResultCard
+    <aside class="grid content-start gap-4">
+      <GameStatusPanel
         {status}
         {playerName}
-        reason={controller.onlineEndReason !== null
-          ? onlineResultReason()
-          : status.endReason === null
-            ? null
-            : gameCopy.result.reasons[status.endReason]}
-        testId="online-game-result"
+        leadingFields={[
+          {
+            label: copy.connectionLabel,
+            value: copy.connection[controller.connectionStatus],
+          },
+          ...(controller.roomCode === null
+            ? []
+            : [
+                {
+                  label: copy.roomLabel,
+                  value: controller.roomCode,
+                  monospaced: true,
+                },
+              ]),
+        ]}
+        showFirstAdvantage={false}
+        showTurnsSinceCapture={false}
       />
-    {/if}
-  </aside>
-</section>
+
+      <PlayerPiecesCard
+        {status}
+        playerName={(player) =>
+          controller.presence[player] === null
+            ? copy.emptySlot
+            : playerSeatLabel(player)}
+      />
+
+      {#if status.phase === "gameOver"}
+        <GameResultCard
+          {status}
+          {playerName}
+          reason={controller.onlineEndReason !== null
+            ? onlineResultReason()
+            : status.endReason === null
+              ? null
+              : gameCopy.result.reasons[status.endReason]}
+          testId="online-game-result"
+        />
+      {/if}
+    </aside>
+  </section>
+{/if}

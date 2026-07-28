@@ -23,6 +23,16 @@ test.describe("O1 guest online game", () => {
 
       await expect(creator.getByTestId("online-board")).toBeVisible();
       await expect(joiner.getByTestId("online-board")).toBeVisible();
+      await expect(
+        joiner.locator('[data-testid^="player-rail-"]').nth(0),
+      ).toHaveAttribute("data-player", "A");
+      await expect(
+        joiner.locator('[data-testid^="player-rail-"]').nth(1),
+      ).toHaveAttribute("data-player", "B");
+      await expect(joiner.getByTestId("player-rail-B")).toHaveAttribute(
+        "data-rotated",
+        "false",
+      );
 
       await creator.locator('[data-point-id="O1"]').click();
 
@@ -41,10 +51,24 @@ test.describe("O1 guest online game", () => {
         "Ayaan wuxuu dhagax dhigay barta O1",
       );
 
+      await joiner.locator('[data-point-id="O2"]').click();
+      await expect(joiner.locator('[data-point-id="O2"]')).toHaveAttribute(
+        "data-occupant",
+        "B",
+      );
+      await expect(
+        joiner.locator(
+          '[data-point-id="O2"] [data-testid="board-piece-b-ring"]',
+        ),
+      ).toBeVisible();
+      await expect(joiner.getByTestId("board")).toHaveCSS("transform", "none");
+
       await creator.reload();
 
       await expect(creator.getByTestId("online-board")).toBeVisible();
-      await expect(creator.getByText("Wuu xiran yahay")).toBeVisible();
+      await expect(
+        creator.getByTestId("game-details-panel").filter({ visible: true }),
+      ).toContainText("Wuu xiran yahay");
       await expect(creator.locator('[data-point-id="O1"]')).toHaveAttribute(
         "data-occupant",
         "A",

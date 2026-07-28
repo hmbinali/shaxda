@@ -16,6 +16,7 @@
 <div
   class="reserve"
   data-testid={`reserve-tray-${player}`}
+  role="img"
   aria-label={`${copy.reserve}: ${count}`}
 >
   <div class="tray" aria-hidden="true">

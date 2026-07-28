@@ -7,7 +7,7 @@
     status: GameStatus;
     playerName: (player: PlayerId) => string;
     reason?: string | null;
-    testId: string;
+    testId?: string;
   }
 
   let { status, playerName, reason = null, testId }: Props = $props();

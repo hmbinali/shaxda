@@ -1,6 +1,6 @@
 <script lang="ts">
   import { LockKeyhole } from "@lucide/svelte";
-  import type { PlayerId } from "@shaxda/game-engine";
+  import { DRAW_TURN_LIMIT, type PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
   import type { RailInstructionKey, RailState } from "$lib/game/seating";
   import type { GameStatus } from "$lib/game/status";
@@ -25,6 +25,7 @@
   }: Props = $props();
 
   const copy = messages.so.localGame;
+  const drawWarningThreshold = Math.ceil(DRAW_TURN_LIMIT * 0.75);
 </script>
 
 <section
@@ -59,6 +60,12 @@
           ? copy.tabletop.states[railState]
           : copy.tabletop.instructions[instruction]}
       </p>
+      {#if (railState === "acting" || railState === "spaceMaking") && status.turnsSinceCapture >= drawWarningThreshold}
+        <span class="draw-warning" data-testid="draw-warning">
+          {DRAW_TURN_LIMIT - status.turnsSinceCapture}
+          {copy.tabletop.turnsRemaining}
+        </span>
+      {/if}
     </div>
 
     {#if status.phase === "placement"}
@@ -187,6 +194,18 @@
     overflow: hidden;
     margin: 0;
     text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .draw-warning {
+    display: inline-block;
+    margin-top: 0.1rem;
+    border-radius: 999px;
+    background: #f8e9bd;
+    padding: 0.1rem 0.35rem;
+    color: #713f12;
+    font-size: 0.6rem;
+    font-weight: 800;
     white-space: nowrap;
   }
 

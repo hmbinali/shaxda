@@ -8,9 +8,11 @@
     saveSoundPreference,
   } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
+  import BoardNotice from "$components/game/BoardNotice.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
-  import GameResultCard from "$components/game/GameResultCard.svelte";
+  import GameResultOverlay from "$components/game/GameResultOverlay.svelte";
   import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
+  import InvalidToast from "$components/game/InvalidToast.svelte";
   import PlayerRail from "$components/game/PlayerRail.svelte";
   import TabletopShell from "$components/game/TabletopShell.svelte";
   import PageMeta from "$components/PageMeta.svelte";
@@ -133,29 +135,30 @@
           </div>
         </details>
 
+        {#if status.isSpaceMaking}
+          <BoardNotice
+            title={copy.tabletop.instructions.makeSpace}
+            body={copy.blockedPrompt}
+            sided
+            testId="blocked-prompt"
+          />
+        {/if}
+
         {#if invalidMessage !== null}
-          <p
-            class="pointer-events-none absolute inset-x-3 bottom-3 z-20 rounded border border-red-700/25 bg-red-50/95 px-3 py-2 text-center text-sm font-medium text-red-800 shadow"
-            role="status"
-            data-testid="invalid-feedback"
-          >
-            {invalidMessage}
-          </p>
+          <InvalidToast message={invalidMessage} testId="invalid-feedback" />
         {/if}
 
         {#if status.phase === "gameOver"}
-          <div
-            class="absolute inset-0 z-10 grid place-items-center bg-board-900/35 p-4"
-          >
-            <GameResultCard
-              {status}
-              {playerName}
-              reason={status.endReason === null
-                ? null
-                : copy.result.reasons[status.endReason]}
-              testId="game-result"
-            />
-          </div>
+          <GameResultOverlay
+            {status}
+            {playerName}
+            reason={status.endReason === null
+              ? null
+              : copy.result.reasons[status.endReason]}
+            testId="game-result"
+            orientation="shared"
+            onNewGame={() => controller.startNewGame()}
+          />
         {/if}
       </div>
     {/snippet}
@@ -171,11 +174,7 @@
     {/snippet}
 
     {#snippet details()}
-      <GameStatusPanel
-        {status}
-        {playerName}
-        blockedPrompt={copy.blockedPrompt}
-      />
+      <GameStatusPanel {status} {playerName} />
 
       <div
         class="grid gap-2 rounded border border-board-700/20 bg-white/60 p-4"

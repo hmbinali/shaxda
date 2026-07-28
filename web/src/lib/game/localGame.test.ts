@@ -165,15 +165,14 @@ describe("LocalGameController", () => {
     expect(game.feedback?.cues).toEqual(["capture"]);
   });
 
-  it("clears saved game when starting over after confirmation", () => {
+  it("clears saved game when starting over", () => {
     const game = createLocalGameController({
       initialState: gameFixtures.movement,
       storage,
-      confirmNewGame: () => true,
     });
     values.set(LOCAL_GAME_STORAGE_KEY, serialize(gameFixtures.movement));
 
-    expect(game.startNewGame()).toBe(true);
+    game.startNewGame();
 
     expect(game.state.phase).toBe("placement");
     expect(game.lastAction).toBeNull();
@@ -186,7 +185,6 @@ describe("LocalGameController", () => {
   it("clears transient feedback when starting a new game", () => {
     const game = createLocalGameController({
       storage,
-      confirmNewGame: () => true,
     });
 
     game.clickPoint("O1");
@@ -196,7 +194,7 @@ describe("LocalGameController", () => {
     expect(game.feedback).not.toBeNull();
     expect(game.invalidNonce).toBe(1);
 
-    expect(game.startNewGame()).toBe(true);
+    game.startNewGame();
 
     expect(game.lastAction).toBeNull();
     expect(game.feedback).toBeNull();

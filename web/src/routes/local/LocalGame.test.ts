@@ -117,7 +117,10 @@ describe("/local", () => {
     render(LocalGamePage);
 
     await fireEvent.click(
-      screen.getAllByRole("button", { name: copy.controls.resign })[0],
+      screen.getByRole("button", { name: copy.controls.resign }),
+    );
+    await fireEvent.click(
+      screen.getByRole("button", { name: copy.tabletop.confirm }),
     );
 
     expect(screen.getByTestId("game-result")).toHaveTextContent(
@@ -129,12 +132,17 @@ describe("/local", () => {
   });
 
   it("starts a new game after confirmation and clears saved state", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { container } = render(LocalGamePage);
 
     await fireEvent.click(point(container, "O1"));
     await fireEvent.click(
       screen.getAllByRole("button", { name: copy.controls.newGame })[0],
+    );
+    expect(
+      screen.getByRole("dialog", { name: copy.controls.newGame }),
+    ).toBeInTheDocument();
+    await fireEvent.click(
+      screen.getByRole("button", { name: copy.tabletop.confirm }),
     );
 
     expect(point(container, "O1")).toHaveAttribute("data-occupant", "empty");
@@ -150,7 +158,7 @@ describe("/local", () => {
     const { container } = render(LocalGamePage);
 
     expect(point(container, "O8")).toHaveAttribute("data-occupant", "B");
-    expect(screen.getByText(copy.phases.movement)).toBeInTheDocument();
+    expect(screen.getAllByText(copy.phases.movement)[0]).toBeInTheDocument();
   });
 });
 

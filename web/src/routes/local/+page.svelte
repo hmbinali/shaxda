@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { Ellipsis, Flag, RotateCcw, Volume2, VolumeX } from "@lucide/svelte";
+  import { RotateCcw, Volume2, VolumeX } from "@lucide/svelte";
+  import {
+    legalActions,
+    type GameState,
+    type PlayerId,
+  } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
   import { onMount } from "svelte";
   import {
@@ -9,9 +14,11 @@
   } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
   import BoardNotice from "$components/game/BoardNotice.svelte";
+  import ConfirmSheet from "$components/game/ConfirmSheet.svelte";
+  import GameActionsMenu from "$components/game/GameActionsMenu.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
+  import GameDetailsPanel from "$components/game/GameDetailsPanel.svelte";
   import GameResultOverlay from "$components/game/GameResultOverlay.svelte";
-  import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
   import InvalidToast from "$components/game/InvalidToast.svelte";
   import PlayerRail from "$components/game/PlayerRail.svelte";
   import TabletopShell from "$components/game/TabletopShell.svelte";
@@ -27,14 +34,16 @@
   const copy = messages.so.localGame;
   const orientation = { orientation: "shared" } as const;
   const seating = resolveSeating(orientation);
-  const controller = createLocalGameController({
-    confirmNewGame: () => window.confirm(copy.prompts.newGame),
-  });
+  const controller = createLocalGameController();
   const soundPlayer = new SoundPlayer();
 
   let soundEnabled = $state(true);
   let lastFeedbackNonce = 0;
+  let pendingConfirm = $state<"newGame" | "resign" | null>(null);
+  let confirmEdge = $state<"top" | "bottom">("bottom");
+  let tabletopBackground = $state<HTMLElement | null>(null);
   const status = $derived(controller.status);
+  const resignOwner = $derived(findResignOwner(controller.state));
   const invalidMessage = $derived(
     controller.invalid === null
       ? null
@@ -59,7 +68,7 @@
     void soundPlayer.play(feedback.cues);
   });
 
-  function playerName(player: "A" | "B"): string {
+  function playerName(player: PlayerId): string {
     return copy.playerNames[player];
   }
 
@@ -71,6 +80,34 @@
       void soundPlayer.unlock();
     }
   }
+
+  function requestNewGame(): void {
+    pendingConfirm = "newGame";
+    confirmEdge = "bottom";
+  }
+
+  function requestResign(player: PlayerId): void {
+    pendingConfirm = "resign";
+    confirmEdge = player === seating.top ? "top" : "bottom";
+  }
+
+  function confirmAction(): void {
+    const action = pendingConfirm;
+    pendingConfirm = null;
+
+    if (action === "newGame") {
+      controller.startNewGame();
+    } else if (action === "resign") {
+      controller.resign();
+    }
+  }
+
+  function findResignOwner(state: GameState): PlayerId | null {
+    return (
+      legalActions(state).find((action) => action.type === "resign")?.player ??
+      null
+    );
+  }
 </script>
 
 <PageMeta title={copy.title} description={copy.description} path="/local" />
@@ -79,7 +116,7 @@
 
 <h1 class="sr-only">{copy.heading}</h1>
 
-<div class="h-full min-h-full">
+<div bind:this={tabletopBackground} class="h-full min-h-full">
   <TabletopShell
     orientation="shared"
     compactRails={status.phase !== "placement"}
@@ -92,6 +129,9 @@
         railState={railStateFor(status, seating.top)}
         instruction={instructionKeyFor(status, seating.top, orientation)}
         rotate={seating.rotateTop}
+        onResign={resignOwner === seating.top
+          ? () => requestResign(seating.top)
+          : null}
       />
     {/snippet}
 
@@ -106,34 +146,25 @@
           onSelectPoint={(point) => controller.clickPoint(point)}
         />
 
-        <details class="mobile-actions">
-          <summary aria-label={copy.tabletop.moreActions}>
-            <Ellipsis size={22} aria-hidden="true" />
-          </summary>
-          <div class="action-popover">
-            <Button ariaPressed={soundEnabled} onclick={toggleSound}>
-              {#if soundEnabled}
-                <Volume2 size={16} aria-hidden="true" />
-                {copy.controls.soundOff}
-              {:else}
-                <VolumeX size={16} aria-hidden="true" />
-                {copy.controls.soundOn}
-              {/if}
-            </Button>
-            <Button onclick={() => controller.startNewGame()}>
-              <RotateCcw size={16} aria-hidden="true" />
-              {copy.controls.newGame}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={controller.state.phase === "gameOver"}
-              onclick={() => controller.resign()}
-            >
-              <Flag size={16} aria-hidden="true" />
-              {copy.controls.resign}
-            </Button>
-          </div>
-        </details>
+        <GameActionsMenu label={copy.tabletop.moreActions}>
+          <GameDetailsPanel {status} {playerName}>
+            {#snippet actions()}
+              <Button ariaPressed={soundEnabled} onclick={toggleSound}>
+                {#if soundEnabled}
+                  <Volume2 size={16} aria-hidden="true" />
+                  {copy.controls.soundOff}
+                {:else}
+                  <VolumeX size={16} aria-hidden="true" />
+                  {copy.controls.soundOn}
+                {/if}
+              </Button>
+              <Button onclick={requestNewGame}>
+                <RotateCcw size={16} aria-hidden="true" />
+                {copy.controls.newGame}
+              </Button>
+            {/snippet}
+          </GameDetailsPanel>
+        </GameActionsMenu>
 
         {#if status.isSpaceMaking}
           <BoardNotice
@@ -170,86 +201,46 @@
         name={playerName(seating.bottom)}
         railState={railStateFor(status, seating.bottom)}
         instruction={instructionKeyFor(status, seating.bottom, orientation)}
+        onResign={resignOwner === seating.bottom
+          ? () => requestResign(seating.bottom)
+          : null}
       />
     {/snippet}
 
     {#snippet details()}
-      <GameStatusPanel {status} {playerName} />
-
-      <div
-        class="grid gap-2 rounded border border-board-700/20 bg-white/60 p-4"
-      >
-        <Button ariaPressed={soundEnabled} onclick={toggleSound}>
-          {#if soundEnabled}
-            <Volume2 size={16} aria-hidden="true" />
-            {copy.controls.soundOff}
-          {:else}
-            <VolumeX size={16} aria-hidden="true" />
-            {copy.controls.soundOn}
-          {/if}
-        </Button>
-        <Button onclick={() => controller.startNewGame()}>
-          <RotateCcw size={16} aria-hidden="true" />
-          {copy.controls.newGame}
-        </Button>
-        <Button
-          variant="primary"
-          disabled={controller.state.phase === "gameOver"}
-          onclick={() => controller.resign()}
-        >
-          <Flag size={16} aria-hidden="true" />
-          {copy.controls.resign}
-        </Button>
-      </div>
+      <GameDetailsPanel {status} {playerName}>
+        {#snippet actions()}
+          <Button ariaPressed={soundEnabled} onclick={toggleSound}>
+            {#if soundEnabled}
+              <Volume2 size={16} aria-hidden="true" />
+              {copy.controls.soundOff}
+            {:else}
+              <VolumeX size={16} aria-hidden="true" />
+              {copy.controls.soundOn}
+            {/if}
+          </Button>
+          <Button onclick={requestNewGame}>
+            <RotateCcw size={16} aria-hidden="true" />
+            {copy.controls.newGame}
+          </Button>
+        {/snippet}
+      </GameDetailsPanel>
     {/snippet}
   </TabletopShell>
 </div>
 
-<style>
-  .mobile-actions {
-    position: absolute;
-    z-index: 30;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  .mobile-actions summary {
-    display: grid;
-    width: 2.75rem;
-    height: 2.75rem;
-    cursor: pointer;
-    list-style: none;
-    place-items: center;
-    border: 1px solid rgb(106 61 37 / 0.3);
-    border-radius: 999px;
-    background: rgb(255 250 243 / 0.92);
-    color: #2e2019;
-    box-shadow: 0 4px 14px rgb(68 38 22 / 0.16);
-  }
-
-  .mobile-actions summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .action-popover {
-    position: absolute;
-    top: calc(100% + 0.4rem);
-    left: 50%;
-    display: grid;
-    width: max-content;
-    gap: 0.35rem;
-    transform: translateX(-50%);
-    border: 1px solid rgb(106 61 37 / 0.24);
-    border-radius: 0.75rem;
-    background: #fffaf3;
-    padding: 0.5rem;
-    box-shadow: 0 10px 30px rgb(68 38 22 / 0.2);
-  }
-
-  @media (min-width: 64rem) {
-    .mobile-actions {
-      display: none;
-    }
-  }
-</style>
+<ConfirmSheet
+  open={pendingConfirm !== null}
+  title={pendingConfirm === "resign"
+    ? copy.controls.resign
+    : copy.controls.newGame}
+  body={pendingConfirm === "resign"
+    ? copy.prompts.resign
+    : copy.prompts.newGame}
+  cancelLabel={copy.tabletop.cancel}
+  confirmLabel={copy.tabletop.confirm}
+  edge={confirmEdge}
+  background={tabletopBackground}
+  onClose={() => (pendingConfirm = null)}
+  onConfirm={confirmAction}
+/>

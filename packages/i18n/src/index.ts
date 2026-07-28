@@ -122,6 +122,7 @@ export const messages = {
       },
       prompts: {
         newGame: "Ciyaar cusub ma bilaabaysaa?",
+        resign: "Ma hubtaa inaad is dhiibayso?",
       },
       invalid: {
         gameOver: "Ciyaartu way dhammaatay.",

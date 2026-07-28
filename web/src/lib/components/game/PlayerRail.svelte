@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LockKeyhole } from "@lucide/svelte";
+  import { Flag, LockKeyhole } from "@lucide/svelte";
   import { DRAW_TURN_LIMIT, type PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
   import type { RailInstructionKey, RailState } from "$lib/game/seating";
@@ -13,6 +13,7 @@
     railState: RailState;
     instruction: RailInstructionKey | null;
     rotate?: boolean;
+    onResign?: (() => void) | null;
   }
 
   let {
@@ -22,6 +23,7 @@
     railState,
     instruction,
     rotate = false,
+    onResign = null,
   }: Props = $props();
 
   const copy = messages.so.localGame;
@@ -68,7 +70,16 @@
       {/if}
     </div>
 
-    {#if status.phase === "placement"}
+    {#if onResign !== null}
+      <button
+        class="resign"
+        type="button"
+        aria-label={copy.controls.resign}
+        onclick={onResign}
+      >
+        <Flag size={16} aria-hidden="true" />
+      </button>
+    {:else if status.phase === "placement"}
       <ReserveTray {player} count={status.players[player].inHand} />
     {:else}
       <dl>
@@ -230,6 +241,17 @@
     grid-template-columns: repeat(2, auto);
     gap: 0.2rem;
     margin: 0;
+  }
+
+  .resign {
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    place-items: center;
+    border: 1px solid rgb(153 27 27 / 0.3);
+    border-radius: 0.6rem;
+    background: rgb(254 242 242 / 0.75);
+    color: #991b1b;
   }
 
   dl div {

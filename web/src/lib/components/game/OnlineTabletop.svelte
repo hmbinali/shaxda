@@ -85,6 +85,7 @@
       <PlayerRail
         player={seating.top}
         {status}
+        {viewer}
         name={playerName(seating.top)}
         railState={railStateFor(status, seating.top)}
         instruction={instructionKeyFor(status, seating.top, orientation)}
@@ -103,7 +104,10 @@
           onSelectPoint={(point) => controller.clickPoint(point)}
         />
 
-        <GameActionsMenu label={gameCopy.tabletop.moreActions}>
+        <GameActionsMenu
+          label={gameCopy.tabletop.moreActions}
+          closeLabel={gameCopy.tabletop.cancel}
+        >
           <GameDetailsPanel
             {status}
             {playerName}
@@ -176,6 +180,7 @@
       <PlayerRail
         player={seating.bottom}
         {status}
+        {viewer}
         name={`${playerName(seating.bottom)} (${copy.youLabel})`}
         railState={railStateFor(status, seating.bottom)}
         instruction={instructionKeyFor(status, seating.bottom, orientation)}

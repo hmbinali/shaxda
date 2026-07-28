@@ -13,6 +13,8 @@ export interface Seating {
 export type RailState =
   "acting" | "spaceMaking" | "blocked" | "winner" | "loser" | "waiting";
 
+export type RailStateLabelKey = RailState | "opponentActing";
+
 export type RailInstructionKey =
   "place" | "remove" | "move" | "capture" | "makeSpace";
 
@@ -57,6 +59,22 @@ export function railStateFor(status: GameStatus, player: PlayerId): RailState {
   }
 
   return status.actingPlayer === player ? "acting" : "waiting";
+}
+
+export function railStateLabelKeyFor(
+  railState: RailState,
+  player: PlayerId,
+  viewer: PlayerId | null,
+): RailStateLabelKey {
+  if (
+    viewer !== null &&
+    player !== viewer &&
+    (railState === "acting" || railState === "spaceMaking")
+  ) {
+    return "opponentActing";
+  }
+
+  return railState;
 }
 
 export function instructionKeyFor(

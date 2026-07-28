@@ -118,6 +118,70 @@ test.describe("tabletop layout", () => {
     });
   }
 
+  test("the shortest mobile actions sheet remains dismissible", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 460 });
+    await page.goto("/local");
+
+    const trigger = page.locator('summary[aria-label="Ficillo kale"]');
+    await trigger.click();
+    await expect(
+      page.getByRole("dialog", { name: "Ficillo kale" }),
+    ).toBeVisible();
+    await page.getByTestId("game-actions-close").click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+
+    await trigger.click();
+    await page.getByTestId("game-actions-backdrop").click({
+      position: { x: 4, y: 4 },
+    });
+    await expect(page.getByRole("dialog")).toBeHidden();
+
+    await trigger.click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("a centred board notice receives input above the actions trigger", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 460 });
+    await page.goto("/");
+    await page.evaluate(({ key, value }) => localStorage.setItem(key, value), {
+      key: storageKey,
+      value: JSON.stringify(blockedState),
+    });
+    await page.goto("/local");
+
+    const trigger = page.locator('summary[aria-label="Ficillo kale"]');
+    const triggerBox = await trigger.boundingBox();
+    const notice = page.getByTestId("blocked-prompt");
+    const noticeBox = await notice.boundingBox();
+
+    expect(triggerBox).not.toBeNull();
+    expect(noticeBox).not.toBeNull();
+    expect(rectanglesOverlap(triggerBox!, noticeBox!)).toBe(true);
+
+    const hitTarget = await page.evaluate(
+      ({ x, y }) => {
+        const target = document.elementFromPoint(x, y);
+        return {
+          isNotice: target?.closest('[data-testid="blocked-prompt"]') !== null,
+          isTrigger:
+            target?.closest('summary[aria-label="Ficillo kale"]') !== null,
+        };
+      },
+      {
+        x: triggerBox!.x + triggerBox!.width / 2,
+        y: triggerBox!.y + triggerBox!.height / 2,
+      },
+    );
+
+    expect(hitTarget).toEqual({ isNotice: true, isTrigger: false });
+  });
+
   test("a PWA notice reduces the measured table tier without clipping it", async ({
     context,
     page,
@@ -229,6 +293,18 @@ test.describe("tabletop layout", () => {
     await expect(page.getByTestId("player-rail-A")).toBeInViewport();
   });
 });
+
+function rectanglesOverlap(
+  first: { x: number; y: number; width: number; height: number },
+  second: { x: number; y: number; width: number; height: number },
+): boolean {
+  return (
+    first.x < second.x + second.width &&
+    first.x + first.width > second.x &&
+    first.y < second.y + second.height &&
+    first.y + first.height > second.y
+  );
+}
 
 async function measureTabletop(page: import("@playwright/test").Page) {
   return page.evaluate(() => {

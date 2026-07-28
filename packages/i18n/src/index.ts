@@ -99,6 +99,7 @@ export const messages = {
       tabletop: {
         states: {
           acting: "Wareeggaaga",
+          opponentActing: "Wareegga ciyaaryahanka kale",
           spaceMaking: "Meel bannay",
           blocked: "Waa xanniban yahay",
           winner: "Guuleystay",

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   instructionKeyFor,
   noticeOwnerFor,
+  railStateLabelKeyFor,
   railStateFor,
   resolveSeating,
 } from "./seating";
@@ -84,6 +85,21 @@ describe("railStateFor", () => {
 
     expect(railStateFor(status, "A")).toBe("waiting");
     expect(railStateFor(status, "B")).toBe("waiting");
+  });
+});
+
+describe("railStateLabelKeyFor", () => {
+  it("uses neutral copy when the solo opponent is acting", () => {
+    expect(railStateLabelKeyFor("acting", "A", "B")).toBe("opponentActing");
+    expect(railStateLabelKeyFor("spaceMaking", "A", "B")).toBe(
+      "opponentActing",
+    );
+  });
+
+  it("keeps viewer and shared-table state labels unchanged", () => {
+    expect(railStateLabelKeyFor("acting", "A", "A")).toBe("acting");
+    expect(railStateLabelKeyFor("acting", "A", null)).toBe("acting");
+    expect(railStateLabelKeyFor("blocked", "A", "B")).toBe("blocked");
   });
 });
 

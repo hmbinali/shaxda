@@ -2,7 +2,11 @@
   import { Flag, LockKeyhole } from "@lucide/svelte";
   import { DRAW_TURN_LIMIT, type PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
-  import type { RailInstructionKey, RailState } from "$lib/game/seating";
+  import {
+    railStateLabelKeyFor,
+    type RailInstructionKey,
+    type RailState,
+  } from "$lib/game/seating";
   import type { GameStatus } from "$lib/game/status";
   import ReserveTray from "./ReserveTray.svelte";
 
@@ -10,6 +14,7 @@
     player: PlayerId;
     status: GameStatus;
     name: string;
+    viewer?: PlayerId | null;
     railState: RailState;
     instruction: RailInstructionKey | null;
     rotate?: boolean;
@@ -21,6 +26,7 @@
     player,
     status,
     name,
+    viewer = null,
     railState,
     instruction,
     rotate = false,
@@ -61,7 +67,9 @@
       <h2>{name}</h2>
       <p>
         {instruction === null
-          ? copy.tabletop.states[railState]
+          ? copy.tabletop.states[
+              railStateLabelKeyFor(railState, player, viewer)
+            ]
           : copy.tabletop.instructions[instruction]}
       </p>
       {#if notice !== null}

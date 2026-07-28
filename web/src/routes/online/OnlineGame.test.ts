@@ -209,6 +209,12 @@ describe("/online", () => {
       "data-rotated",
       "false",
     );
+    expect(screen.getByTestId("player-rail-A")).toHaveTextContent(
+      messages.so.localGame.tabletop.states.opponentActing,
+    );
+    expect(screen.getByTestId("player-rail-A")).not.toHaveTextContent(
+      messages.so.localGame.tabletop.states.acting,
+    );
     expect(document.querySelector('[data-occupant="B"]')).toBeInTheDocument();
   });
 

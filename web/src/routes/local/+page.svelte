@@ -146,7 +146,10 @@
           onSelectPoint={(point) => controller.clickPoint(point)}
         />
 
-        <GameActionsMenu label={copy.tabletop.moreActions}>
+        <GameActionsMenu
+          label={copy.tabletop.moreActions}
+          closeLabel={copy.tabletop.cancel}
+        >
           <GameDetailsPanel {status} {playerName}>
             {#snippet actions()}
               <Button ariaPressed={soundEnabled} onclick={toggleSound}>

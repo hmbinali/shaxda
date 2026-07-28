@@ -28,9 +28,30 @@ describe("/local", () => {
   it("places a piece and persists the unfinished game", async () => {
     const { container } = render(LocalGamePage);
 
+    expect(screen.getByTestId("tabletop")).toHaveAttribute(
+      "data-testid",
+      "tabletop",
+    );
+    expect(screen.getByTestId("player-rail-B")).toHaveAttribute(
+      "data-rotated",
+      "true",
+    );
+    expect(screen.getByTestId("player-rail-A")).toHaveAttribute(
+      "data-rotated",
+      "false",
+    );
+    expect(screen.getByTestId("player-rail-A")).toHaveAttribute(
+      "data-rail-state",
+      "acting",
+    );
+
     await fireEvent.click(point(container, "O1"));
 
     expect(point(container, "O1")).toHaveAttribute("data-occupant", "A");
+    expect(screen.getByTestId("player-rail-B")).toHaveAttribute(
+      "data-rail-state",
+      "acting",
+    );
     const saved = window.localStorage.getItem(LOCAL_GAME_STORAGE_KEY);
     expect(saved).not.toBeNull();
     expect(deserialize(saved ?? "").board.O1).toBe("A");
@@ -65,9 +86,9 @@ describe("/local", () => {
   it("renders and persists the sound toggle state", async () => {
     render(LocalGamePage);
 
-    const muteButton = screen.getByRole("button", {
+    const muteButton = screen.getAllByRole("button", {
       name: copy.controls.soundOff,
-    });
+    })[0];
     expect(muteButton).toHaveAttribute("aria-pressed", "true");
 
     await fireEvent.click(muteButton);
@@ -76,7 +97,7 @@ describe("/local", () => {
       "false",
     );
     expect(
-      screen.getByRole("button", { name: copy.controls.soundOn }),
+      screen.getAllByRole("button", { name: copy.controls.soundOn })[0],
     ).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -87,7 +108,7 @@ describe("/local", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: copy.controls.soundOn }),
+        screen.getAllByRole("button", { name: copy.controls.soundOn })[0],
       ).toHaveAttribute("aria-pressed", "false"),
     );
   });
@@ -97,6 +118,9 @@ describe("/local", () => {
 
     await fireEvent.click(
       screen.getByRole("button", { name: copy.controls.resign }),
+    );
+    await fireEvent.click(
+      screen.getByRole("button", { name: copy.tabletop.confirm }),
     );
 
     expect(screen.getByTestId("game-result")).toHaveTextContent(
@@ -108,12 +132,17 @@ describe("/local", () => {
   });
 
   it("starts a new game after confirmation and clears saved state", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { container } = render(LocalGamePage);
 
     await fireEvent.click(point(container, "O1"));
     await fireEvent.click(
-      screen.getByRole("button", { name: copy.controls.newGame }),
+      screen.getAllByRole("button", { name: copy.controls.newGame })[0],
+    );
+    expect(
+      screen.getByRole("dialog", { name: copy.controls.newGame }),
+    ).toBeInTheDocument();
+    await fireEvent.click(
+      screen.getByRole("button", { name: copy.tabletop.confirm }),
     );
 
     expect(point(container, "O1")).toHaveAttribute("data-occupant", "empty");
@@ -129,7 +158,7 @@ describe("/local", () => {
     const { container } = render(LocalGamePage);
 
     expect(point(container, "O8")).toHaveAttribute("data-occupant", "B");
-    expect(screen.getByText(copy.phases.movement)).toBeInTheDocument();
+    expect(screen.getAllByText(copy.phases.movement)[0]).toBeInTheDocument();
   });
 });
 

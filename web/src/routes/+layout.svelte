@@ -111,9 +111,7 @@
 
 <AnalyticsBeacon />
 
-<div
-  class="flex h-dvh min-h-screen flex-col overflow-hidden bg-board-50 text-board-900"
->
+<div class="flex h-dvh flex-col overflow-hidden bg-board-50 text-board-900">
   <a
     href="#main-content"
     class="fixed left-3 top-3 z-50 -translate-y-24 rounded bg-board-900 px-4 py-2 text-sm font-semibold text-board-50 outline-none transition-transform focus:translate-y-0 focus:ring-2 focus:ring-red-800 focus:ring-offset-2 motion-reduce:transition-none"

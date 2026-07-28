@@ -27,6 +27,8 @@ export type ActionError =
 export type ActionResult =
   { ok: true; state: GameState } | { ok: false; error: ActionError };
 
+export const DRAW_TURN_LIMIT = 80;
+
 export function otherPlayer(player: PlayerId): PlayerId {
   return player === "A" ? "B" : "A";
 }
@@ -430,7 +432,7 @@ function finalizeMovementTurn(
     return endDraw(withRepetition, "drawTermination");
   }
 
-  if (withRepetition.draw.turnsSinceCapture >= 80) {
+  if (withRepetition.draw.turnsSinceCapture >= DRAW_TURN_LIMIT) {
     return endDraw(withRepetition, "drawTermination");
   }
 

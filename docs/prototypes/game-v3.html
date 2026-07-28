@@ -1,0 +1,3089 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shaxda — Compact Shared Table Prototype</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #efe7dc;
+        --paper: #fffaf3;
+        --paper-strong: #f5e7d5;
+        --ink: #2e2019;
+        --muted: #765e50;
+        --hairline: #d7c3b0;
+        --accent: #8b3f2f;
+        --accent-soft: #f1d8ca;
+        --turn: #176b55;
+        --turn-soft: #d8eee5;
+        --warning: #875a12;
+        --warning-soft: #f8e9bd;
+        --danger: #a52f34;
+        --danger-soft: #f9dfe0;
+        --focus: #164e9a;
+        --wood-light: #e9c18e;
+        --wood-mid: #c98e58;
+        --wood-dark: #9b6039;
+        --stone-a: #f3dfbf;
+        --stone-a-edge: #8a6c54;
+        --stone-b: #5b3020;
+        --stone-b-edge: #2e160f;
+        --phone-width: 390px;
+        --rail-size: 88px;
+        --app-bar-size: 56px;
+        --shadow: 0 24px 70px rgb(72 42 24 / 0.18);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-width: 320px;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            circle at 12% 4%,
+            rgb(255 255 255 / 0.65),
+            transparent 34rem
+          ),
+          var(--page);
+        color: var(--ink);
+      }
+
+      button,
+      select {
+        font: inherit;
+      }
+
+      button {
+        touch-action: manipulation;
+      }
+
+      button:focus-visible,
+      select:focus-visible,
+      [role="button"]:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      .lab {
+        width: min(1180px, calc(100% - 24px));
+        margin: 0 auto;
+        padding: 24px 0 56px;
+      }
+
+      .lab-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 20px;
+        align-items: end;
+        margin-bottom: 18px;
+      }
+
+      .eyebrow {
+        margin: 0 0 7px;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(28px, 5vw, 48px);
+        line-height: 1;
+        letter-spacing: -0.045em;
+      }
+
+      .lab-header p:not(.eyebrow) {
+        max-width: 720px;
+        margin: 12px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .prototype-badge {
+        border: 1px solid var(--hairline);
+        border-radius: 999px;
+        background: rgb(255 250 243 / 0.82);
+        padding: 8px 12px;
+        color: var(--muted);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .lab-controls {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) repeat(3, auto);
+        gap: 10px;
+        align-items: end;
+        margin-bottom: 22px;
+        border: 1px solid var(--hairline);
+        border-radius: 18px;
+        background: rgb(255 250 243 / 0.82);
+        padding: 12px;
+        box-shadow: 0 8px 30px rgb(72 42 24 / 0.06);
+      }
+
+      .control-group {
+        display: grid;
+        gap: 6px;
+      }
+
+      .control-label {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      select,
+      .lab-button,
+      .segmented button {
+        min-height: 44px;
+        border: 1px solid var(--hairline);
+        border-radius: 12px;
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      select {
+        width: 100%;
+        padding: 8px 34px 8px 11px;
+      }
+
+      .segmented {
+        display: flex;
+        gap: 5px;
+      }
+
+      .segmented button,
+      .lab-button {
+        padding: 8px 11px;
+        cursor: pointer;
+      }
+
+      .segmented button[aria-pressed="true"],
+      .lab-button.primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+        gap: clamp(24px, 5vw, 64px);
+        align-items: start;
+      }
+
+      .phone-stage {
+        display: grid;
+        justify-items: center;
+        min-width: 0;
+      }
+
+      .phone {
+        position: relative;
+        display: grid;
+        grid-template-rows: var(--app-bar-size) minmax(0, 1fr);
+        width: min(var(--phone-width), 100%);
+        height: min(
+          calc(var(--phone-width) * 1.9),
+          max(568px, calc(100dvh - 32px))
+        );
+        min-height: 568px;
+        max-height: 820px;
+        overflow: hidden;
+        border: 1px solid #ad907c;
+        border-radius: clamp(24px, 8vw, 38px);
+        background: #f6eee4;
+        box-shadow: var(--shadow);
+        transition: width 180ms ease;
+      }
+
+      .phone::after {
+        position: absolute;
+        z-index: 30;
+        inset: 0;
+        border: 5px solid rgb(255 255 255 / 0.22);
+        border-radius: inherit;
+        content: "";
+        pointer-events: none;
+      }
+
+      .app-bar {
+        position: relative;
+        z-index: 12;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        min-height: var(--app-bar-size);
+        border-bottom: 1px solid var(--hairline);
+        background: rgb(255 250 243 / 0.96);
+        padding: 7px 8px;
+        box-shadow: 0 4px 14px rgb(68 38 22 / 0.06);
+      }
+
+      .brand {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        font-size: 14px;
+        font-weight: 900;
+        letter-spacing: 0.01em;
+      }
+
+      .app-actions {
+        display: flex;
+        gap: 5px;
+        justify-content: end;
+      }
+
+      .nav-icon-button {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--hairline);
+        border-radius: 12px;
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      .nav-icon-button[aria-pressed="true"],
+      .nav-icon-button[aria-expanded="true"] {
+        border-color: var(--turn);
+        background: var(--turn-soft);
+        color: #174f41;
+      }
+
+      .nav-icon-button svg {
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
+      }
+
+      .nav-popover {
+        position: absolute;
+        z-index: 28;
+        top: calc(var(--app-bar-size) - 2px);
+        right: 8px;
+        width: min(230px, calc(100% - 16px));
+        border: 1px solid var(--hairline);
+        border-radius: 15px;
+        background: var(--paper);
+        padding: 6px;
+        box-shadow: 0 16px 36px rgb(47 26 15 / 0.25);
+      }
+
+      .nav-popover button {
+        width: 100%;
+        min-height: 44px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--ink);
+        padding: 8px 10px;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .nav-popover button:hover,
+      .nav-popover button:focus-visible {
+        background: var(--paper-strong);
+      }
+
+      .nav-popover button.danger {
+        color: var(--danger);
+      }
+
+      .nav-popover svg {
+        width: 19px;
+        height: 19px;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
+      }
+
+      .tabletop {
+        display: grid;
+        grid-template-rows: var(--rail-size) minmax(0, 1fr) var(--rail-size);
+        gap: 4px;
+        min-height: 0;
+        height: auto;
+        padding: 5px 6px max(6px, env(safe-area-inset-bottom));
+        transition: grid-template-rows 240ms ease;
+      }
+
+      .phone.post-placement {
+        --rail-size: 72px;
+      }
+
+      .player-rail {
+        position: relative;
+        z-index: 3;
+        min-height: 0;
+        border: 1px solid var(--hairline);
+        border-radius: 16px;
+        background:
+          linear-gradient(135deg, rgb(255 255 255 / 0.58), transparent 60%),
+          rgb(255 250 243 / 0.94);
+        box-shadow: 0 5px 16px rgb(68 38 22 / 0.08);
+        overflow: hidden;
+        transition:
+          border-color 160ms ease,
+          background 160ms ease,
+          box-shadow 160ms ease;
+      }
+
+      .player-rail.acting {
+        border-color: var(--turn);
+        background:
+          linear-gradient(135deg, rgb(255 255 255 / 0.54), transparent 60%),
+          var(--turn-soft);
+        box-shadow:
+          inset 0 0 0 1px rgb(23 107 85 / 0.28),
+          0 5px 18px rgb(23 107 85 / 0.13);
+      }
+
+      .player-rail.current-blocked {
+        border-color: var(--warning);
+        background: var(--warning-soft);
+      }
+
+      .rail-orientation {
+        height: 100%;
+      }
+
+      .player-rail.top .rail-orientation {
+        transform: rotate(180deg);
+      }
+
+      .rail-content {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        gap: 6px;
+        align-items: center;
+        height: 100%;
+        padding: 6px 7px;
+      }
+
+      .phone.post-placement .rail-content {
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        padding-block: 6px;
+      }
+
+      .player-copy {
+        min-width: 0;
+      }
+
+      .player-avatar-wrap {
+        position: relative;
+        width: 44px;
+        height: 44px;
+      }
+
+      .player-avatar {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border: 3px solid transparent;
+        border-radius: 50%;
+        background: rgb(255 255 255 / 0.64);
+        color: var(--muted);
+        box-shadow: inset 0 0 0 1px var(--hairline);
+        transition:
+          border-color 160ms ease,
+          box-shadow 160ms ease,
+          opacity 160ms ease;
+      }
+
+      .player-avatar svg {
+        width: 23px;
+        height: 23px;
+        fill: currentColor;
+      }
+
+      .player-avatar.a {
+        background: radial-gradient(
+          circle at 33% 28%,
+          #fffaf1,
+          var(--stone-a) 68%,
+          #a8886d
+        );
+        color: #604b3c;
+      }
+
+      .player-avatar.b {
+        background: radial-gradient(
+          circle at 33% 28%,
+          #9f6d4d,
+          var(--stone-b) 66%,
+          #25120d
+        );
+        color: #fff4e5;
+      }
+
+      .acting .player-avatar {
+        border-color: var(--turn);
+        box-shadow:
+          0 0 0 3px rgb(23 107 85 / 0.2),
+          inset 0 0 0 1px rgb(255 255 255 / 0.36);
+      }
+
+      .current-blocked .player-avatar {
+        border-color: var(--warning);
+        box-shadow:
+          0 0 0 3px rgb(135 90 18 / 0.18),
+          inset 0 0 0 1px rgb(255 255 255 / 0.36);
+      }
+
+      .player-rail.winner .player-avatar {
+        border-color: var(--turn);
+        box-shadow:
+          0 0 0 3px rgb(23 107 85 / 0.22),
+          inset 0 0 0 1px rgb(255 255 255 / 0.36);
+      }
+
+      .player-rail.loser .player-avatar {
+        opacity: 0.62;
+      }
+
+      .blocked-badge {
+        position: absolute;
+        right: -3px;
+        bottom: -2px;
+        width: 19px;
+        height: 19px;
+        display: grid;
+        place-items: center;
+        border: 2px solid var(--paper);
+        border-radius: 50%;
+        background: var(--warning);
+        color: #fff;
+      }
+
+      .blocked-badge svg {
+        width: 10px;
+        height: 10px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2;
+      }
+
+      .reserve-stone.a {
+        border-color: var(--stone-a-edge);
+        background: radial-gradient(
+          circle at 33% 28%,
+          #fffaf1,
+          var(--stone-a) 62%,
+          #a8886d
+        );
+      }
+
+      .reserve-stone.b {
+        border-color: var(--stone-b-edge);
+        background: radial-gradient(
+          circle at 33% 28%,
+          #9f6d4d,
+          var(--stone-b) 60%,
+          #25120d
+        );
+      }
+
+      .player-instruction {
+        display: -webkit-box;
+        overflow: hidden;
+        margin: 0;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.3;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+
+      .acting .player-instruction {
+        color: #214d41;
+        font-weight: 700;
+      }
+
+      .reserve-tray {
+        display: grid;
+        grid-template-columns: repeat(6, 11px);
+        grid-template-rows: repeat(2, 11px);
+        gap: 2px;
+        justify-content: center;
+        align-content: center;
+        width: 82px;
+        min-height: 32px;
+        border: 1px solid #c9ad94;
+        border-radius: 11px;
+        background:
+          inset 0 1px 3px rgb(55 32 19 / 0.12),
+          #ead7c3;
+        padding: 3px;
+      }
+
+      .reserve-slot {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: rgb(83 48 29 / 0.12);
+        box-shadow: inset 0 1px 2px rgb(70 38 22 / 0.2);
+      }
+
+      .reserve-stone {
+        width: 11px;
+        height: 11px;
+        border: 1px solid;
+        border-radius: 50%;
+        transition:
+          opacity 150ms ease,
+          transform 150ms ease;
+      }
+
+      .reserve-slot.spent .reserve-stone {
+        opacity: 0;
+        transform: scale(0.5);
+      }
+
+      .placement-resource {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+      }
+
+      .piece-counts {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
+        align-items: center;
+        min-width: 82px;
+        min-height: 40px;
+      }
+
+      .count-cell {
+        border: 1px solid var(--hairline);
+        border-radius: 10px;
+        background: rgb(255 255 255 / 0.48);
+        padding: 4px 5px;
+        text-align: center;
+      }
+
+      .count-cell span,
+      .count-cell strong {
+        display: block;
+      }
+
+      .count-cell span {
+        color: var(--muted);
+        font-size: 7px;
+      }
+
+      .count-cell strong {
+        margin-top: 1px;
+        font-size: 12px;
+      }
+
+      .board-stage {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        min-height: 0;
+        container-type: size;
+      }
+
+      .board-shell {
+        position: relative;
+        width: min(calc(100cqw - 8px), calc(100cqh - 8px));
+        min-width: 250px;
+        aspect-ratio: 1;
+        border: 1px solid var(--wood-dark);
+        border-radius: 22px;
+        background:
+          linear-gradient(135deg, rgb(255 255 255 / 0.3), transparent 36%),
+          repeating-linear-gradient(
+            5deg,
+            rgb(100 53 27 / 0.05) 0 2px,
+            transparent 2px 18px
+          ),
+          linear-gradient(145deg, var(--wood-light), var(--wood-mid));
+        padding: 5px;
+        box-shadow:
+          inset 0 0 0 2px rgb(255 248 231 / 0.26),
+          0 12px 24px rgb(67 36 19 / 0.18);
+        transition:
+          width 240ms ease,
+          transform 160ms ease;
+      }
+
+      .board-shell.invalid {
+        animation: invalid-shake 220ms ease-in-out;
+      }
+
+      .board {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 17px;
+        background: rgb(255 238 210 / 0.14);
+      }
+
+      .board-line {
+        fill: none;
+        stroke: rgb(86 47 27 / 0.58);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
+      }
+
+      .jare-underlay,
+      .jare-line {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .jare-underlay {
+        stroke: #fff7e7;
+        stroke-width: 5.2;
+      }
+
+      .jare-line {
+        stroke: var(--turn);
+        stroke-width: 2.8;
+        stroke-dasharray: 3 2;
+        animation: jare-breathe 1.2s ease-in-out infinite;
+      }
+
+      .point-hit {
+        fill: transparent;
+        stroke: transparent;
+        stroke-width: 0;
+      }
+
+      .board-node {
+        pointer-events: none;
+      }
+
+      .board-touch-plane {
+        fill: transparent;
+        cursor: pointer;
+        pointer-events: all;
+      }
+
+      .point-socket {
+        fill: rgb(74 39 22 / 0.18);
+        stroke: rgb(70 37 21 / 0.48);
+        stroke-width: 0.8;
+        pointer-events: none;
+      }
+
+      .legal-ring,
+      .target-ring,
+      .movable-ring,
+      .invalid-ring {
+        fill: none;
+        pointer-events: none;
+      }
+
+      .legal-ring {
+        fill: rgb(255 250 237 / 0.9);
+        stroke: var(--turn);
+        stroke-width: 1.2;
+      }
+
+      .movable-ring {
+        stroke: #2b617d;
+        stroke-width: 1.2;
+        stroke-dasharray: 1.5 1.5;
+      }
+
+      .target-ring {
+        stroke: var(--danger);
+        stroke-width: 1.8;
+      }
+
+      .target-mark {
+        fill: var(--danger);
+        font-size: 4px;
+        font-weight: 900;
+        pointer-events: none;
+        text-anchor: middle;
+      }
+
+      .invalid-ring {
+        stroke: var(--danger);
+        stroke-width: 1.5;
+        stroke-dasharray: 2 1.4;
+      }
+
+      .piece {
+        stroke-width: 1.1;
+        filter: drop-shadow(0 1px 1px rgb(41 22 13 / 0.4));
+        pointer-events: none;
+      }
+
+      .piece.a {
+        fill: url("#piece-a");
+        stroke: var(--stone-a-edge);
+      }
+
+      .piece.b {
+        fill: url("#piece-b");
+        stroke: var(--stone-b-edge);
+      }
+
+      .selected-halo {
+        fill: none;
+        stroke: var(--focus);
+        stroke-width: 1.6;
+        pointer-events: none;
+      }
+
+      .board-node:focus-visible .point-hit {
+        fill: rgb(22 78 154 / 0.1);
+        stroke: var(--focus);
+        stroke-width: 0.8;
+      }
+
+      .center-notice {
+        position: absolute;
+        z-index: 5;
+        inset: 50% auto auto 50%;
+        width: min(76%, 270px);
+        border: 1px solid var(--warning);
+        border-radius: 16px;
+        background: rgb(255 250 243 / 0.97);
+        box-shadow: 0 14px 32px rgb(57 31 18 / 0.24);
+        transform: translate(-50%, -50%);
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .notice-half {
+        min-height: 48px;
+        display: grid;
+        place-items: center;
+        padding: 8px 12px;
+        text-align: center;
+      }
+
+      .notice-half:first-child {
+        border-bottom: 1px solid var(--hairline);
+        transform: rotate(180deg);
+      }
+
+      .notice-half strong {
+        display: block;
+        font-size: 11px;
+      }
+
+      .notice-half span {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+
+      .result-overlay {
+        position: absolute;
+        z-index: 6;
+        inset: 8px;
+        display: grid;
+        grid-template-rows: 1fr 1fr;
+        border: 1px solid #4e3223;
+        border-radius: 18px;
+        background: rgb(46 32 25 / 0.91);
+        color: #fff9ed;
+        box-shadow: 0 18px 38px rgb(43 23 13 / 0.34);
+        overflow: hidden;
+      }
+
+      .result-half {
+        display: grid;
+        place-items: center;
+        padding: 12px;
+        text-align: center;
+      }
+
+      .result-half:first-child {
+        border-bottom: 1px solid rgb(255 255 255 / 0.2);
+        transform: rotate(180deg);
+      }
+
+      .result-half h2 {
+        margin: 0;
+        font-size: 19px;
+      }
+
+      .result-half p {
+        margin: 5px 0 10px;
+        color: #ead8c2;
+        font-size: 10px;
+      }
+
+      .result-half button {
+        min-height: 44px;
+        border: 1px solid #fff2dd;
+        border-radius: 12px;
+        background: #fff2dd;
+        color: var(--ink);
+        padding: 8px 14px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .invalid-message {
+        position: absolute;
+        z-index: 7;
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        border: 1px solid var(--danger);
+        border-radius: 12px;
+        background: rgb(255 247 244 / 0.97);
+        padding: 8px 10px;
+        color: #7c2025;
+        font-size: 10px;
+        font-weight: 750;
+        text-align: center;
+        box-shadow: 0 8px 18px rgb(73 25 20 / 0.16);
+        pointer-events: none;
+      }
+
+      .invalid-message.for-b {
+        top: 12px;
+        bottom: auto;
+        transform: rotate(180deg);
+      }
+
+      .modal-layer {
+        position: absolute;
+        z-index: 20;
+        inset: 0;
+      }
+
+      .modal-scrim {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        background: rgb(41 27 20 / 0.5);
+        cursor: pointer;
+      }
+
+      .confirm-panel {
+        position: absolute;
+        right: 8px;
+        left: 8px;
+        border: 1px solid var(--hairline);
+        border-radius: 19px;
+        background: var(--paper);
+        box-shadow: 0 18px 42px rgb(47 26 15 / 0.32);
+        overflow: hidden;
+      }
+
+      .modal-layer.from-a .confirm-panel {
+        bottom: max(8px, env(safe-area-inset-bottom));
+        animation: panel-from-bottom 220ms ease-out;
+      }
+
+      .modal-layer.from-b .confirm-panel {
+        top: max(8px, env(safe-area-inset-top));
+        animation: panel-from-top 220ms ease-out;
+      }
+
+      .modal-layer.from-b .panel-orientation {
+        transform: rotate(180deg);
+      }
+
+      .confirm-action {
+        min-height: 44px;
+        border: 1px solid var(--hairline);
+        border-radius: 11px;
+        background: #fff;
+        color: var(--ink);
+        padding: 8px 10px;
+        cursor: pointer;
+      }
+
+      .confirm-action.danger {
+        border-color: rgb(165 47 52 / 0.44);
+        color: var(--danger);
+      }
+
+      .confirm-panel {
+        padding: 15px;
+      }
+
+      .confirm-panel h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .confirm-panel p {
+        margin: 7px 0 14px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .confirm-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .review-notes {
+        position: sticky;
+        top: 20px;
+        min-width: 0;
+      }
+
+      .review-notes h2 {
+        margin: 0;
+        font-size: clamp(22px, 3vw, 32px);
+        letter-spacing: -0.025em;
+      }
+
+      .review-notes > p {
+        margin: 9px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .scenario-card {
+        margin-top: 20px;
+        border: 1px solid var(--hairline);
+        border-radius: 16px;
+        background: rgb(255 250 243 / 0.78);
+        padding: 15px;
+      }
+
+      .scenario-card h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .scenario-card p {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .fact-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .fact {
+        border-top: 1px solid var(--hairline);
+        padding-top: 8px;
+      }
+
+      .fact span,
+      .fact strong {
+        display: block;
+      }
+
+      .fact span {
+        color: var(--muted);
+        font-size: 10px;
+        text-transform: uppercase;
+      }
+
+      .fact strong {
+        margin-top: 3px;
+        font-size: 13px;
+      }
+
+      .design-points {
+        display: grid;
+        gap: 10px;
+        margin: 18px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .design-points li {
+        border-left: 3px solid var(--accent);
+        border-radius: 0 11px 11px 0;
+        background: rgb(255 250 243 / 0.58);
+        padding: 9px 11px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .design-points strong {
+        color: var(--ink);
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+      }
+
+      @keyframes jare-breathe {
+        50% {
+          opacity: 0.55;
+        }
+      }
+
+      @keyframes invalid-shake {
+        25% {
+          transform: translateX(-5px);
+        }
+
+        75% {
+          transform: translateX(5px);
+        }
+      }
+
+      @keyframes panel-from-bottom {
+        from {
+          opacity: 0;
+          transform: translateY(18px);
+        }
+      }
+
+      @keyframes panel-from-top {
+        from {
+          opacity: 0;
+          transform: translateY(-18px);
+        }
+      }
+
+      @media (max-width: 860px) {
+        .lab-header {
+          grid-template-columns: 1fr;
+        }
+
+        .prototype-badge {
+          justify-self: start;
+        }
+
+        .lab-controls {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .review-notes {
+          position: static;
+          width: min(100%, 600px);
+          margin-inline: auto;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .lab {
+          width: min(100% - 12px, 1180px);
+          padding-top: 10px;
+        }
+
+        .lab-header {
+          margin-inline: 6px;
+        }
+
+        .lab-header p:not(.eyebrow),
+        .prototype-badge {
+          display: none;
+        }
+
+        .lab-controls {
+          grid-template-columns: 1fr;
+          margin-bottom: 12px;
+        }
+
+        .segmented {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+        }
+
+        .phone {
+          border-radius: 25px;
+        }
+
+        .review-notes {
+          padding: 0 6px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+
+      .force-reduced-motion *,
+      .force-reduced-motion *::before,
+      .force-reduced-motion *::after {
+        scroll-behavior: auto !important;
+        animation: none !important;
+        transition: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="lab">
+      <header class="lab-header">
+        <div>
+          <p class="eyebrow">Interaction prototype · V3</p>
+          <h1>Compact Shared Table</h1>
+          <p>
+            One fixed Shaxda board, two compact player cards, and a single
+            action nav for local play on a shared portrait phone.
+          </p>
+        </div>
+        <div class="prototype-badge">Local prototype · no production data</div>
+      </header>
+
+      <section class="lab-controls" aria-label="Prototype controls">
+        <label class="control-group">
+          <span class="control-label">Scenario</span>
+          <select id="scenario-select"></select>
+        </label>
+
+        <div class="control-group">
+          <span class="control-label">Phone width</span>
+          <div class="segmented" id="width-controls">
+            <button type="button" data-width="320" aria-pressed="false">
+              320
+            </button>
+            <button type="button" data-width="360" aria-pressed="false">
+              360
+            </button>
+            <button type="button" data-width="390" aria-pressed="true">
+              390
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Panel side</span>
+          <div class="segmented" id="side-controls">
+            <button type="button" data-side="A" aria-pressed="true">
+              A · Bottom
+            </button>
+            <button type="button" data-side="B" aria-pressed="false">
+              B · Top
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Motion</span>
+          <div class="segmented" id="motion-controls">
+            <button type="button" data-motion="normal" aria-pressed="true">
+              Normal
+            </button>
+            <button type="button" data-motion="reduced" aria-pressed="false">
+              Reduced
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div class="workspace">
+        <section class="phone-stage" aria-label="Interactive phone prototype">
+          <div class="phone" id="phone" lang="so">
+            <header class="app-bar">
+              <div class="brand">
+                <button
+                  class="nav-icon-button"
+                  id="site-navigation"
+                  type="button"
+                  aria-label="Fur hagaha bogga"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7h16M4 12h16M4 17h16"></path>
+                  </svg>
+                </button>
+                <span>Shaxda</span>
+              </div>
+              <div></div>
+              <nav class="app-actions" aria-label="Ficillada ciyaarta">
+                <button
+                  class="nav-icon-button"
+                  id="sound-toggle"
+                  type="button"
+                  aria-label="Dami codka"
+                  aria-pressed="true"
+                >
+                  <svg data-sound-on viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 9v6h4l5 4V5L9 9H5z"></path>
+                    <path
+                      d="M18 9c1 1 1.5 2 1.5 3s-.5 2-1.5 3M20.5 6.5c2 2 3 3.8 3 5.5s-1 3.5-3 5.5"
+                    ></path>
+                  </svg>
+                  <svg
+                    data-sound-off
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    hidden
+                  >
+                    <path d="M5 9v6h4l5 4V5L9 9H5zM18 9l4 6M22 9l-4 6"></path>
+                  </svg>
+                </button>
+                <button
+                  class="nav-icon-button"
+                  type="button"
+                  data-confirm="newGame"
+                  aria-label="Bilow ciyaar cusub"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 4v6h6"></path>
+                    <path d="M5.5 16a8 8 0 1 0 .5-8"></path>
+                  </svg>
+                </button>
+                <button
+                  class="nav-icon-button"
+                  id="overflow-toggle"
+                  type="button"
+                  aria-label="Fur ficillo kale"
+                  aria-controls="nav-popover"
+                  aria-expanded="false"
+                  aria-haspopup="menu"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="5" cy="12" r="1"></circle>
+                    <circle cx="12" cy="12" r="1"></circle>
+                    <circle cx="19" cy="12" r="1"></circle>
+                  </svg>
+                </button>
+              </nav>
+            </header>
+
+            <div
+              class="nav-popover"
+              id="nav-popover"
+              role="menu"
+              aria-label="Ficillo kale"
+              hidden
+            >
+              <button
+                type="button"
+                role="menuitem"
+                data-simple-notice="Xeerarka waxaa laga furi doonaa bogga xeerarka."
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5z"
+                  ></path>
+                  <path
+                    d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z"
+                  ></path>
+                </svg>
+                Xeerarka
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                data-simple-notice="Hagaha guud wuxuu ka baxsan yahay tijaabadan."
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <path
+                    d="M9.7 9a2.5 2.5 0 1 1 3.2 2.4c-.9.4-.9 1-.9 1.6M12 17h.01"
+                  ></path>
+                </svg>
+                Hagaha
+              </button>
+              <button
+                class="danger"
+                type="button"
+                role="menuitem"
+                data-confirm="resign"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 21V4M6 5h10l-2 3 2 3H6"></path>
+                </svg>
+                Is dhiib
+              </button>
+              <button
+                class="danger"
+                type="button"
+                role="menuitem"
+                data-confirm="leave"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"></path>
+                </svg>
+                Ka bax
+              </button>
+            </div>
+
+            <div class="tabletop" id="tabletop">
+              <section
+                class="player-rail top"
+                data-player-rail="B"
+                aria-label="Ciyaaryahan B"
+              >
+                <div class="rail-orientation">
+                  <div class="rail-content">
+                    <div class="player-avatar-wrap" aria-hidden="true">
+                      <span class="player-avatar b">
+                        <svg viewBox="0 0 24 24">
+                          <circle cx="12" cy="8" r="4"></circle>
+                          <path d="M4.5 21a7.5 7.5 0 0 1 15 0z"></path>
+                        </svg>
+                      </span>
+                      <span class="blocked-badge" data-blocked-badge="B" hidden>
+                        <svg viewBox="0 0 12 12">
+                          <rect
+                            x="2.5"
+                            y="5"
+                            width="7"
+                            height="5"
+                            rx="1"
+                          ></rect>
+                          <path d="M4 5V3.5a2 2 0 0 1 4 0V5"></path>
+                        </svg>
+                      </span>
+                    </div>
+                    <div class="player-copy">
+                      <p class="player-instruction" data-instruction="B"></p>
+                    </div>
+                    <div data-player-resource="B"></div>
+                  </div>
+                </div>
+              </section>
+
+              <div class="board-stage">
+                <div class="board-shell" id="board-shell">
+                  <svg
+                    class="board"
+                    id="board"
+                    viewBox="0 0 100 100"
+                    role="group"
+                    aria-label="Looxa Shaxda oo leh 24 barood"
+                  ></svg>
+
+                  <div class="center-notice" id="center-notice" hidden>
+                    <div class="notice-half">
+                      <div>
+                        <strong data-notice-title></strong>
+                        <span data-notice-copy></span>
+                      </div>
+                    </div>
+                    <div class="notice-half">
+                      <div>
+                        <strong data-notice-title></strong>
+                        <span data-notice-copy></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="result-overlay" id="result-overlay" hidden>
+                    <div class="result-half" data-result-half="B"></div>
+                    <div class="result-half" data-result-half="A"></div>
+                  </div>
+
+                  <div
+                    class="invalid-message"
+                    id="invalid-message"
+                    hidden
+                  ></div>
+                </div>
+              </div>
+
+              <section
+                class="player-rail bottom"
+                data-player-rail="A"
+                aria-label="Ciyaaryahan A"
+              >
+                <div class="rail-orientation">
+                  <div class="rail-content">
+                    <div class="player-avatar-wrap" aria-hidden="true">
+                      <span class="player-avatar a">
+                        <svg viewBox="0 0 24 24">
+                          <circle cx="12" cy="8" r="4"></circle>
+                          <path d="M4.5 21a7.5 7.5 0 0 1 15 0z"></path>
+                        </svg>
+                      </span>
+                      <span class="blocked-badge" data-blocked-badge="A" hidden>
+                        <svg viewBox="0 0 12 12">
+                          <rect
+                            x="2.5"
+                            y="5"
+                            width="7"
+                            height="5"
+                            rx="1"
+                          ></rect>
+                          <path d="M4 5V3.5a2 2 0 0 1 4 0V5"></path>
+                        </svg>
+                      </span>
+                    </div>
+                    <div class="player-copy">
+                      <p class="player-instruction" data-instruction="A"></p>
+                    </div>
+                    <div data-player-resource="A"></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="modal-layer" id="confirm-layer" hidden>
+              <button
+                class="modal-scrim"
+                type="button"
+                data-close-modal
+                aria-label="Jooji"
+                tabindex="-1"
+              ></button>
+              <section
+                class="confirm-panel"
+                id="confirm-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="confirm-title"
+                aria-describedby="confirm-copy"
+              >
+                <div class="panel-orientation">
+                  <h2 id="confirm-title"></h2>
+                  <p id="confirm-copy"></p>
+                  <div class="confirm-actions">
+                    <button
+                      class="confirm-action"
+                      type="button"
+                      data-close-modal
+                    >
+                      Jooji
+                    </button>
+                    <button
+                      class="confirm-action danger"
+                      id="confirm-submit"
+                      type="button"
+                    ></button>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <p class="sr-only" id="live-region" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <aside class="review-notes">
+          <p class="eyebrow">Design review</p>
+          <h2 id="scenario-title"></h2>
+          <p id="scenario-description"></p>
+
+          <section class="scenario-card">
+            <h3>Scenario facts</h3>
+            <div class="fact-grid">
+              <div class="fact">
+                <span>Phase</span>
+                <strong id="fact-phase"></strong>
+              </div>
+              <div class="fact">
+                <span>Current</span>
+                <strong id="fact-current"></strong>
+              </div>
+              <div class="fact">
+                <span>Acting</span>
+                <strong id="fact-acting"></strong>
+              </div>
+            </div>
+          </section>
+
+          <ul class="design-points">
+            <li>
+              <strong>Compact by turn.</strong> A profile halo changes owners
+              without adding visible status labels.
+            </li>
+            <li>
+              <strong>Information in context.</strong> Each card carries only
+              the counts needed for the current phase.
+            </li>
+            <li>
+              <strong>One action nav.</strong> Sound and new game stay visible;
+              secondary actions live in a compact top popover.
+            </li>
+            <li>
+              <strong>Rule-aware board.</strong> Removal, movement, capture,
+              blocked play, and keyboard input retain their V2 behavior.
+            </li>
+          </ul>
+        </aside>
+      </div>
+    </main>
+
+    <script>
+      const NS = "http://www.w3.org/2000/svg";
+      const PLAYER_IDS = ["A", "B"];
+      const POINT_IDS = [
+        "O1",
+        "O2",
+        "O3",
+        "O4",
+        "O5",
+        "O6",
+        "O7",
+        "O8",
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M7",
+        "M8",
+        "I1",
+        "I2",
+        "I3",
+        "I4",
+        "I5",
+        "I6",
+        "I7",
+        "I8",
+      ];
+
+      const POINT_COORDS = {
+        O1: [8, 8],
+        O2: [50, 8],
+        O3: [92, 8],
+        O4: [92, 50],
+        O5: [92, 92],
+        O6: [50, 92],
+        O7: [8, 92],
+        O8: [8, 50],
+        M1: [21, 21],
+        M2: [50, 21],
+        M3: [79, 21],
+        M4: [79, 50],
+        M5: [79, 79],
+        M6: [50, 79],
+        M7: [21, 79],
+        M8: [21, 50],
+        I1: [34, 34],
+        I2: [50, 34],
+        I3: [66, 34],
+        I4: [66, 50],
+        I5: [66, 66],
+        I6: [50, 66],
+        I7: [34, 66],
+        I8: [34, 50],
+      };
+
+      const ADJACENCY = {
+        O1: ["O2", "O8"],
+        O2: ["O1", "O3", "M2"],
+        O3: ["O2", "O4"],
+        O4: ["O3", "O5", "M4"],
+        O5: ["O4", "O6"],
+        O6: ["O5", "O7", "M6"],
+        O7: ["O6", "O8"],
+        O8: ["O7", "O1", "M8"],
+        M1: ["M2", "M8"],
+        M2: ["M1", "M3", "O2", "I2"],
+        M3: ["M2", "M4"],
+        M4: ["M3", "M5", "O4", "I4"],
+        M5: ["M4", "M6"],
+        M6: ["M5", "M7", "O6", "I6"],
+        M7: ["M6", "M8"],
+        M8: ["M7", "M1", "O8", "I8"],
+        I1: ["I2", "I8"],
+        I2: ["I1", "I3", "M2"],
+        I3: ["I2", "I4"],
+        I4: ["I3", "I5", "M4"],
+        I5: ["I4", "I6"],
+        I6: ["I5", "I7", "M6"],
+        I7: ["I6", "I8"],
+        I8: ["I7", "I1", "M8"],
+      };
+
+      const JARE_LINES = [
+        ["O1", "O2", "O3"],
+        ["O3", "O4", "O5"],
+        ["O5", "O6", "O7"],
+        ["O7", "O8", "O1"],
+        ["M1", "M2", "M3"],
+        ["M3", "M4", "M5"],
+        ["M5", "M6", "M7"],
+        ["M7", "M8", "M1"],
+        ["I1", "I2", "I3"],
+        ["I3", "I4", "I5"],
+        ["I5", "I6", "I7"],
+        ["I7", "I8", "I1"],
+        ["O2", "M2", "I2"],
+        ["O4", "M4", "I4"],
+        ["O6", "M6", "I6"],
+        ["O8", "M8", "I8"],
+      ];
+
+      const PHASE_LABELS = {
+        placement: "Dhigis",
+        initialRemoval: "Ka saarista bilowga",
+        movement: "Dhaqdhaqaaq",
+        capture: "Qabasho",
+        gameOver: "Dhammaad",
+      };
+
+      const baseMovementBoard = boardFrom({
+        A: ["O3", "O5", "O7", "M2", "M4", "M6", "M8", "I1", "I3", "I5", "I7"],
+        B: ["O2", "O4", "O6", "O8", "M1", "M3", "M5", "M7", "I2", "I4", "I6"],
+      });
+
+      const fullPlacementBoard = boardFrom({
+        A: [
+          "O1",
+          "O2",
+          "O3",
+          "O5",
+          "O7",
+          "M2",
+          "M4",
+          "M6",
+          "M8",
+          "I1",
+          "I5",
+          "I7",
+        ],
+        B: [
+          "O4",
+          "O6",
+          "O8",
+          "M1",
+          "M3",
+          "M5",
+          "M7",
+          "I2",
+          "I3",
+          "I4",
+          "I6",
+          "I8",
+        ],
+      });
+
+      const captureBoard = boardFrom({
+        A: ["O1", "O2", "O3", "M2", "M4", "M8", "I1", "I5"],
+        B: ["O4", "O5", "O6", "M1", "M3", "M5", "M7", "I2", "I4"],
+      });
+
+      const movementBase = {
+        phase: "movement",
+        currentPlayer: "B",
+        actingPlayer: "B",
+        firstAdvantage: "B",
+        board: baseMovementBoard,
+        players: {
+          A: { inHand: 0, captured: 1 },
+          B: { inHand: 0, captured: 1 },
+        },
+        movable: ["O2", "O8"],
+        legal: [],
+        eligibleTargets: [],
+        selected: null,
+        jareLines: [],
+        invalidPoint: null,
+        notice: null,
+        result: null,
+      };
+
+      const SCENARIOS = [
+        makeScenario({
+          id: "empty",
+          label: "1 · Empty board / start",
+          title: "Bilowga dhigista",
+          description:
+            "Both fixed 6×2 reserves are full. A board tap spends one identical stone without requiring a reserve selection.",
+          phase: "placement",
+          currentPlayer: "A",
+          actingPlayer: "A",
+          firstAdvantage: null,
+          board: boardFrom({ A: [], B: [] }),
+          players: {
+            A: { inHand: 12, captured: 0 },
+            B: { inHand: 12, captured: 0 },
+          },
+          legal: POINT_IDS,
+        }),
+        makeScenario({
+          id: "mid-placement",
+          label: "2 · Mid-placement",
+          title: "Dhigista dhexdeeda",
+          description:
+            "Empty reserve sockets remain visible, preserving tray width and the physical sense of stones moving onto the board.",
+          phase: "placement",
+          currentPlayer: "B",
+          actingPlayer: "B",
+          firstAdvantage: null,
+          board: boardFrom({
+            A: ["O1", "O2", "M1", "I5"],
+            B: ["O4", "O5", "M5"],
+          }),
+          players: {
+            A: { inHand: 8, captured: 0 },
+            B: { inHand: 9, captured: 0 },
+          },
+          legal: POINT_IDS.filter(
+            (point) =>
+              !["O1", "O2", "M1", "I5", "O4", "O5", "M5"].includes(point),
+          ),
+        }),
+        makeScenario({
+          id: "final-placement",
+          label: "3 · Final placement / first advantage",
+          title: "Dhigistu way dhammaatay",
+          description:
+            "A placement jare awards first advantage but does not trigger a capture. The mirrored announcement is readable from both sides.",
+          phase: "placement",
+          currentPlayer: "A",
+          actingPlayer: "A",
+          firstAdvantage: "A",
+          board: fullPlacementBoard,
+          players: {
+            A: { inHand: 0, captured: 0 },
+            B: { inHand: 0, captured: 0 },
+          },
+          jareLines: [["O1", "O2", "O3"]],
+          notice: {
+            title: "Dhigistu way dhammaatay",
+            copy: "Ciyaaryahan A ayaa helay horraynta",
+          },
+        }),
+        makeScenario({
+          id: "initial-removal",
+          label: "4 · Initial removal",
+          title: "Ka saarista bilowga",
+          description:
+            "Player A removes first because A has first advantage. Every Player B stone is an eligible target, including stones in a jare.",
+          phase: "initialRemoval",
+          currentPlayer: "A",
+          actingPlayer: "A",
+          firstAdvantage: "A",
+          board: fullPlacementBoard,
+          players: {
+            A: { inHand: 0, captured: 0 },
+            B: { inHand: 0, captured: 0 },
+          },
+          eligibleTargets: pointsOwnedBy(fullPlacementBoard, "B"),
+        }),
+        makeScenario({
+          id: "movement",
+          label: "5 · Normal movement",
+          title: "Dhaqdhaqaaq caadi ah",
+          description:
+            "Only movable Player B stones receive a source hint. The board remains fixed while turn emphasis changes between rails.",
+          ...movementBase,
+        }),
+        makeScenario({
+          id: "selected-move",
+          label: "6 · Selected stone / legal destination",
+          title: "Dhagax la doortay",
+          description:
+            "O2 is selected and O1 is the only adjacent empty destination. The previous prototype’s illegal I2-to-I5 hint is removed.",
+          ...movementBase,
+          selected: "O2",
+          legal: ["O1"],
+        }),
+        makeScenario({
+          id: "jare-formed",
+          label: "7 · Jare formed",
+          title: "Jare cusub",
+          description:
+            "The newly completed O1–O2–O3 line uses a high-contrast underlay and a restrained secondary treatment.",
+          phase: "capture",
+          currentPlayer: "A",
+          actingPlayer: "A",
+          firstAdvantage: "A",
+          board: captureBoard,
+          players: {
+            A: { inHand: 0, captured: 3 },
+            B: { inHand: 0, captured: 4 },
+          },
+          jareLines: [["O1", "O2", "O3"]],
+          notice: {
+            title: "Jare!",
+            copy: "Hal qabasho ayaa kuu bannaan",
+          },
+        }),
+        makeScenario({
+          id: "capture",
+          label: "8 · Capture selection",
+          title: "Doorashada qabashada",
+          description:
+            "Exactly one capture is pending, and every Player B stone is marked as eligible without protecting existing jare stones.",
+          phase: "capture",
+          currentPlayer: "A",
+          actingPlayer: "A",
+          firstAdvantage: "A",
+          board: captureBoard,
+          players: {
+            A: { inHand: 0, captured: 3 },
+            B: { inHand: 0, captured: 4 },
+          },
+          jareLines: [["O1", "O2", "O3"]],
+          eligibleTargets: pointsOwnedBy(captureBoard, "B"),
+        }),
+        makeScenario({
+          id: "invalid",
+          label: "9 · Invalid move",
+          title: "Dhaqdhaqaaq aan sharci ahayn",
+          description:
+            "The layout does not move. Somali text, a static target marker, and a short board response reinforce the error without relying on sound.",
+          ...movementBase,
+          selected: "O2",
+          legal: ["O1"],
+          invalidPoint: "I5",
+          invalidMessage: "Bartaas kuma xigto dhagaxa la doortay.",
+        }),
+        makeScenario({
+          id: "blocked",
+          label: "10 · Blocked-player space-making",
+          title: "Meel u bannaynta ciyaaryahan xanniban",
+          description:
+            "Player B owns the turn but Player A acts temporarily to create a legal space. The two roles are visibly distinct.",
+          phase: "movement",
+          currentPlayer: "B",
+          actingPlayer: "A",
+          firstAdvantage: "B",
+          board: boardFrom({
+            A: ["O2", "O8", "M2", "M8", "I2", "I8"],
+            B: ["O1", "M1", "I1"],
+          }),
+          players: {
+            A: { inHand: 0, captured: 9 },
+            B: { inHand: 0, captured: 6 },
+          },
+          selected: "O2",
+          legal: ["O3"],
+          movable: ["O2"],
+          blocked: true,
+          notice: {
+            title: "Ciyaaryahan B wuu xanniban yahay",
+            copy: "Ciyaaryahan A ha u baneeyo meel sharci ah",
+          },
+        }),
+        makeScenario({
+          id: "game-over",
+          label: "11 · Game over / rematch",
+          title: "Ciyaartu way dhammaatay",
+          description:
+            "The final board remains visible behind a two-ended result card. Either player can start the same rematch flow.",
+          phase: "gameOver",
+          currentPlayer: "A",
+          actingPlayer: "A",
+          firstAdvantage: "A",
+          board: boardFrom({
+            A: ["O1", "O2", "O3", "M2", "I2"],
+            B: ["O5", "I5"],
+          }),
+          players: {
+            A: { inHand: 0, captured: 10 },
+            B: { inHand: 0, captured: 7 },
+          },
+          jareLines: [["O1", "O2", "O3"]],
+          result: {
+            winner: "A",
+            reason: "Ciyaaryahan B wuxuu ka haray wax ka yar saddex dhagax.",
+          },
+        }),
+        makeScenario({
+          id: "info-a",
+          label: "12 · Compact card / Player A",
+          title: "Kaarka ciyaaryahanka A",
+          description:
+            "Player A’s profile halo, concise instruction, board count, and capture count remain next to the board without a drawer.",
+          ...movementBase,
+          currentPlayer: "A",
+          actingPlayer: "A",
+          movable: ["O3", "O5", "O7"],
+          modalSide: "A",
+        }),
+        makeScenario({
+          id: "info-b",
+          label: "13 · Nav actions / Player B",
+          title: "Ficillada nav-ka",
+          description:
+            "Secondary actions open below the upright app nav while Player B’s compact card remains readable from the opposite edge.",
+          ...movementBase,
+          initialPopover: true,
+          modalSide: "B",
+        }),
+        makeScenario({
+          id: "confirmation",
+          label: "14 · Destructive confirmation",
+          title: "Xaqiijinta ciyaar cusub",
+          description:
+            "Destructive actions are removed from permanent chrome and require an explicit, invocation-oriented confirmation.",
+          ...movementBase,
+          initialModal: "confirm",
+          modalSide: "A",
+          confirmAction: "newGame",
+        }),
+        makeScenario({
+          id: "reduced-motion",
+          label: "15 · Reduced motion",
+          title: "Dhaqdhaqaaq la dhimay",
+          description:
+            "All pulses, shakes, panel slides, tray transitions, and board resizing animations are disabled while static state cues remain.",
+          ...movementBase,
+          selected: "O2",
+          legal: ["O1"],
+          forceMotion: "reduced",
+        }),
+      ];
+
+      const CONFIRM_COPY = {
+        newGame: {
+          title: "Ciyaar cusub ma bilaabaysaa?",
+          copy: "Ciyaarta hadda socota waa laga tagayaa.",
+          action: "Bilow ciyaar cusub",
+        },
+        resign: {
+          title: "Ma is dhiibaysaa?",
+          copy: "Ciyaaryahanka kale ayaa guuleysanaya.",
+          action: "Haa, is dhiib",
+        },
+        leave: {
+          title: "Ma ka baxaysaa ciyaarta?",
+          copy: "Waxaad ka baxaysaa looxa hadda furan.",
+          action: "Ka bax",
+        },
+      };
+
+      const phone = document.getElementById("phone");
+      const tabletop = document.getElementById("tabletop");
+      const board = document.getElementById("board");
+      const boardShell = document.getElementById("board-shell");
+      const scenarioSelect = document.getElementById("scenario-select");
+      const confirmLayer = document.getElementById("confirm-layer");
+      const navPopover = document.getElementById("nav-popover");
+      const overflowToggle = document.getElementById("overflow-toggle");
+      const soundToggle = document.getElementById("sound-toggle");
+      const liveRegion = document.getElementById("live-region");
+
+      let activeScenarioId = "empty";
+      let state = cloneScenario(SCENARIOS[0]);
+      let panelSide = "A";
+      let motionMode = "normal";
+      let soundEnabled = true;
+      let modalOpener = null;
+      let activeModal = null;
+      let confirmAction = null;
+      let navPopoverOpen = false;
+      let focusedPoint = "O1";
+
+      SCENARIOS.forEach((scenario) => {
+        const option = document.createElement("option");
+        option.value = scenario.id;
+        option.textContent = scenario.label;
+        scenarioSelect.appendChild(option);
+      });
+
+      function boardFrom(groups) {
+        const result = Object.fromEntries(
+          POINT_IDS.map((point) => [point, null]),
+        );
+        PLAYER_IDS.forEach((player) => {
+          (groups[player] || []).forEach((point) => {
+            result[point] = player;
+          });
+        });
+        return result;
+      }
+
+      function pointsOwnedBy(boardState, player) {
+        return POINT_IDS.filter((point) => boardState[point] === player);
+      }
+
+      function makeScenario(input) {
+        const scenario = {
+          startingPlayer: "A",
+          initialRemovals: 0,
+          movable: [],
+          legal: [],
+          eligibleTargets: [],
+          selected: null,
+          jareLines: [],
+          invalidPoint: null,
+          invalidMessage: null,
+          blocked: false,
+          notice: null,
+          result: null,
+          initialModal: null,
+          initialPopover: false,
+          modalSide: "A",
+          confirmAction: null,
+          forceMotion: null,
+          ...input,
+        };
+
+        PLAYER_IDS.forEach((player) => {
+          scenario.players[player].onBoard = pointsOwnedBy(
+            scenario.board,
+            player,
+          ).length;
+        });
+
+        return scenario;
+      }
+
+      function cloneScenario(scenario) {
+        return JSON.parse(JSON.stringify(scenario));
+      }
+
+      function otherPlayer(player) {
+        return player === "A" ? "B" : "A";
+      }
+
+      function playerName(player) {
+        return `Ciyaaryahan ${player}`;
+      }
+
+      function instructionFor(player) {
+        if (state.phase === "gameOver" || state.actingPlayer !== player)
+          return "";
+
+        if (state.blocked && state.currentPlayer !== player)
+          return "Meel sharci ah u bannee";
+
+        switch (state.phase) {
+          case "placement":
+            return "Meel bannaan taabo";
+          case "initialRemoval":
+            return "Hal dhagax ka saar";
+          case "movement":
+            return state.selected
+              ? "Meel ku xigta dooro"
+              : "Dhagax dhaqaaqi kara dooro";
+          case "capture":
+            return "Hal dhagax ka qabso";
+          default:
+            return "";
+        }
+      }
+
+      function playerCardLabel(player, instruction) {
+        const playerState = state.players[player];
+        const parts = [playerName(player)];
+
+        if (state.phase === "placement") {
+          parts.push(
+            `${playerState.inHand} gacanta`,
+            `${playerState.onBoard} looxa`,
+          );
+        } else {
+          parts.push(
+            `${playerState.onBoard} looxa`,
+            `${playerState.captured} qabtay`,
+          );
+        }
+
+        if (
+          state.blocked &&
+          state.currentPlayer === player &&
+          state.actingPlayer !== player
+        ) {
+          parts.push("Wuu xanniban yahay");
+        } else if (state.phase === "gameOver") {
+          parts.push(
+            state.result?.winner === player
+              ? "Wuu guuleystay"
+              : "Ciyaartu way dhammaatay",
+          );
+        } else if (state.actingPlayer === player) {
+          parts.push("Wuxuu ciyaaraya");
+          if (instruction) parts.push(instruction);
+        }
+
+        return parts.join(". ");
+      }
+
+      function render() {
+        phone.classList.toggle("post-placement", state.phase !== "placement");
+        phone.classList.toggle(
+          "force-reduced-motion",
+          motionMode === "reduced",
+        );
+
+        PLAYER_IDS.forEach((player) => {
+          const rail = document.querySelector(`[data-player-rail="${player}"]`);
+          const isActing =
+            state.phase !== "gameOver" && state.actingPlayer === player;
+          const isBlocked = Boolean(
+            state.blocked &&
+            state.currentPlayer === player &&
+            state.actingPlayer !== player,
+          );
+          const instruction = instructionFor(player);
+          const instructionElement = rail.querySelector(
+            `[data-instruction="${player}"]`,
+          );
+
+          rail.classList.toggle("acting", isActing);
+          rail.classList.toggle("current-blocked", isBlocked);
+          rail.classList.toggle(
+            "winner",
+            state.phase === "gameOver" && state.result?.winner === player,
+          );
+          rail.classList.toggle(
+            "loser",
+            state.phase === "gameOver" &&
+              Boolean(state.result?.winner) &&
+              state.result.winner !== player,
+          );
+          rail.querySelector(`[data-blocked-badge="${player}"]`).hidden =
+            !isBlocked;
+          instructionElement.textContent = instruction;
+          instructionElement.hidden = !instruction;
+          rail.setAttribute("aria-label", playerCardLabel(player, instruction));
+          renderPlayerResource(player);
+        });
+
+        renderBoard();
+        renderNotice();
+        renderResult();
+        renderInvalid();
+        renderReviewNotes();
+      }
+
+      function renderPlayerResource(player) {
+        const container = document.querySelector(
+          `[data-player-resource="${player}"]`,
+        );
+        container.innerHTML = "";
+
+        if (state.phase === "placement") {
+          const placementResource = document.createElement("div");
+          placementResource.className = "placement-resource";
+          const tray = document.createElement("div");
+          tray.className = "reserve-tray";
+          tray.setAttribute(
+            "aria-label",
+            `${state.players[player].inHand} dhagax ayaa gacanta ugu haray ${playerName(player)}`,
+          );
+
+          for (let index = 0; index < 12; index += 1) {
+            const slot = document.createElement("span");
+            const hasStone = index < state.players[player].inHand;
+            slot.className = `reserve-slot${hasStone ? "" : " spent"}`;
+
+            const stone = document.createElement("i");
+            stone.className = `reserve-stone ${player.toLowerCase()}`;
+            stone.setAttribute("aria-hidden", "true");
+            slot.appendChild(stone);
+            tray.appendChild(slot);
+          }
+
+          const counts = document.createElement("div");
+          counts.className = "piece-counts";
+          counts.innerHTML = `
+          <div class="count-cell">
+            <span>Gacanta</span>
+            <strong>${state.players[player].inHand}</strong>
+          </div>
+          <div class="count-cell">
+            <span>Looxa</span>
+            <strong>${state.players[player].onBoard}</strong>
+          </div>
+        `;
+          placementResource.append(tray, counts);
+          container.appendChild(placementResource);
+          return;
+        }
+
+        const counts = document.createElement("div");
+        counts.className = "piece-counts";
+        counts.innerHTML = `
+        <div class="count-cell">
+          <span>Looxa</span>
+          <strong>${state.players[player].onBoard}</strong>
+        </div>
+        <div class="count-cell">
+          <span>Qabtay</span>
+          <strong>${state.players[player].captured}</strong>
+        </div>
+      `;
+        container.appendChild(counts);
+      }
+
+      function svgElement(name, attributes = {}) {
+        const element = document.createElementNS(NS, name);
+        Object.entries(attributes).forEach(([key, value]) => {
+          element.setAttribute(key, String(value));
+        });
+        return element;
+      }
+
+      function renderBoard() {
+        board.innerHTML = "";
+
+        const defs = svgElement("defs");
+        const pieceA = svgElement("radialGradient", {
+          id: "piece-a",
+          cx: "32%",
+          cy: "25%",
+          r: "72%",
+        });
+        pieceA.append(
+          svgElement("stop", { offset: "0%", "stop-color": "#fffaf1" }),
+          svgElement("stop", { offset: "62%", "stop-color": "#f3dfbf" }),
+          svgElement("stop", { offset: "100%", "stop-color": "#9d7d64" }),
+        );
+        const pieceB = svgElement("radialGradient", {
+          id: "piece-b",
+          cx: "32%",
+          cy: "25%",
+          r: "72%",
+        });
+        pieceB.append(
+          svgElement("stop", { offset: "0%", "stop-color": "#a87959" }),
+          svgElement("stop", { offset: "60%", "stop-color": "#5b3020" }),
+          svgElement("stop", { offset: "100%", "stop-color": "#25120d" }),
+        );
+        defs.append(pieceA, pieceB);
+        board.appendChild(defs);
+
+        [
+          "M8 8H92V92H8Z",
+          "M21 21H79V79H21Z",
+          "M34 34H66V66H34Z",
+          "M50 8V34",
+          "M50 66V92",
+          "M8 50H34",
+          "M66 50H92",
+        ].forEach((path) => {
+          board.appendChild(
+            svgElement("path", { d: path, class: "board-line" }),
+          );
+        });
+
+        state.jareLines.forEach((line) => {
+          const [start, , end] = line;
+          const [x1, y1] = POINT_COORDS[start];
+          const [x2, y2] = POINT_COORDS[end];
+          const path = `M${x1} ${y1}L${x2} ${y2}`;
+          board.appendChild(
+            svgElement("path", { d: path, class: "jare-underlay" }),
+          );
+          board.appendChild(
+            svgElement("path", { d: path, class: "jare-line" }),
+          );
+        });
+
+        POINT_IDS.forEach((point) => {
+          const [cx, cy] = POINT_COORDS[point];
+          const group = svgElement("g", {
+            class: "board-node",
+            "data-point": point,
+            role: "button",
+            tabindex: point === focusedPoint ? 0 : -1,
+            "aria-label": accessiblePointLabel(point),
+          });
+
+          group.appendChild(
+            svgElement("circle", {
+              cx,
+              cy,
+              r: 7.4,
+              class: "point-hit",
+            }),
+          );
+          group.appendChild(
+            svgElement("circle", {
+              cx,
+              cy,
+              r: 2.6,
+              class: "point-socket",
+            }),
+          );
+
+          if (state.movable.includes(point)) {
+            group.appendChild(
+              svgElement("circle", {
+                cx,
+                cy,
+                r: 5.7,
+                class: "movable-ring",
+              }),
+            );
+          }
+
+          if (state.legal.includes(point) && state.phase !== "placement") {
+            group.appendChild(
+              svgElement("circle", {
+                cx,
+                cy,
+                r: 3.8,
+                class: "legal-ring",
+              }),
+            );
+          }
+
+          if (state.eligibleTargets.includes(point)) {
+            group.appendChild(
+              svgElement("circle", {
+                cx,
+                cy,
+                r: 6.2,
+                class: "target-ring",
+              }),
+            );
+            const mark = svgElement("text", {
+              x: cx,
+              y: cy - 6.9,
+              class: "target-mark",
+              "aria-hidden": "true",
+            });
+            mark.textContent = "×";
+            group.appendChild(mark);
+          }
+
+          if (state.invalidPoint === point) {
+            group.appendChild(
+              svgElement("circle", {
+                cx,
+                cy,
+                r: 6.5,
+                class: "invalid-ring",
+              }),
+            );
+          }
+
+          const owner = state.board[point];
+          if (owner) {
+            group.appendChild(
+              svgElement("circle", {
+                cx,
+                cy,
+                r: 4.2,
+                class: `piece ${owner.toLowerCase()}`,
+              }),
+            );
+          }
+
+          if (state.selected === point) {
+            group.appendChild(
+              svgElement("circle", {
+                cx,
+                cy,
+                r: 6.1,
+                class: "selected-halo",
+              }),
+            );
+          }
+
+          group.addEventListener("focus", () => {
+            focusedPoint = point;
+          });
+          group.addEventListener("keydown", (event) => {
+            handlePointKeydown(event, point);
+          });
+          board.appendChild(group);
+        });
+
+        const touchPlane = svgElement("rect", {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          class: "board-touch-plane",
+          "aria-hidden": "true",
+        });
+        touchPlane.addEventListener("click", handleBoardPointer);
+        board.appendChild(touchPlane);
+      }
+
+      function handleBoardPointer(event) {
+        const bounds = board.getBoundingClientRect();
+        const x = ((event.clientX - bounds.left) / bounds.width) * 100;
+        const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+        let nearest = null;
+
+        POINT_IDS.forEach((point) => {
+          const [pointX, pointY] = POINT_COORDS[point];
+          const distance = Math.hypot(x - pointX, y - pointY);
+          if (!nearest || distance < nearest.distance) {
+            nearest = { point, distance };
+          }
+        });
+
+        if (nearest && nearest.distance <= 7.4) {
+          focusedPoint = nearest.point;
+          activatePoint(nearest.point);
+        }
+      }
+
+      function accessiblePointLabel(point) {
+        const owner = state.board[point];
+        const labels = [
+          owner
+            ? `${playerName(owner)} dhagaxiisa ${point}`
+            : `Bar bannaan ${point}`,
+        ];
+        if (state.selected === point) labels.push("La doortay");
+        if (state.movable.includes(point))
+          labels.push("Waa la dhaqaajin karaa");
+        if (state.legal.includes(point)) labels.push("Meel sharci ah");
+        if (state.eligibleTargets.includes(point))
+          labels.push("Waa la qaadi karaa");
+        if (state.invalidPoint === point)
+          labels.push("Dhaqdhaqaaq aan sharci ahayn");
+        return labels.join(". ");
+      }
+
+      function handlePointKeydown(event, point) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          activatePoint(point);
+          return;
+        }
+
+        if (event.key === "Escape" && state.selected) {
+          event.preventDefault();
+          state.selected = null;
+          state.legal = [];
+          render();
+          focusBoardPoint(point);
+          return;
+        }
+
+        if (event.key === "Home") {
+          event.preventDefault();
+          focusBoardPoint("O1");
+          return;
+        }
+
+        const directions = {
+          ArrowLeft: [-1, 0],
+          ArrowRight: [1, 0],
+          ArrowUp: [0, -1],
+          ArrowDown: [0, 1],
+        };
+        const direction = directions[event.key];
+        if (!direction) return;
+
+        const nextPoint = bestAlignedNeighbor(point, direction);
+        if (nextPoint) {
+          event.preventDefault();
+          focusBoardPoint(nextPoint);
+        }
+      }
+
+      function bestAlignedNeighbor(point, direction) {
+        const [originX, originY] = POINT_COORDS[point];
+        let best = null;
+
+        ADJACENCY[point].forEach((neighbor) => {
+          const [x, y] = POINT_COORDS[neighbor];
+          const deltaX = x - originX;
+          const deltaY = y - originY;
+          const distance = Math.hypot(deltaX, deltaY);
+          const alignment =
+            (deltaX * direction[0] + deltaY * direction[1]) / distance;
+
+          if (alignment >= 0.5 && (!best || alignment > best.alignment)) {
+            best = { point: neighbor, alignment };
+          }
+        });
+
+        return best?.point || null;
+      }
+
+      function focusBoardPoint(point) {
+        focusedPoint = point;
+        renderBoard();
+        board.querySelector(`[data-point="${point}"]`)?.focus();
+      }
+
+      function activatePoint(point) {
+        if (activeModal || state.phase === "gameOver") return;
+
+        const owner = state.board[point];
+
+        if (state.phase === "placement") {
+          if (owner || !state.legal.includes(point)) {
+            showInvalid(point, "Bartaas hadda lama ciyaari karo.");
+            return;
+          }
+
+          const player = state.actingPlayer;
+          state.board[point] = player;
+          state.players[player].inHand -= 1;
+          updateOnBoardCounts();
+          const formedJare = completedJareLines(point, player);
+          if (state.firstAdvantage === null && formedJare.length > 0) {
+            state.firstAdvantage = player;
+          }
+          state.legal = POINT_IDS.filter((id) => state.board[id] === null);
+
+          if (state.legal.length === 0) {
+            state.firstAdvantage =
+              state.firstAdvantage || otherPlayer(state.startingPlayer);
+            state.phase = "initialRemoval";
+            state.currentPlayer = state.firstAdvantage;
+            state.actingPlayer = state.firstAdvantage;
+            state.eligibleTargets = pointsOwnedBy(
+              state.board,
+              otherPlayer(state.actingPlayer),
+            );
+            state.jareLines = formedJare;
+            state.notice = {
+              title: "Dhigistu way dhammaatay",
+              copy: `${playerName(state.firstAdvantage)} ayaa helay horraynta`,
+            };
+          } else {
+            state.currentPlayer = otherPlayer(player);
+            state.actingPlayer = state.currentPlayer;
+          }
+
+          announce(`${playerName(player)} wuxuu dhagax dhigay barta ${point}.`);
+          render();
+          return;
+        }
+
+        if (state.phase === "initialRemoval" || state.phase === "capture") {
+          if (!state.eligibleTargets.includes(point)) {
+            showInvalid(point, "Dooro dhagax uu leeyahay ciyaaryahanka kale.");
+            return;
+          }
+
+          const player = state.actingPlayer;
+          const removedOwner = state.board[point];
+          state.notice = null;
+          state.board[point] = null;
+          state.players[player].captured += 1;
+          updateOnBoardCounts();
+
+          if (state.phase === "initialRemoval") {
+            state.initialRemovals += 1;
+
+            if (state.initialRemovals >= 2) {
+              state.phase = "movement";
+              state.currentPlayer = state.firstAdvantage || player;
+              state.actingPlayer = state.currentPlayer;
+              state.eligibleTargets = [];
+              state.jareLines = [];
+              state.movable = movablePointsFor(state.actingPlayer);
+            } else {
+              const nextPlayer = otherPlayer(player);
+              state.currentPlayer = nextPlayer;
+              state.actingPlayer = nextPlayer;
+              state.eligibleTargets = pointsOwnedBy(state.board, player);
+            }
+
+            announce(
+              `${playerName(player)} wuxuu saaray dhagaxa bilowga ee ${point}.`,
+            );
+          } else {
+            state.eligibleTargets = [];
+            state.jareLines = [];
+
+            if (state.players[removedOwner].onBoard < 3) {
+              state.phase = "gameOver";
+              state.currentPlayer = player;
+              state.actingPlayer = player;
+              state.movable = [];
+              state.result = {
+                winner: player,
+                reason: `${playerName(removedOwner)} wuxuu ka haray wax ka yar saddex dhagax.`,
+              };
+              announce(`${playerName(player)} ayaa guuleystay.`);
+            } else {
+              state.phase = "movement";
+              state.currentPlayer = otherPlayer(player);
+              state.actingPlayer = state.currentPlayer;
+              state.movable = movablePointsFor(state.actingPlayer);
+              announce(`${playerName(player)} wuxuu qabtay dhagaxa ${point}.`);
+            }
+          }
+
+          render();
+          return;
+        }
+
+        if (state.phase === "movement") {
+          if (!state.selected) {
+            if (
+              owner !== state.actingPlayer ||
+              !state.movable.includes(point)
+            ) {
+              showInvalid(point, "Dooro dhagax dhaqaaqi kara.");
+              return;
+            }
+
+            state.selected = point;
+            state.legal = ADJACENCY[point].filter(
+              (neighbor) => state.board[neighbor] === null,
+            );
+            announce(`${point} waa la doortay.`);
+            render();
+            return;
+          }
+
+          if (point === state.selected) {
+            state.selected = null;
+            state.legal = [];
+            announce("Doorashada waa laga baxay.");
+            render();
+            return;
+          }
+
+          if (!state.legal.includes(point)) {
+            showInvalid(point, "Bartaas kuma xigto dhagaxa la doortay.");
+            return;
+          }
+
+          const player = state.actingPlayer;
+          const from = state.selected;
+          state.board[from] = null;
+          state.board[point] = player;
+          state.selected = null;
+          state.legal = [];
+          state.invalidPoint = null;
+          state.invalidMessage = null;
+          const completed = completedJareLines(point, player);
+
+          if (completed.length > 0) {
+            state.phase = "capture";
+            state.jareLines = completed;
+            state.eligibleTargets = pointsOwnedBy(
+              state.board,
+              otherPlayer(player),
+            );
+            state.movable = [];
+            announce(
+              `${playerName(player)} wuxuu sameeyay jare. Hal dhagax dooro.`,
+            );
+          } else {
+            state.currentPlayer = otherPlayer(player);
+            state.actingPlayer = state.currentPlayer;
+            state.movable = movablePointsFor(state.actingPlayer);
+            announce(
+              `${playerName(player)} wuxuu ka dhaqaaqay ${from} una dhaqaaqay ${point}.`,
+            );
+          }
+
+          render();
+        }
+      }
+
+      function movablePointsFor(player) {
+        return pointsOwnedBy(state.board, player).filter((point) =>
+          ADJACENCY[point].some((neighbor) => state.board[neighbor] === null),
+        );
+      }
+
+      function completedJareLines(point, player) {
+        return JARE_LINES.filter(
+          (line) =>
+            line.includes(point) &&
+            line.every((linePoint) => state.board[linePoint] === player),
+        );
+      }
+
+      function updateOnBoardCounts() {
+        PLAYER_IDS.forEach((player) => {
+          state.players[player].onBoard = pointsOwnedBy(
+            state.board,
+            player,
+          ).length;
+        });
+      }
+
+      function showInvalid(point, message) {
+        state.invalidPoint = point;
+        state.invalidMessage = message;
+        boardShell.classList.remove("invalid");
+        void boardShell.offsetWidth;
+        boardShell.classList.add("invalid");
+        announce(message);
+        render();
+      }
+
+      function renderNotice() {
+        const notice = document.getElementById("center-notice");
+        notice.hidden = !state.notice;
+        if (!state.notice) return;
+
+        notice.querySelectorAll("[data-notice-title]").forEach((element) => {
+          element.textContent = state.notice.title;
+        });
+        notice.querySelectorAll("[data-notice-copy]").forEach((element) => {
+          element.textContent = state.notice.copy;
+        });
+      }
+
+      function renderResult() {
+        const overlay = document.getElementById("result-overlay");
+        overlay.hidden = !state.result;
+        if (!state.result) return;
+
+        PLAYER_IDS.forEach((player) => {
+          const half = overlay.querySelector(`[data-result-half="${player}"]`);
+          half.innerHTML = `
+          <div>
+            <h2>${state.result.winner ? `${playerName(state.result.winner)} ayaa guuleystay` : "Barbaro"}</h2>
+            <p>${state.result.reason}</p>
+            <button type="button" data-rematch="${player}">Ciyaar kale</button>
+          </div>
+        `;
+          half.querySelector("button").addEventListener("click", (event) => {
+            openConfirm("newGame", player, event.currentTarget);
+          });
+        });
+      }
+
+      function renderInvalid() {
+        const invalid = document.getElementById("invalid-message");
+        invalid.hidden = !state.invalidMessage;
+        invalid.classList.toggle("for-b", state.actingPlayer === "B");
+        invalid.textContent = state.invalidMessage || "";
+      }
+
+      function renderReviewNotes() {
+        document.getElementById("scenario-title").textContent = state.title;
+        document.getElementById("scenario-description").textContent =
+          state.description;
+        document.getElementById("fact-phase").textContent =
+          PHASE_LABELS[state.phase];
+        document.getElementById("fact-current").textContent = playerName(
+          state.currentPlayer,
+        );
+        document.getElementById("fact-acting").textContent = playerName(
+          state.actingPlayer,
+        );
+      }
+
+      function selectScenario(id, options = {}) {
+        const scenario = SCENARIOS.find((item) => item.id === id);
+        if (!scenario) return;
+
+        closeModal({ restoreFocus: false });
+        closeNavPopover({ restoreFocus: false });
+        activeScenarioId = id;
+        state = cloneScenario(scenario);
+        scenarioSelect.value = id;
+        panelSide = scenario.modalSide || panelSide;
+        setPressedState("#side-controls", "side", panelSide);
+
+        if (scenario.forceMotion) {
+          motionMode = scenario.forceMotion;
+          setPressedState("#motion-controls", "motion", motionMode);
+        }
+
+        focusedPoint =
+          state.selected || state.movable[0] || state.legal[0] || POINT_IDS[0];
+        render();
+
+        if (!options.skipModal) {
+          requestAnimationFrame(() => {
+            if (scenario.initialPopover) {
+              openNavPopover();
+            } else if (scenario.initialModal === "confirm") {
+              openConfirm(
+                scenario.confirmAction || "newGame",
+                scenario.modalSide,
+                document.querySelector('[data-confirm="newGame"]'),
+              );
+            }
+          });
+        }
+      }
+
+      function openNavPopover(options = {}) {
+        if (activeModal) return;
+        navPopoverOpen = true;
+        navPopover.hidden = false;
+        overflowToggle.setAttribute("aria-expanded", "true");
+
+        if (options.focus !== false) {
+          requestAnimationFrame(() => {
+            navPopover.querySelector('[role="menuitem"]')?.focus();
+          });
+        }
+      }
+
+      function closeNavPopover(options = {}) {
+        if (!navPopoverOpen) return;
+        navPopoverOpen = false;
+        navPopover.hidden = true;
+        overflowToggle.setAttribute("aria-expanded", "false");
+
+        if (options.restoreFocus !== false) overflowToggle.focus();
+      }
+
+      function openConfirm(action, side, opener) {
+        closeModal({ restoreFocus: false });
+        closeNavPopover({ restoreFocus: false });
+        panelSide = side;
+        confirmAction = action;
+        modalOpener = opener || document.activeElement;
+        activeModal = confirmLayer;
+        setModalSide(confirmLayer, side);
+
+        const copy = CONFIRM_COPY[action];
+        document.getElementById("confirm-title").textContent = copy.title;
+        document.getElementById("confirm-copy").textContent = copy.copy;
+        document.getElementById("confirm-submit").textContent = copy.action;
+        confirmLayer.hidden = false;
+        tabletop.inert = true;
+        document.querySelector(".app-bar").inert = true;
+        requestAnimationFrame(() => {
+          confirmLayer.querySelector("[data-close-modal]")?.focus();
+        });
+      }
+
+      function setModalSide(layer, side) {
+        layer.classList.toggle("from-a", side === "A");
+        layer.classList.toggle("from-b", side === "B");
+      }
+
+      function closeModal(options = {}) {
+        if (!activeModal) {
+          confirmLayer.hidden = true;
+          tabletop.inert = false;
+          document.querySelector(".app-bar").inert = false;
+          return;
+        }
+
+        const opener = modalOpener;
+        activeModal.hidden = true;
+        activeModal = null;
+        modalOpener = null;
+        confirmAction = null;
+        tabletop.inert = false;
+        document.querySelector(".app-bar").inert = false;
+
+        if (options.restoreFocus !== false && opener instanceof HTMLElement) {
+          opener.focus();
+        }
+      }
+
+      function handleModalKeydown(event) {
+        if (!activeModal) return;
+
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeModal();
+          return;
+        }
+
+        if (event.key !== "Tab") return;
+
+        const focusable = Array.from(
+          activeModal.querySelectorAll(
+            'button:not([disabled]), [href], select, [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((element) => !element.hidden);
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+
+      function applyConfirmedAction() {
+        const action = confirmAction;
+        closeModal({ restoreFocus: false });
+
+        if (action === "newGame") {
+          selectScenario("empty", { skipModal: true });
+          announce("Ciyaar cusub ayaa bilaabatay.");
+          return;
+        }
+
+        if (action === "resign") {
+          const loser = panelSide;
+          const winner = otherPlayer(loser);
+          state.phase = "gameOver";
+          state.result = {
+            winner,
+            reason: `${playerName(loser)} ayaa is dhiibay.`,
+          };
+          state.currentPlayer = winner;
+          state.actingPlayer = winner;
+          state.notice = null;
+          state.invalidMessage = null;
+          render();
+          announce(`${playerName(winner)} ayaa guuleystay.`);
+          return;
+        }
+
+        announce("Tijaabada bixitaanka ayaa la xaqiijiyay.");
+      }
+
+      function announce(message) {
+        liveRegion.textContent = "";
+        requestAnimationFrame(() => {
+          liveRegion.textContent = message;
+        });
+      }
+
+      function setPressedState(containerSelector, dataName, value) {
+        document
+          .querySelectorAll(`${containerSelector} [data-${dataName}]`)
+          .forEach((button) => {
+            button.setAttribute(
+              "aria-pressed",
+              String(button.dataset[dataName] === String(value)),
+            );
+          });
+      }
+
+      scenarioSelect.addEventListener("change", () => {
+        selectScenario(scenarioSelect.value);
+      });
+
+      document.querySelectorAll("[data-width]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const width = button.dataset.width;
+          phone.style.setProperty("--phone-width", `${width}px`);
+          setPressedState("#width-controls", "width", width);
+        });
+      });
+
+      document.querySelectorAll("[data-side]").forEach((button) => {
+        button.addEventListener("click", () => {
+          panelSide = button.dataset.side;
+          setPressedState("#side-controls", "side", panelSide);
+        });
+      });
+
+      document.querySelectorAll("[data-motion]").forEach((button) => {
+        button.addEventListener("click", () => {
+          motionMode = button.dataset.motion;
+          setPressedState("#motion-controls", "motion", motionMode);
+          render();
+        });
+      });
+
+      overflowToggle.addEventListener("click", () => {
+        if (navPopoverOpen) {
+          closeNavPopover();
+        } else {
+          openNavPopover();
+        }
+      });
+
+      document.querySelectorAll("[data-close-modal]").forEach((button) => {
+        button.addEventListener("click", () => closeModal());
+      });
+
+      document.querySelectorAll("[data-confirm]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const opener = button.closest("#nav-popover")
+            ? overflowToggle
+            : button;
+          openConfirm(button.dataset.confirm, panelSide, opener);
+        });
+      });
+
+      document.querySelectorAll("[data-simple-notice]").forEach((button) => {
+        button.addEventListener("click", () => {
+          announce(button.dataset.simpleNotice);
+          if (button.closest("#nav-popover")) closeNavPopover();
+        });
+      });
+
+      soundToggle.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        soundToggle.setAttribute("aria-pressed", String(soundEnabled));
+        soundToggle.setAttribute(
+          "aria-label",
+          soundEnabled ? "Dami codka" : "Daar codka",
+        );
+        soundToggle.querySelector("[data-sound-on]").hidden = !soundEnabled;
+        soundToggle.querySelector("[data-sound-off]").hidden = soundEnabled;
+        announce(
+          soundEnabled ? "Codka waa la shiday." : "Codka waa la damiyay.",
+        );
+      });
+
+      document
+        .getElementById("site-navigation")
+        .addEventListener("click", () => {
+          announce("Hagaha bogga wuxuu ka baxsan yahay tijaabadan.");
+        });
+
+      document
+        .getElementById("confirm-submit")
+        .addEventListener("click", applyConfirmedAction);
+
+      document.addEventListener("keydown", (event) => {
+        handleModalKeydown(event);
+        if (!activeModal && navPopoverOpen && event.key === "Escape") {
+          event.preventDefault();
+          closeNavPopover();
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        if (
+          navPopoverOpen &&
+          !navPopover.contains(event.target) &&
+          !overflowToggle.contains(event.target)
+        ) {
+          closeNavPopover({ restoreFocus: false });
+        }
+      });
+
+      selectScenario("empty");
+    </script>
+  </body>
+</html>

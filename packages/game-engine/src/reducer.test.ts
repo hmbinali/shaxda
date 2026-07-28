@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { POINT_IDS } from "./board";
-import { applyAction, getActingPlayer } from "./reducer";
+import { applyAction, DRAW_TURN_LIMIT, getActingPlayer } from "./reducer";
 import { createInitialState } from "./state";
 import type {
   BoardOccupancy,
@@ -646,7 +646,7 @@ describe("movement", () => {
     expect(afterSpaceMaking.draw.turnsSinceCapture).toBe(1);
   });
 
-  it("ends in a draw after 80 movement turns without capture", () => {
+  it("ends in a draw at the exported movement-turn limit", () => {
     const state = baseMovementState(
       "A",
       {
@@ -655,7 +655,7 @@ describe("movement", () => {
       },
       {
         draw: {
-          turnsSinceCapture: 79,
+          turnsSinceCapture: DRAW_TURN_LIMIT - 1,
           repeatedPositions: {},
         },
       },
@@ -671,7 +671,7 @@ describe("movement", () => {
     expect(afterMove.phase).toBe("gameOver");
     expect(afterMove.winner).toBeNull();
     expect(afterMove.endReason).toBe("drawTermination");
-    expect(afterMove.draw.turnsSinceCapture).toBe(80);
+    expect(afterMove.draw.turnsSinceCapture).toBe(DRAW_TURN_LIMIT);
   });
 
   it("ends in a draw when a movement position occurs for the third time", () => {

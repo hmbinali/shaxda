@@ -209,6 +209,10 @@ test.describe("L1 local game", () => {
   test("persists the local sound preference", async ({ page }) => {
     await page.goto("/local");
 
+    const actionsMenu = page.locator(`summary[aria-label="Ficillo kale"]`);
+    if (await actionsMenu.isVisible()) {
+      await actionsMenu.click();
+    }
     await page.getByRole("button", { name: "Codka dami" }).click();
 
     await expect
@@ -219,6 +223,9 @@ test.describe("L1 local game", () => {
 
     await page.reload();
 
+    if (await actionsMenu.isVisible()) {
+      await actionsMenu.click();
+    }
     const soundButton = page.getByRole("button", { name: "Codka shid" });
     await expect(soundButton).toHaveAttribute("aria-pressed", "false");
   });

@@ -1,6 +1,12 @@
 import { messages } from "@shaxda/i18n";
 import { gameFixtures, protocolVersion } from "@shaxda/shared";
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/site/metadata", () => ({
@@ -152,6 +158,133 @@ describe("/online", () => {
     );
     expect(screen.getByTestId("online-game-result")).not.toHaveTextContent(
       copy.result.reasons.opponentAbandoned.winner,
+    );
+  });
+
+  it("seats a player B viewer at the bottom without rotating or remapping colour", async () => {
+    render(OnlineGamePage);
+
+    await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
+      target: { value: "Bilan" },
+    });
+    await fireEvent.click(screen.getByTestId("create-room"));
+    await waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+
+    const socket = FakeWebSocket.latest();
+    socket.open();
+    socket.message({
+      v: protocolVersion,
+      type: "joined",
+      roomCode: "ABCDEFGH",
+      guestId: "guest-id-b",
+      slot: "B",
+    });
+    socket.message({
+      v: protocolVersion,
+      type: "presence",
+      roomCode: "ABCDEFGH",
+      players: {
+        A: { displayName: "Ayaan" },
+        B: { displayName: "Bilan" },
+      },
+      started: true,
+    });
+    socket.message({
+      v: protocolVersion,
+      type: "state",
+      roomCode: "ABCDEFGH",
+      state: gameFixtures.midPlacement,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("online-board")).toBeVisible(),
+    );
+    const rails = screen.getAllByTestId(/^player-rail-/);
+    expect(rails.map((rail) => rail.dataset.player)).toEqual(["A", "B"]);
+    expect(screen.getByTestId("player-rail-A")).toHaveAttribute(
+      "data-rotated",
+      "false",
+    );
+    expect(screen.getByTestId("player-rail-B")).toHaveAttribute(
+      "data-rotated",
+      "false",
+    );
+    expect(screen.getByTestId("player-rail-A")).toHaveTextContent(
+      messages.so.localGame.tabletop.states.opponentActing,
+    );
+    expect(screen.getByTestId("player-rail-A")).not.toHaveTextContent(
+      messages.so.localGame.tabletop.states.acting,
+    );
+    expect(document.querySelector('[data-occupant="B"]')).toBeInTheDocument();
+  });
+
+  it("places connection notices with their owner and keeps claim-win actionable at centre", async () => {
+    render(OnlineGamePage);
+
+    await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
+      target: { value: "Ayaan" },
+    });
+    await fireEvent.click(screen.getByTestId("create-room"));
+    await waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+
+    const socket = FakeWebSocket.latest();
+    socket.open();
+    socket.message({
+      v: protocolVersion,
+      type: "joined",
+      roomCode: "ABCDEFGH",
+      guestId: "guest-id-a",
+      slot: "A",
+    });
+    socket.message({
+      v: protocolVersion,
+      type: "presence",
+      roomCode: "ABCDEFGH",
+      players: {
+        A: { displayName: "Ayaan" },
+        B: { displayName: "Bilan" },
+      },
+      started: true,
+    });
+    socket.message({
+      v: protocolVersion,
+      type: "state",
+      roomCode: "ABCDEFGH",
+      state: gameFixtures.midPlacement,
+    });
+    socket.message({
+      v: protocolVersion,
+      type: "matchStatus",
+      roomCode: "ABCDEFGH",
+      connections: { A: true, B: false },
+      idleSlot: null,
+      claimableBy: "A",
+      claimReason: "opponentAbandoned",
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("online-board")).toBeVisible(),
+    );
+    expect(
+      within(screen.getByTestId("player-rail-B")).getByText(
+        copy.notices.opponentDisconnected,
+      ),
+    ).toBeVisible();
+    expect(
+      within(screen.getByTestId("player-rail-A")).queryByText(
+        copy.notices.opponentDisconnected,
+      ),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: copy.claimWin })).toBeVisible();
+
+    socket.close();
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("player-rail-A")).getByText(
+          copy.notices.reconnecting,
+        ),
+      ).toBeVisible(),
     );
   });
 });

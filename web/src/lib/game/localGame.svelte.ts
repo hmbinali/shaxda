@@ -42,7 +42,6 @@ export interface ActionFeedback {
 export interface LocalGameControllerOptions {
   initialState?: GameState;
   storage?: LocalGameStorage | null;
-  confirmNewGame?: () => boolean;
 }
 
 export class LocalGameController {
@@ -55,16 +54,12 @@ export class LocalGameController {
   status = $derived(buildGameStatus(this.state));
 
   readonly #storage: LocalGameStorage | null | undefined;
-  readonly #confirmNewGame: () => boolean;
   #invalidNonce = 0;
   #feedbackNonce = 0;
   #actionNonce = 0;
 
   constructor(options: LocalGameControllerOptions = {}) {
     this.#storage = options.storage;
-    this.#confirmNewGame =
-      options.confirmNewGame ??
-      (() => window.confirm("Ciyaar cusub ma bilaabaysaa?"));
     this.state =
       options.initialState ??
       loadResumableLocalGame(this.#storage) ??
@@ -108,11 +103,7 @@ export class LocalGameController {
     this.apply(action);
   }
 
-  startNewGame(): boolean {
-    if (this.state.phase !== "gameOver" && !this.#confirmNewGame()) {
-      return false;
-    }
-
+  startNewGame(): void {
     this.state = createInitialState("A");
     this.selected = null;
     this.invalid = null;
@@ -123,7 +114,6 @@ export class LocalGameController {
     this.#actionNonce = 0;
     this.#feedbackNonce = 0;
     clearSavedLocalGame(this.#storage);
-    return true;
   }
 
   private apply(action: GameAction): void {

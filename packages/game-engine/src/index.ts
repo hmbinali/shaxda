@@ -9,7 +9,7 @@ export {
 } from "./jare";
 export { getLegalMoves, getSpaceMakingMoves, hasLegalMoves } from "./moves";
 export type { Move } from "./moves";
-export { applyAction, getActingPlayer } from "./reducer";
+export { applyAction, DRAW_TURN_LIMIT, getActingPlayer } from "./reducer";
 export type { ActionError, ActionResult } from "./reducer";
 export {
   applyActionLog,

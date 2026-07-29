@@ -313,21 +313,30 @@ test.describe("L1 local game", () => {
     );
   });
 
-  test("prompts for blocked-player space making", async ({ page }) => {
+  test("guides blocked-player space making without covering the board", async ({
+    page,
+  }) => {
     await page.addInitScript(
       ({ key, value }) => localStorage.setItem(key, value),
       { key: storageKey, value: blockedPlayerState },
     );
     await page.goto("/local");
 
-    await expect(page.getByTestId("blocked-prompt")).toBeVisible();
+    await expect(page.getByTestId("blocked-prompt")).not.toBeAttached();
+    await expect(page.getByTestId("player-rail-B")).toHaveAttribute(
+      "data-rail-state",
+      "blocked",
+    );
+    await expect(
+      page.getByTestId("board-space-making-candidate").first(),
+    ).toBeVisible();
 
     await page.locator('[data-point-id="O2"]').click();
     await expect(page.locator('[data-point-id="O3"]')).toHaveAttribute(
       "data-legal-hint",
       "true",
     );
-    await page.locator('[data-point-id="O3"]').click({ force: true });
+    await page.locator('[data-point-id="O3"]').click();
 
     await expect(page.locator('[data-point-id="O3"]')).toHaveAttribute(
       "data-occupant",

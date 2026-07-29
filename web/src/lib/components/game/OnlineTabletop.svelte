@@ -131,7 +131,6 @@
             {playerName}
             reason={resultReason}
             testId="online-game-result"
-            orientation="solo"
             {onLeave}
           />
         {/if}

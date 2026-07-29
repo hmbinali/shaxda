@@ -20,7 +20,6 @@
   import Board from "$components/Board.svelte";
   import ConfirmDialog from "$components/game/ConfirmDialog.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
-  import GameResultCard from "$components/game/GameResultCard.svelte";
   import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
   import OnlineTabletop from "$components/game/OnlineTabletop.svelte";
   import PlayerPiecesCard from "$components/game/PlayerPiecesCard.svelte";
@@ -543,6 +542,7 @@
             invalidNonce={controller.invalidNonce}
             interactive={controller.canInteract}
             onSelectPoint={(point) => controller.clickPoint(point)}
+            onCancelSelection={() => controller.cancelSelection()}
           />
         </div>
       {/if}
@@ -578,19 +578,6 @@
             ? copy.emptySlot
             : playerSeatLabel(player)}
       />
-
-      {#if status.phase === "gameOver"}
-        <GameResultCard
-          {status}
-          {playerName}
-          reason={controller.onlineEndReason !== null
-            ? onlineResultReason()
-            : status.endReason === null
-              ? null
-              : gameCopy.result.reasons[status.endReason]}
-          testId="online-game-result"
-        />
-      {/if}
     </aside>
   </section>
 

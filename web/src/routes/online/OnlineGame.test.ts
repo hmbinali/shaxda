@@ -234,6 +234,7 @@ describe("/online", () => {
     await waitFor(() =>
       expect(screen.getByTestId("online-board")).toBeVisible(),
     );
+    expect(screen.queryByTestId("game-details-panel")).not.toBeInTheDocument();
     const rails = screen.getAllByTestId(/^player-rail-/);
     expect(rails.map((rail) => rail.dataset.player)).toEqual(["A", "B"]);
     expect(screen.getByTestId("player-rail-A")).toHaveAttribute(

@@ -8,7 +8,6 @@
     body: string;
     cancelLabel: string;
     confirmLabel: string;
-    edge?: "top" | "bottom";
     background?: HTMLElement | null;
     onClose: () => void;
     onConfirm: () => void;
@@ -20,7 +19,6 @@
     body,
     cancelLabel,
     confirmLabel,
-    edge = "bottom",
     background = null,
     onClose,
     onConfirm,
@@ -82,7 +80,7 @@
 </script>
 
 {#if open}
-  <div class="layer" data-edge={edge}>
+  <div class="layer">
     <button
       class="backdrop"
       type="button"
@@ -92,20 +90,19 @@
     ></button>
     <div
       bind:this={dialog}
-      class="sheet"
-      class:top={edge === "top"}
-      data-testid="confirm-sheet"
+      class="dialog"
+      data-testid="confirm-dialog"
       style:overflow-y="auto"
       role="dialog"
       tabindex="-1"
       aria-modal="true"
-      aria-labelledby="confirm-sheet-title"
-      aria-describedby="confirm-sheet-body"
+      aria-labelledby="confirm-dialog-title"
+      aria-describedby="confirm-dialog-body"
       onkeydown={handleKeydown}
     >
-      <div class:rotated={edge === "top"}>
-        <h2 id="confirm-sheet-title">{title}</h2>
-        <p id="confirm-sheet-body">{body}</p>
+      <div>
+        <h2 id="confirm-dialog-title">{title}</h2>
+        <p id="confirm-dialog-body">{body}</p>
         <div class="actions">
           <Button onclick={onClose}>{cancelLabel}</Button>
           <button
@@ -128,11 +125,8 @@
     z-index: 70;
     inset: 0;
     display: grid;
-    align-items: end;
-  }
-
-  .layer[data-edge="top"] {
-    align-items: start;
+    place-items: center;
+    padding: 1rem;
   }
 
   .backdrop {
@@ -142,25 +136,16 @@
     background: rgb(46 32 25 / 0.55);
   }
 
-  .sheet {
+  .dialog {
     position: relative;
-    width: 100%;
-    max-height: min(70dvh, 28rem);
+    width: min(100%, 28rem);
+    max-height: calc(100dvh - 2rem);
     overflow-y: auto;
-    border-radius: 1rem 1rem 0 0;
+    border-radius: 1rem;
     background: #fffaf3;
     padding: 1rem;
-    box-shadow: 0 -12px 36px rgb(46 32 25 / 0.24);
-    animation: sheet-in 160ms ease-out;
-  }
-
-  .sheet.top {
-    border-radius: 0 0 1rem 1rem;
-    box-shadow: 0 12px 36px rgb(46 32 25 / 0.24);
-  }
-
-  .rotated {
-    transform: rotate(180deg);
+    box-shadow: 0 18px 48px rgb(46 32 25 / 0.28);
+    animation: dialog-in 160ms ease-out;
   }
 
   h2 {
@@ -193,15 +178,15 @@
     font-weight: 700;
   }
 
-  @keyframes sheet-in {
+  @keyframes dialog-in {
     from {
-      transform: translateY(1rem);
+      transform: translateY(0.5rem) scale(0.98);
       opacity: 0;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sheet {
+    .dialog {
       animation: none;
     }
   }

@@ -16,9 +16,8 @@
   } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
   import BoardNotice from "$components/game/BoardNotice.svelte";
-  import ConfirmSheet from "$components/game/ConfirmSheet.svelte";
+  import ConfirmDialog from "$components/game/ConfirmDialog.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
-  import GameDetailsPanel from "$components/game/GameDetailsPanel.svelte";
   import GameResultOverlay from "$components/game/GameResultOverlay.svelte";
   import InvalidToast from "$components/game/InvalidToast.svelte";
   import PlayerRail from "$components/game/PlayerRail.svelte";
@@ -41,7 +40,6 @@
   let soundEnabled = $state(true);
   let lastFeedbackNonce = 0;
   let pendingConfirm = $state<"newGame" | "resign" | "exit" | null>(null);
-  let confirmEdge = $state<"top" | "bottom">("bottom");
   let tabletopBackground = $state<HTMLElement | null>(null);
   const status = $derived(controller.status);
   const resignOwner = $derived(findResignOwner(controller.state));
@@ -73,7 +71,7 @@
         if (resignOwner === null) {
           requestExit();
         } else {
-          requestResign(resignOwner);
+          requestResign();
         }
       },
       tone: resignOwner === null ? "default" : "danger",
@@ -113,17 +111,14 @@
 
   function requestNewGame(): void {
     pendingConfirm = "newGame";
-    confirmEdge = "bottom";
   }
 
-  function requestResign(player: PlayerId): void {
+  function requestResign(): void {
     pendingConfirm = "resign";
-    confirmEdge = player === seating.top ? "top" : "bottom";
   }
 
   function requestExit(): void {
     pendingConfirm = "exit";
-    confirmEdge = "bottom";
   }
 
   function confirmAction(): void {
@@ -217,14 +212,10 @@
         instruction={instructionKeyFor(status, seating.bottom, orientation)}
       />
     {/snippet}
-
-    {#snippet details()}
-      <GameDetailsPanel {status} {playerName} />
-    {/snippet}
   </TabletopShell>
 </div>
 
-<ConfirmSheet
+<ConfirmDialog
   open={pendingConfirm !== null}
   title={pendingConfirm === "resign"
     ? copy.controls.resign
@@ -238,7 +229,6 @@
       : copy.prompts.newGame}
   cancelLabel={copy.tabletop.cancel}
   confirmLabel={copy.tabletop.confirm}
-  edge={confirmEdge}
   background={tabletopBackground}
   onClose={() => (pendingConfirm = null)}
   onConfirm={confirmAction}

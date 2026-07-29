@@ -39,6 +39,7 @@ describe("/local", () => {
       "data-testid",
       "tabletop",
     );
+    expect(screen.queryByTestId("game-details-panel")).not.toBeInTheDocument();
     expect(screen.getByTestId("player-rail-B")).toHaveAttribute(
       "data-rotated",
       "true",
@@ -126,19 +127,25 @@ describe("/local", () => {
     );
   });
 
-  it("resigns and displays the game-over result", async () => {
-    renderLocalGame();
+  it("uses the centered dialog when the top player resigns and displays the result", async () => {
+    const { container } = renderLocalGame();
     const topBar = within(screen.getByTestId("app-top-bar"));
 
+    await fireEvent.click(point(container, "O1"));
     await fireEvent.click(
       topBar.getByRole("button", { name: copy.controls.resign }),
     );
+    const dialog = screen.getByRole("dialog", {
+      name: copy.controls.resign,
+    });
+    expect(dialog).toHaveAttribute("data-testid", "confirm-dialog");
+    expect(dialog).not.toHaveAttribute("data-edge");
     await fireEvent.click(
       screen.getByRole("button", { name: copy.tabletop.confirm }),
     );
 
     expect(screen.getByTestId("game-result")).toHaveTextContent(
-      `${copy.result.winnerLabel}: ${copy.playerNames.B}`,
+      `${copy.result.winnerLabel}: ${copy.playerNames.A}`,
     );
     expect(screen.getByTestId("game-result")).toHaveTextContent(
       copy.result.reasons.resignation,
@@ -163,6 +170,9 @@ describe("/local", () => {
     expect(
       screen.getByRole("dialog", { name: copy.controls.newGame }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("confirm-dialog")).not.toHaveAttribute(
+      "data-edge",
+    );
     await fireEvent.click(
       screen.getByRole("button", { name: copy.tabletop.confirm }),
     );
@@ -180,7 +190,9 @@ describe("/local", () => {
     const { container } = renderLocalGame();
 
     expect(point(container, "O8")).toHaveAttribute("data-occupant", "B");
-    expect(screen.getAllByText(copy.phases.movement)[0]).toBeInTheDocument();
+    expect(
+      screen.getByText(copy.tabletop.instructions.move),
+    ).toBeInTheDocument();
   });
 });
 

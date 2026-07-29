@@ -18,7 +18,7 @@
     saveSoundPreference,
   } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
-  import ConfirmSheet from "$components/game/ConfirmSheet.svelte";
+  import ConfirmDialog from "$components/game/ConfirmDialog.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
   import GameResultCard from "$components/game/GameResultCard.svelte";
   import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
@@ -594,7 +594,7 @@
     </aside>
   </section>
 
-  <ConfirmSheet
+  <ConfirmDialog
     open={pendingConfirm !== null}
     title={pendingConfirm === "resign"
       ? gameCopy.controls.resign

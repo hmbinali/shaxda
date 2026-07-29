@@ -11,8 +11,7 @@
     resolveSeating,
   } from "$lib/game/seating";
   import BoardNotice from "./BoardNotice.svelte";
-  import ConfirmSheet from "./ConfirmSheet.svelte";
-  import GameDetailsPanel from "./GameDetailsPanel.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import GameResultOverlay from "./GameResultOverlay.svelte";
   import InvalidToast from "./InvalidToast.svelte";
   import PlayerRail from "./PlayerRail.svelte";
@@ -145,28 +144,10 @@
         notice={noticeFor(seating.bottom)}
       />
     {/snippet}
-
-    {#snippet details()}
-      <GameDetailsPanel
-        {status}
-        {playerName}
-        leadingFields={[
-          {
-            label: copy.connectionLabel,
-            value: copy.connection[controller.connectionStatus],
-          },
-          {
-            label: copy.roomLabel,
-            value: controller.roomCode ?? "",
-            monospaced: true,
-          },
-        ]}
-      />
-    {/snippet}
   </TabletopShell>
 </div>
 
-<ConfirmSheet
+<ConfirmDialog
   open={pendingConfirm !== null}
   title={pendingConfirm === "resign" ? gameCopy.controls.resign : copy.leave}
   body={pendingConfirm === "resign"

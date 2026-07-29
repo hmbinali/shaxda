@@ -254,7 +254,60 @@ test.describe("tabletop layout", () => {
     });
     await expect(page.getByTestId("player-rail-A")).toBeInViewport();
   });
+
+  test("new-game and top-player resignation confirmations stay centered and upright", async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 1280, height: 800 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/local");
+
+      await expect(page.getByTestId("game-details-panel")).not.toBeAttached();
+      const tabletopBox = await page.getByTestId("tabletop").boundingBox();
+      expect(tabletopBox).not.toBeNull();
+      expect(
+        Math.abs(tabletopBox!.x + tabletopBox!.width / 2 - viewport.width / 2),
+      ).toBeLessThan(1);
+
+      const topBar = page.getByTestId("app-top-bar");
+      await topBar.getByRole("button", { name: "Ciyaar cusub" }).click();
+      await expectCenteredDialog(page, viewport);
+      await page.getByRole("button", { name: "Jooji" }).last().click();
+
+      await page.locator('[data-point-id="O1"]').click();
+      await topBar.getByRole("button", { name: "Is dhiib" }).click();
+      await expectCenteredDialog(page, viewport);
+      await page.getByRole("button", { name: "Jooji" }).last().click();
+    }
+  });
 });
+
+async function expectCenteredDialog(
+  page: import("@playwright/test").Page,
+  viewport: { width: number; height: number },
+) {
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations().map((animation) => animation.finished),
+    );
+  });
+
+  const box = await dialog.boundingBox();
+  expect(box).not.toBeNull();
+  expect(Math.abs(box!.x + box!.width / 2 - viewport.width / 2)).toBeLessThan(
+    1,
+  );
+  expect(Math.abs(box!.y + box!.height / 2 - viewport.height / 2)).toBeLessThan(
+    1,
+  );
+  await expect(dialog).toHaveCSS("transform", "none");
+  await expect(dialog).not.toHaveAttribute("data-edge");
+}
 
 async function measureTabletop(page: import("@playwright/test").Page) {
   return page.evaluate(() => {

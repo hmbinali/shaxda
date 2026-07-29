@@ -5,7 +5,6 @@
     topRail: Snippet;
     board: Snippet;
     bottomRail: Snippet;
-    details?: Snippet;
     compactRails?: boolean;
     orientation: "shared" | "solo";
   }
@@ -14,7 +13,6 @@
     topRail,
     board,
     bottomRail,
-    details,
     compactRails = false,
     orientation,
   }: Props = $props();
@@ -34,12 +32,6 @@
       </div>
     </div>
   </div>
-
-  {#if details}
-    <aside class="details">
-      {@render details()}
-    </aside>
-  {/if}
 </section>
 
 <style>
@@ -98,10 +90,6 @@
     aspect-ratio: 1;
   }
 
-  .details {
-    display: none;
-  }
-
   @container tabletop (min-height: 380px) {
     .tabletop {
       --rail-h: 4rem;
@@ -125,23 +113,6 @@
         4.5rem,
         max(3.5rem, calc((100cqh - 17.5rem - 2 * var(--stack-gap) - 1rem) / 2))
       );
-    }
-  }
-
-  @media (min-width: 64rem) {
-    .route-shell {
-      grid-template-columns: minmax(0, 1fr) 20rem;
-      gap: 1rem;
-      height: 100%;
-      padding: 1rem;
-    }
-
-    .details {
-      display: grid;
-      align-content: start;
-      gap: 1rem;
-      min-height: 0;
-      overflow-y: auto;
     }
   }
 </style>

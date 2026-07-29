@@ -21,7 +21,7 @@ or browser chrome. Before release, manually verify:
 - iOS Safari on a small device with browser chrome visible;
 - the installed PWA on an iOS device or Simulator for safe-area behavior;
 - shared local play from both ends of the phone, including rail rotation,
-  turn-state changes, top-bar resignation, the rotated confirmation sheet, and
+  turn-state changes, top-bar resignation, the centered confirmation dialog, and
   both halves of the result overlay.
 
 The app intentionally does not opt into `viewport-fit=cover`; changing that

@@ -93,6 +93,7 @@ export const messages = {
       controls: {
         newGame: "Ciyaar cusub",
         resign: "Is dhiib",
+        exit: "Ka bax",
         soundOn: "Codka shid",
         soundOff: "Codka dami",
       },
@@ -116,7 +117,6 @@ export const messages = {
         reserve: "Dhagaxa gacanta",
         drawApproaching: "Barbaro ayaa soo dhow",
         turnsRemaining: "dhaqaaq ayaa haray",
-        moreActions: "Ficillo kale",
         details: "Faahfaahinta ciyaarta",
         cancel: "Jooji",
         confirm: "Xaqiiji",
@@ -297,8 +297,6 @@ export const siteContent = {
       skipToContent: "U bood nuxurka",
       openMenu: "Fur hagaha",
       closeMenu: "Xir hagaha",
-      expandSidebar: "Ballaari hagaha",
-      collapseSidebar: "Isku koob astaamo",
     },
     footer: {
       tagline: "Shaxda Soomaali keliya, si fudud loogu barto loona ciyaaro.",

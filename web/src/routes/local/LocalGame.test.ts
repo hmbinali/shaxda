@@ -1,10 +1,17 @@
 import { deserialize, serialize } from "@shaxda/game-engine";
 import { messages } from "@shaxda/i18n";
 import { gameFixtures } from "@shaxda/shared";
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SOUND_PREFERENCE_STORAGE_KEY } from "$lib/audio/sound";
 import { LOCAL_GAME_STORAGE_KEY } from "$lib/game/localGameStorage";
+import AppShellHarness from "$lib/shell/AppShellHarness.svelte";
 
 vi.mock("$lib/site/metadata", () => ({
   absoluteUrl: (path: string) => `https://shaxda.example${path}`,
@@ -26,7 +33,7 @@ describe("/local", () => {
   });
 
   it("places a piece and persists the unfinished game", async () => {
-    const { container } = render(LocalGamePage);
+    const { container } = renderLocalGame();
 
     expect(screen.getByTestId("tabletop")).toHaveAttribute(
       "data-testid",
@@ -43,6 +50,9 @@ describe("/local", () => {
     expect(screen.getByTestId("player-rail-A")).toHaveAttribute(
       "data-rail-state",
       "acting",
+    );
+    expect(screen.getByTestId("player-rail-A")).toHaveTextContent(
+      copy.tabletop.instructions.place,
     );
 
     await fireEvent.click(point(container, "O1"));
@@ -61,7 +71,7 @@ describe("/local", () => {
   });
 
   it("announces the first jare formed during placement", async () => {
-    const { container } = render(LocalGamePage);
+    const { container } = renderLocalGame();
 
     for (const pointId of ["O1", "M1", "O2", "M3", "O3"]) {
       await fireEvent.click(point(container, pointId));
@@ -73,7 +83,7 @@ describe("/local", () => {
   });
 
   it("shows invalid feedback for illegal taps", async () => {
-    const { container } = render(LocalGamePage);
+    const { container } = renderLocalGame();
 
     await fireEvent.click(point(container, "O1"));
     await fireEvent.click(point(container, "O1"));
@@ -84,11 +94,12 @@ describe("/local", () => {
   });
 
   it("renders and persists the sound toggle state", async () => {
-    render(LocalGamePage);
+    renderLocalGame();
 
-    const muteButton = screen.getAllByRole("button", {
+    const topBar = within(screen.getByTestId("app-top-bar"));
+    const muteButton = topBar.getByRole("button", {
       name: copy.controls.soundOff,
-    })[0];
+    });
     expect(muteButton).toHaveAttribute("aria-pressed", "true");
 
     await fireEvent.click(muteButton);
@@ -97,27 +108,30 @@ describe("/local", () => {
       "false",
     );
     expect(
-      screen.getAllByRole("button", { name: copy.controls.soundOn })[0],
+      topBar.getByRole("button", { name: copy.controls.soundOn }),
     ).toHaveAttribute("aria-pressed", "false");
   });
 
   it("loads the persisted muted state", async () => {
     window.localStorage.setItem(SOUND_PREFERENCE_STORAGE_KEY, "false");
 
-    render(LocalGamePage);
+    renderLocalGame();
 
     await waitFor(() =>
       expect(
-        screen.getAllByRole("button", { name: copy.controls.soundOn })[0],
+        within(screen.getByTestId("app-top-bar")).getByRole("button", {
+          name: copy.controls.soundOn,
+        }),
       ).toHaveAttribute("aria-pressed", "false"),
     );
   });
 
   it("resigns and displays the game-over result", async () => {
-    render(LocalGamePage);
+    renderLocalGame();
+    const topBar = within(screen.getByTestId("app-top-bar"));
 
     await fireEvent.click(
-      screen.getByRole("button", { name: copy.controls.resign }),
+      topBar.getByRole("button", { name: copy.controls.resign }),
     );
     await fireEvent.click(
       screen.getByRole("button", { name: copy.tabletop.confirm }),
@@ -129,14 +143,22 @@ describe("/local", () => {
     expect(screen.getByTestId("game-result")).toHaveTextContent(
       copy.result.reasons.resignation,
     );
+    expect(
+      topBar.getByRole("button", { name: copy.controls.exit }),
+    ).toBeVisible();
+    expect(
+      topBar.queryByRole("button", { name: copy.controls.resign }),
+    ).not.toBeInTheDocument();
   });
 
   it("starts a new game after confirmation and clears saved state", async () => {
-    const { container } = render(LocalGamePage);
+    const { container } = renderLocalGame();
 
     await fireEvent.click(point(container, "O1"));
     await fireEvent.click(
-      screen.getAllByRole("button", { name: copy.controls.newGame })[0],
+      within(screen.getByTestId("app-top-bar")).getByRole("button", {
+        name: copy.controls.newGame,
+      }),
     );
     expect(
       screen.getByRole("dialog", { name: copy.controls.newGame }),
@@ -155,12 +177,16 @@ describe("/local", () => {
       serialize(gameFixtures.movement),
     );
 
-    const { container } = render(LocalGamePage);
+    const { container } = renderLocalGame();
 
     expect(point(container, "O8")).toHaveAttribute("data-occupant", "B");
     expect(screen.getAllByText(copy.phases.movement)[0]).toBeInTheDocument();
   });
 });
+
+function renderLocalGame() {
+  return render(AppShellHarness, { component: LocalGamePage });
+}
 
 function point(container: HTMLElement, id: string): Element {
   const element = container.querySelector(`[data-point-id="${id}"]`);

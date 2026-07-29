@@ -110,77 +110,38 @@ test.describe("tabletop layout", () => {
       expect(geometry.smallestTarget.height).toBeGreaterThanOrEqual(24);
       expect(geometry.top.bottom).toBeLessThanOrEqual(geometry.board.top);
       expect(geometry.board.bottom).toBeLessThanOrEqual(geometry.bottom.top);
+      expect(geometry.board.top - geometry.top.bottom).toBeLessThanOrEqual(12);
+      expect(geometry.bottom.top - geometry.board.bottom).toBeLessThanOrEqual(
+        12,
+      );
       expect(geometry.documentWidth).toBeLessThanOrEqual(viewport.width);
       expect(geometry.main.scrollHeight).toBeLessThanOrEqual(
         geometry.main.clientHeight + 1,
       );
-      expect(geometry.actionOverlapsPoint).toBe(false);
     });
   }
 
-  test("the shortest mobile actions sheet remains dismissible", async ({
+  test("placement keeps the player name and instruction readable at 320×460", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 460 });
     await page.goto("/local");
 
-    const trigger = page.locator('summary[aria-label="Ficillo kale"]');
-    await trigger.click();
-    await expect(
-      page.getByRole("dialog", { name: "Ficillo kale" }),
-    ).toBeVisible();
-    await page.getByTestId("game-actions-close").click();
-    await expect(page.getByRole("dialog")).toBeHidden();
+    const rail = page.getByTestId("player-rail-A");
+    const name = rail.locator("h2");
+    const instruction = rail.locator("p").first();
+    const copyBox = await rail.locator(".copy").boundingBox();
+    const rightSlotBox = await rail.locator(".right-slot").boundingBox();
 
-    await trigger.click();
-    await page.getByTestId("game-actions-backdrop").click({
-      position: { x: 4, y: 4 },
-    });
-    await expect(page.getByRole("dialog")).toBeHidden();
-
-    await trigger.click();
-    await expect(page.getByTestId("game-actions-close")).toBeFocused();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toBeHidden();
-    await expect(trigger).toBeFocused();
-  });
-
-  test("a centred board notice receives input above the actions trigger", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 320, height: 460 });
-    await page.goto("/");
-    await page.evaluate(({ key, value }) => localStorage.setItem(key, value), {
-      key: storageKey,
-      value: JSON.stringify(blockedState),
-    });
-    await page.goto("/local");
-
-    const trigger = page.locator('summary[aria-label="Ficillo kale"]');
-    const triggerBox = await trigger.boundingBox();
-    const notice = page.getByTestId("blocked-prompt");
-    const noticeBox = await notice.boundingBox();
-
-    expect(triggerBox).not.toBeNull();
-    expect(noticeBox).not.toBeNull();
-    expect(rectanglesOverlap(triggerBox!, noticeBox!)).toBe(true);
-
-    const hitTarget = await page.evaluate(
-      ({ x, y }) => {
-        const target = document.elementFromPoint(x, y);
-        return {
-          isNotice: target?.closest('[data-testid="blocked-prompt"]') !== null,
-          isTrigger:
-            target?.closest('summary[aria-label="Ficillo kale"]') !== null,
-        };
-      },
-      {
-        x: triggerBox!.x + triggerBox!.width / 2,
-        y: triggerBox!.y + triggerBox!.height / 2,
-      },
+    await expect(name).toBeVisible();
+    await expect(instruction).toBeVisible();
+    expect((await name.textContent())?.trim().length).toBeGreaterThan(0);
+    expect((await instruction.textContent())?.trim().length).toBeGreaterThan(0);
+    expect(copyBox).not.toBeNull();
+    expect(rightSlotBox).not.toBeNull();
+    expect(copyBox!.x + copyBox!.width).toBeLessThanOrEqual(
+      rightSlotBox!.x + 1,
     );
-
-    expect(hitTarget).toEqual({ isNotice: true, isTrigger: false });
   });
 
   test("a PWA notice reduces the measured table tier without clipping it", async ({
@@ -245,7 +206,7 @@ test.describe("tabletop layout", () => {
       ).toBeVisible();
       if (fixture.name === "result") {
         await page
-          .getByTestId("player-rail-A")
+          .getByTestId("app-top-bar")
           .getByRole("button", { name: "Is dhiib" })
           .click();
         await page
@@ -295,18 +256,6 @@ test.describe("tabletop layout", () => {
   });
 });
 
-function rectanglesOverlap(
-  first: { x: number; y: number; width: number; height: number },
-  second: { x: number; y: number; width: number; height: number },
-): boolean {
-  return (
-    first.x < second.x + second.width &&
-    first.x + first.width > second.x &&
-    first.y < second.y + second.height &&
-    first.y + first.height > second.y
-  );
-}
-
 async function measureTabletop(page: import("@playwright/test").Page) {
   return page.evaluate(() => {
     const rect = (selector: string): DOMRect => {
@@ -332,14 +281,6 @@ async function measureTabletop(page: import("@playwright/test").Page) {
       document.querySelectorAll('[data-testid="board-hit-target"]'),
       (element) => element.getBoundingClientRect(),
     );
-    const action = rect('summary[aria-label="Ficillo kale"]');
-    const actionOverlapsPoint = targetRects.some(
-      (target) =>
-        action.left < target.right &&
-        action.right > target.left &&
-        action.top < target.bottom &&
-        action.bottom > target.top,
-    );
     const smallestTarget = targetRects.reduce((smallest, target) =>
       target.width < smallest.width ? target : smallest,
     );
@@ -350,7 +291,6 @@ async function measureTabletop(page: import("@playwright/test").Page) {
       top: plain(rect('[data-testid="player-rail-B"]')),
       bottom: plain(rect('[data-testid="player-rail-A"]')),
       smallestTarget: plain(smallestTarget),
-      actionOverlapsPoint,
       documentWidth: document.documentElement.scrollWidth,
       main: {
         ...plain(mainRect),

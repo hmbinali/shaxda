@@ -75,6 +75,26 @@ test.describe("Q1 mobile responsive smoke", () => {
       page.getByRole("heading", { name: "Ciyaar qalabkan", exact: true }),
     ).toBeVisible();
     await expect(page.getByTestId("board")).toBeInViewport();
+    const topRailBox = await page.getByTestId("player-rail-B").boundingBox();
+    const boardBox = await page.getByTestId("board").boundingBox();
+    const bottomRailBox = await page.getByTestId("player-rail-A").boundingBox();
+    const playerName = page.getByTestId("player-rail-A").locator("h2");
+    const instruction = page.getByTestId("player-rail-A").locator("p").first();
+
+    expect(topRailBox).not.toBeNull();
+    expect(boardBox).not.toBeNull();
+    expect(bottomRailBox).not.toBeNull();
+    expect(
+      boardBox!.y - (topRailBox!.y + topRailBox!.height),
+    ).toBeLessThanOrEqual(12);
+    expect(
+      bottomRailBox!.y - (boardBox!.y + boardBox!.height),
+    ).toBeLessThanOrEqual(12);
+    await expect(playerName).toBeVisible();
+    await expect(instruction).toBeVisible();
+    expect((await playerName.textContent())?.trim().length).toBeGreaterThan(0);
+    expect((await instruction.textContent())?.trim().length).toBeGreaterThan(0);
+
     await page.locator('[data-point-id="O1"]').click();
     await expect(page.locator('[data-point-id="O1"]')).toHaveAttribute(
       "data-occupant",

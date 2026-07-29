@@ -8,7 +8,7 @@
     Volume2,
     VolumeX,
   } from "@lucide/svelte";
-  import { replaceState } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { messages } from "@shaxda/i18n";
   import { onMount } from "svelte";
@@ -18,6 +18,7 @@
     saveSoundPreference,
   } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
+  import ConfirmSheet from "$components/game/ConfirmSheet.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
   import GameResultCard from "$components/game/GameResultCard.svelte";
   import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
@@ -32,6 +33,7 @@
   } from "$lib/online/guestIdentity";
   import { OnlineCreateRoomError } from "$lib/online/onlineGameClient";
   import { createOnlineGameController } from "$lib/online/onlineGame.svelte";
+  import { registerTopBarActions } from "$lib/shell/appShell.svelte";
 
   type TurnstileApi = {
     render: (
@@ -60,6 +62,8 @@
   let formError = $state<string | null>(null);
   let copied = $state(false);
   let soundEnabled = $state(true);
+  let pendingConfirm = $state<"resign" | "leave" | null>(null);
+  let lobbyBackground = $state<HTMLElement | null>(null);
   let lastFeedbackNonce = 0;
   let turnstileToken = $state<string | undefined>();
   let turnstileContainer = $state<HTMLDivElement | null>(null);
@@ -75,6 +79,40 @@
       : `${pageOrigin}/online?room=${controller.roomCode}`,
   );
   const invalidMessage = $derived(resolveInvalidMessage());
+
+  registerTopBarActions(() => {
+    const liveGame =
+      controller.started &&
+      controller.mySlot !== null &&
+      status.phase !== "gameOver";
+
+    return [
+      {
+        id: "sound",
+        label: soundEnabled
+          ? gameCopy.controls.soundOff
+          : gameCopy.controls.soundOn,
+        icon: soundEnabled ? Volume2 : VolumeX,
+        onSelect: toggleSound,
+        pressed: soundEnabled,
+      },
+      {
+        id: "resign-or-exit",
+        label: liveGame ? gameCopy.controls.resign : gameCopy.controls.exit,
+        icon: liveGame ? Flag : LogOut,
+        onSelect: () => {
+          if (liveGame) {
+            pendingConfirm = "resign";
+          } else if (controller.roomCode === null) {
+            void goto(resolve("/"));
+          } else {
+            pendingConfirm = "leave";
+          }
+        },
+        tone: liveGame ? "danger" : "default",
+      },
+    ];
+  });
 
   onMount(() => {
     guestId = getOrCreateGuestId();
@@ -180,6 +218,17 @@
     controller.leave();
     roomCodeInput = "";
     replaceState(resolve("/online"), {});
+  }
+
+  function confirmPendingAction(): void {
+    const action = pendingConfirm;
+    pendingConfirm = null;
+
+    if (action === "resign") {
+      controller.resign();
+    } else if (action === "leave") {
+      leaveRoom();
+    }
   }
 
   function toggleSound(): void {
@@ -311,7 +360,6 @@
   <OnlineTabletop
     {controller}
     viewer={controller.mySlot}
-    {soundEnabled}
     invalidMessage={formError ?? invalidMessage}
     {playerName}
     resultReason={controller.onlineEndReason !== null
@@ -319,11 +367,13 @@
       : status.endReason === null
         ? null
         : gameCopy.result.reasons[status.endReason]}
-    onToggleSound={toggleSound}
+    {pendingConfirm}
+    onRequestConfirm={(action) => (pendingConfirm = action)}
     onLeave={leaveRoom}
   />
 {:else}
   <section
+    bind:this={lobbyBackground}
     class="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:px-8"
     data-testid="online-page"
   >
@@ -340,32 +390,6 @@
           <h1 class="mt-1 text-3xl font-semibold tracking-normal sm:text-5xl">
             {copy.heading}
           </h1>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-          <Button ariaPressed={soundEnabled} onclick={toggleSound}>
-            {#if soundEnabled}
-              <Volume2 size={16} aria-hidden="true" />
-              {gameCopy.controls.soundOff}
-            {:else}
-              <VolumeX size={16} aria-hidden="true" />
-              {gameCopy.controls.soundOn}
-            {/if}
-          </Button>
-          {#if controller.roomCode !== null}
-            <Button onclick={leaveRoom}>
-              <LogOut size={16} aria-hidden="true" />
-              {copy.leave}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={controller.state.phase === "gameOver"}
-              onclick={() => controller.resign()}
-            >
-              <Flag size={16} aria-hidden="true" />
-              {gameCopy.controls.resign}
-            </Button>
-          {/if}
         </div>
       </div>
 
@@ -569,4 +593,19 @@
       {/if}
     </aside>
   </section>
+
+  <ConfirmSheet
+    open={pendingConfirm !== null}
+    title={pendingConfirm === "resign"
+      ? gameCopy.controls.resign
+      : gameCopy.controls.exit}
+    body={pendingConfirm === "resign"
+      ? gameCopy.prompts.resign
+      : gameCopy.prompts.leave}
+    cancelLabel={gameCopy.tabletop.cancel}
+    confirmLabel={gameCopy.tabletop.confirm}
+    background={lobbyBackground}
+    onClose={() => (pendingConfirm = null)}
+    onConfirm={confirmPendingAction}
+  />
 {/if}

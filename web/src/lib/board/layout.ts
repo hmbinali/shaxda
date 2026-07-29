@@ -19,7 +19,7 @@ export const PIECE_RADIUS = 4.2;
 export const LEGAL_HINT_RADIUS = 1.55;
 
 const RING_HALF_SIZES = {
-  O: 42,
+  O: 41.45,
   M: 29,
   I: 16,
 } as const satisfies Record<Ring, number>;

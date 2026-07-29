@@ -83,7 +83,7 @@ select {
 }
 
 .shaxda-piece-selected {
-  transform: translateY(-0.7px);
+  transform: translateY(var(--shaxda-selected-offset));
 }
 
 .shaxda-board-point[data-pressed="true"] .shaxda-piece-group {

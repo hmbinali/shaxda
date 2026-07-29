@@ -41,6 +41,8 @@
     nonce: number;
   };
 
+  const SELECTED_PIECE_OFFSET = -0.7;
+
   let {
     state: gameState,
     selected = null,
@@ -370,6 +372,10 @@
     return action.player === "A" ? "B" : "A";
   }
 
+  function removalConfirmationClass(action: RemovalFeedback["action"]): string {
+    return action.type === "capture" ? "stroke-danger" : "stroke-warning";
+  }
+
   function isBoardKeyboardKey(key: string): boolean {
     return [
       "Tab",
@@ -415,6 +421,7 @@
     role="group"
     aria-label={copy.title}
     aria-describedby={interactive ? "shaxda-board-keyboard-help" : undefined}
+    style={`--shaxda-selected-offset: ${SELECTED_PIECE_OFFSET}px;`}
     onfocusout={handleBoardFocusOut}
     onanimationend={handleBoardAnimationEnd}
   >
@@ -438,10 +445,35 @@
         <stop offset="62%" stop-color="#4b2714" stop-opacity="0" />
         <stop offset="100%" stop-color="#4b2714" stop-opacity="0.24" />
       </radialGradient>
-      <linearGradient id="shaxda-board-frame" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#9a6036" />
-        <stop offset="48%" stop-color="#74411f" />
-        <stop offset="100%" stop-color="#4d2917" />
+      <linearGradient
+        id="shaxda-board-frame-dark"
+        x1="0%"
+        y1="0%"
+        x2="0%"
+        y2="100%"
+      >
+        <stop offset="0%" stop-color="#5C361F" />
+        <stop offset="100%" stop-color="#3D2013" />
+      </linearGradient>
+      <linearGradient
+        id="shaxda-board-frame-mid"
+        x1="0%"
+        y1="0%"
+        x2="0%"
+        y2="100%"
+      >
+        <stop offset="0%" stop-color="#7E4A25" />
+        <stop offset="100%" stop-color="#5C361F" />
+      </linearGradient>
+      <linearGradient
+        id="shaxda-board-frame-light"
+        x1="0%"
+        y1="0%"
+        x2="0%"
+        y2="100%"
+      >
+        <stop offset="0%" stop-color="#D3B08F" />
+        <stop offset="100%" stop-color="#7E4A25" />
       </linearGradient>
       <linearGradient id="shaxda-carved-line" x1="0%" y1="0%" x2="0%" y2="100%">
         <stop offset="0%" stop-color="#2c160c" />
@@ -466,18 +498,45 @@
       width="98.6"
       height="98.6"
       rx="5.4"
-      fill="#3d2012"
+      fill="#3D2013"
       data-testid="board-wood-frame"
+      data-frame-layer="outer"
       aria-hidden="true"
       pointer-events="none"
     />
     <rect
-      x="1.5"
-      y="1.5"
-      width="97"
-      height="97"
-      rx="4.7"
-      fill="url(#shaxda-board-frame)"
+      x="1.3"
+      y="1.3"
+      width="97.4"
+      height="97.4"
+      rx="4.9"
+      fill="url(#shaxda-board-frame-dark)"
+      data-testid="board-frame-layer"
+      data-frame-layer="dark"
+      aria-hidden="true"
+      pointer-events="none"
+    />
+    <rect
+      x="2.1"
+      y="2.1"
+      width="95.8"
+      height="95.8"
+      rx="4.25"
+      fill="url(#shaxda-board-frame-mid)"
+      data-testid="board-frame-layer"
+      data-frame-layer="mid"
+      aria-hidden="true"
+      pointer-events="none"
+    />
+    <rect
+      x="3"
+      y="3"
+      width="94"
+      height="94"
+      rx="3.6"
+      fill="url(#shaxda-board-frame-light)"
+      data-testid="board-frame-layer"
+      data-frame-layer="light"
       aria-hidden="true"
       pointer-events="none"
     />
@@ -516,24 +575,24 @@
       pointer-events="none"
     />
     <rect
-      x="3.25"
-      y="3.25"
-      width="93.5"
-      height="93.5"
-      rx="3.5"
-      class="fill-transparent stroke-board-900/45"
-      stroke-width="0.9"
+      x="3.4"
+      y="3.4"
+      width="93.2"
+      height="93.2"
+      rx="3.35"
+      class="fill-transparent stroke-board-900/30"
+      stroke-width="0.5"
       aria-hidden="true"
       pointer-events="none"
     />
     <rect
-      x="4.45"
-      y="4.45"
-      width="91.1"
-      height="91.1"
-      rx="2.45"
-      class="fill-transparent stroke-board-50/35"
-      stroke-width="0.55"
+      x="4.3"
+      y="4.3"
+      width="91.4"
+      height="91.4"
+      rx="2.55"
+      class="fill-transparent stroke-board-50/22"
+      stroke-width="0.35"
       aria-hidden="true"
       pointer-events="none"
     />
@@ -660,8 +719,8 @@
             cx={point.x}
             cy={point.y}
             r={SOCKET_RADIUS}
-            class="fill-board-900/20 stroke-board-50/35"
-            stroke-width="0.7"
+            class="fill-board-900/16 stroke-board-50/25"
+            stroke-width="0.55"
             aria-hidden="true"
             pointer-events="none"
           />
@@ -690,7 +749,7 @@
             <circle
               data-testid="board-selected-ring"
               cx={point.x}
-              cy={point.y}
+              cy={point.y + SELECTED_PIECE_OFFSET}
               r={PIECE_RADIUS + 1.65}
               class="shaxda-selected-halo shaxda-cue-enter fill-transparent stroke-selected"
               stroke-width="1.85"
@@ -773,28 +832,6 @@
               aria-hidden="true"
               pointer-events="none"
             />
-            <g
-              data-testid="board-capture-minus"
-              class="shaxda-cue-enter"
-              aria-hidden="true"
-              pointer-events="none"
-            >
-              <circle
-                cx={point.x + 4.5}
-                cy={point.y - 4.5}
-                r="1.55"
-                class="fill-danger"
-              />
-              <line
-                x1={point.x + 3.75}
-                y1={point.y - 4.5}
-                x2={point.x + 5.25}
-                y2={point.y - 4.5}
-                class="stroke-white"
-                stroke-width="0.55"
-                stroke-linecap="round"
-              />
-            </g>
           {/if}
 
           {#if point.isRemovalTarget}
@@ -863,7 +900,7 @@
           cx={POINT_COORDS[removalFeedback.action.point].x}
           cy={POINT_COORDS[removalFeedback.action.point].y}
           r={PIECE_RADIUS + 0.6}
-          class="shaxda-removal-confirmation fill-transparent stroke-success"
+          class={`shaxda-removal-confirmation fill-transparent ${removalConfirmationClass(removalFeedback.action)}`}
           stroke-width="1"
         />
       </g>

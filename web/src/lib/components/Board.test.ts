@@ -34,6 +34,16 @@ describe("Board", () => {
     expect(
       container.querySelector('[data-testid="board-hit-target"]'),
     ).toHaveAttribute("r", "6.2");
+    expect(
+      container.querySelector('[data-testid="board-socket"]'),
+    ).toHaveAttribute("r", "2.3");
+    expect(
+      container.querySelector('[data-testid="board-socket"]'),
+    ).toHaveAttribute("stroke-width", "0.55");
+    expect(container.querySelector('[data-testid="board-socket"]')).toHaveClass(
+      "fill-board-900/16",
+      "stroke-board-50/25",
+    );
     expect(point(container, "O1")).toHaveAttribute("data-occupant", "A");
     expect(point(container, "M1")).toHaveAttribute("data-occupant", "B");
   });
@@ -54,6 +64,13 @@ describe("Board", () => {
     expect(
       screenClass(container, '[data-testid="board-selected-ring"]'),
     ).toContain("shaxda-selected-halo");
+    expect(
+      container.querySelector('[data-testid="board-selected-ring"]'),
+    ).toHaveAttribute("cy", "49.3");
+    expect(container.querySelector(".shaxda-board-svg")).toHaveAttribute(
+      "style",
+      expect.stringContaining("--shaxda-selected-offset: -0.7px"),
+    );
     expect(
       screenClass(container, '[data-testid="board-legal-hint"]'),
     ).toContain("shaxda-cue-enter");
@@ -76,7 +93,10 @@ describe("Board", () => {
     ).toHaveLength(3);
     expect(
       container.querySelectorAll('[data-testid="board-capture-minus"]'),
-    ).toHaveLength(3);
+    ).toHaveLength(0);
+    expect(
+      container.querySelector('[data-testid="board-capture-target"]'),
+    ).toHaveClass("stroke-danger");
     expect(
       container.querySelector('[data-testid="board-capture-target"]'),
     ).not.toHaveAttribute("stroke-dasharray");
@@ -149,6 +169,29 @@ describe("Board", () => {
     expect(
       container.querySelector('[data-testid="board-wood-frame"]'),
     ).toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-testid="board-frame-layer"]'),
+    ).toHaveLength(3);
+    expect(
+      Array.from(container.querySelectorAll("[data-frame-layer]"), (layer) =>
+        layer.getAttribute("data-frame-layer"),
+      ),
+    ).toEqual(["outer", "dark", "mid", "light"]);
+    expect(
+      container.querySelector('[data-frame-layer="outer"]'),
+    ).toHaveAttribute("fill", "#3D2013");
+    const frameStopColors = Array.from(
+      container.querySelectorAll('[id^="shaxda-board-frame-"] stop'),
+      (stop) => stop.getAttribute("stop-color"),
+    );
+    expect(frameStopColors).toEqual([
+      "#5C361F",
+      "#3D2013",
+      "#7E4A25",
+      "#5C361F",
+      "#D3B08F",
+      "#7E4A25",
+    ]);
     expect(
       container.querySelector('[data-testid="board-edge-vignette"]'),
     ).toBeInTheDocument();
@@ -270,7 +313,7 @@ describe("Board", () => {
       removalFeedback?.querySelector(
         '[data-testid="board-removal-confirmation"]',
       ),
-    ).toHaveClass("shaxda-removal-confirmation");
+    ).toHaveClass("shaxda-removal-confirmation", "stroke-danger");
   });
 
   it("animates an initially removed stone with the same removal feedback", () => {
@@ -290,7 +333,7 @@ describe("Board", () => {
     ).toBeInTheDocument();
     expect(
       container.querySelector('[data-testid="board-removal-confirmation"]'),
-    ).toBeInTheDocument();
+    ).toHaveClass("stroke-warning");
   });
 
   it("pops the full piece group after placement", () => {

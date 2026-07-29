@@ -105,19 +105,21 @@ test.describe("C1 public content", () => {
     ).toHaveAttribute("href", "/online");
   });
 
-  test("desktop sidebar starts games directly and persists across navigation", async ({
+  test("the global top bar persists while drawer navigation changes routes", async ({
     page,
   }) => {
     await page.goto("/learn");
+    const topBar = page.getByTestId("app-top-bar");
+    await topBar.evaluate((element) => {
+      element.setAttribute("data-persistence-check", "present");
+    });
+
+    await page.getByRole("button", { name: "Fur hagaha" }).click();
     const navigation = page.getByRole("navigation", { name: "Hagaha bogga" });
-    const sidebar = navigation.locator("xpath=ancestor::aside");
 
     await expect(
       navigation.getByRole("link", { name: "Baro" }),
     ).toHaveAttribute("aria-current", "page");
-    await sidebar.evaluate((element) => {
-      element.setAttribute("data-persistence-check", "present");
-    });
 
     await navigation.getByRole("link", { name: "Ciyaar qalabkan" }).click();
 
@@ -125,41 +127,36 @@ test.describe("C1 public content", () => {
     await expect(
       page.getByRole("heading", { name: "Ciyaar qalabkan", exact: true }),
     ).toBeVisible();
-    await expect(sidebar).toHaveAttribute("data-persistence-check", "present");
+    await expect(topBar).toHaveAttribute("data-persistence-check", "present");
+
+    await page.getByRole("button", { name: "Fur hagaha" }).click();
     await expect(
-      navigation.getByRole("link", { name: "Ciyaar qalabkan" }),
+      page
+        .getByRole("navigation", { name: "Hagaha bogga" })
+        .getByRole("link", { name: "Ciyaar qalabkan" }),
     ).toHaveAttribute("aria-current", "page");
   });
 
-  test("desktop sidebar collapses responsively and remembers its state", async ({
+  test("desktop uses the same overlay drawer without taking layout width", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/learn");
 
-    const sidebar = page.getByTestId("desktop-sidebar");
     const main = page.locator("#main-content");
-    const expandedWidth = await sidebar.evaluate(
-      (element) => element.getBoundingClientRect().width,
-    );
     const mainWidthBefore = await main.evaluate(
       (element) => element.getBoundingClientRect().width,
     );
 
-    expect(expandedWidth).toBeGreaterThanOrEqual(256);
-    expect(expandedWidth).toBeLessThanOrEqual(288);
-
-    await page.getByRole("button", { name: "Isku koob astaamo" }).click();
-    await expect(sidebar).toHaveAttribute("data-collapsed", "true");
-    await expect
-      .poll(() =>
-        sidebar.evaluate((element) => element.getBoundingClientRect().width),
-      )
-      .toBeLessThanOrEqual(72.5);
-    const mainWidthAfter = await main.evaluate(
+    expect(await page.getByTestId("desktop-sidebar").count()).toBe(0);
+    await page.getByRole("button", { name: "Fur hagaha" }).click();
+    const drawer = page.getByRole("dialog", { name: "Hagaha bogga" });
+    await expect(drawer).toBeVisible();
+    await expect(main).toHaveCSS("overflow-y", "hidden");
+    const mainWidthWithDrawer = await main.evaluate(
       (element) => element.getBoundingClientRect().width,
     );
-    expect(mainWidthAfter).toBeGreaterThan(mainWidthBefore + 150);
+    expect(mainWidthWithDrawer).toBe(mainWidthBefore);
 
     for (const name of [
       "Hoy",
@@ -170,45 +167,17 @@ test.describe("C1 public content", () => {
       "Asturnaanta",
       "Shuruudaha",
     ]) {
-      await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+      await expect(
+        drawer.getByRole("link", { name, exact: true }),
+      ).toBeVisible();
     }
 
-    const localLink = page.getByRole("link", {
-      name: "Ciyaar qalabkan",
-      exact: true,
-    });
-    await localLink.focus();
-    await expect(localLink).toHaveAttribute("data-tooltip", "Ciyaar qalabkan");
-
-    await page.reload();
-    await expect(sidebar).toHaveAttribute("data-collapsed", "true");
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(main).toHaveCSS("overflow-y", "auto");
     await expect(
-      page.getByRole("button", { name: "Ballaari hagaha" }),
-    ).toBeVisible();
-
-    await page.getByRole("button", { name: "Ballaari hagaha" }).click();
-    await page.setViewportSize({ width: 1024, height: 800 });
-    await expect
-      .poll(() =>
-        sidebar.evaluate((element) => element.getBoundingClientRect().width),
-      )
-      .toBeGreaterThanOrEqual(255.5);
-    await expect
-      .poll(() =>
-        sidebar.evaluate((element) => element.getBoundingClientRect().width),
-      )
-      .toBeLessThanOrEqual(256.5);
-    await page.setViewportSize({ width: 1920, height: 1000 });
-    await expect
-      .poll(() =>
-        sidebar.evaluate((element) => element.getBoundingClientRect().width),
-      )
-      .toBeGreaterThanOrEqual(287.5);
-    await expect
-      .poll(() =>
-        sidebar.evaluate((element) => element.getBoundingClientRect().width),
-      )
-      .toBeLessThanOrEqual(288.5);
+      page.getByRole("button", { name: "Fur hagaha" }),
+    ).toBeFocused();
   });
 
   test("offers a keyboard skip link to the main content", async ({ page }) => {

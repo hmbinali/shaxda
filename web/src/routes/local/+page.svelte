@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { RotateCcw, Volume2, VolumeX } from "@lucide/svelte";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
+  import { Flag, LogOut, RotateCcw, Volume2, VolumeX } from "@lucide/svelte";
   import {
     legalActions,
     type GameState,
@@ -14,22 +16,20 @@
   } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
   import BoardNotice from "$components/game/BoardNotice.svelte";
-  import ConfirmSheet from "$components/game/ConfirmSheet.svelte";
-  import GameActionsMenu from "$components/game/GameActionsMenu.svelte";
+  import ConfirmDialog from "$components/game/ConfirmDialog.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
-  import GameDetailsPanel from "$components/game/GameDetailsPanel.svelte";
   import GameResultOverlay from "$components/game/GameResultOverlay.svelte";
   import InvalidToast from "$components/game/InvalidToast.svelte";
   import PlayerRail from "$components/game/PlayerRail.svelte";
   import TabletopShell from "$components/game/TabletopShell.svelte";
   import PageMeta from "$components/PageMeta.svelte";
-  import Button from "$components/ui/Button.svelte";
   import { createLocalGameController } from "$lib/game/localGame.svelte";
   import {
     instructionKeyFor,
     railStateFor,
     resolveSeating,
   } from "$lib/game/seating";
+  import { registerTopBarActions } from "$lib/shell/appShell.svelte";
 
   const copy = messages.so.localGame;
   const orientation = { orientation: "shared" } as const;
@@ -39,8 +39,7 @@
 
   let soundEnabled = $state(true);
   let lastFeedbackNonce = 0;
-  let pendingConfirm = $state<"newGame" | "resign" | null>(null);
-  let confirmEdge = $state<"top" | "bottom">("bottom");
+  let pendingConfirm = $state<"newGame" | "resign" | "exit" | null>(null);
   let tabletopBackground = $state<HTMLElement | null>(null);
   const status = $derived(controller.status);
   const resignOwner = $derived(findResignOwner(controller.state));
@@ -49,6 +48,35 @@
       ? null
       : copy.invalid[controller.invalid.reason],
   );
+
+  registerTopBarActions(() => [
+    {
+      id: "sound",
+      label: soundEnabled ? copy.controls.soundOff : copy.controls.soundOn,
+      icon: soundEnabled ? Volume2 : VolumeX,
+      onSelect: toggleSound,
+      pressed: soundEnabled,
+    },
+    {
+      id: "new-game",
+      label: copy.controls.newGame,
+      icon: RotateCcw,
+      onSelect: requestNewGame,
+    },
+    {
+      id: "resign-or-exit",
+      label: resignOwner === null ? copy.controls.exit : copy.controls.resign,
+      icon: resignOwner === null ? LogOut : Flag,
+      onSelect: () => {
+        if (resignOwner === null) {
+          requestExit();
+        } else {
+          requestResign();
+        }
+      },
+      tone: resignOwner === null ? "default" : "danger",
+    },
+  ]);
 
   onMount(() => {
     soundEnabled = loadSoundPreference();
@@ -83,12 +111,14 @@
 
   function requestNewGame(): void {
     pendingConfirm = "newGame";
-    confirmEdge = "bottom";
   }
 
-  function requestResign(player: PlayerId): void {
+  function requestResign(): void {
     pendingConfirm = "resign";
-    confirmEdge = player === seating.top ? "top" : "bottom";
+  }
+
+  function requestExit(): void {
+    pendingConfirm = "exit";
   }
 
   function confirmAction(): void {
@@ -99,6 +129,8 @@
       controller.startNewGame();
     } else if (action === "resign") {
       controller.resign();
+    } else if (action === "exit") {
+      void goto(resolve("/"));
     }
   }
 
@@ -129,9 +161,6 @@
         railState={railStateFor(status, seating.top)}
         instruction={instructionKeyFor(status, seating.top, orientation)}
         rotate={seating.rotateTop}
-        onResign={resignOwner === seating.top
-          ? () => requestResign(seating.top)
-          : null}
       />
     {/snippet}
 
@@ -145,29 +174,6 @@
           interactive
           onSelectPoint={(point) => controller.clickPoint(point)}
         />
-
-        <GameActionsMenu
-          label={copy.tabletop.moreActions}
-          closeLabel={copy.tabletop.cancel}
-        >
-          <GameDetailsPanel {status} {playerName}>
-            {#snippet actions()}
-              <Button ariaPressed={soundEnabled} onclick={toggleSound}>
-                {#if soundEnabled}
-                  <Volume2 size={16} aria-hidden="true" />
-                  {copy.controls.soundOff}
-                {:else}
-                  <VolumeX size={16} aria-hidden="true" />
-                  {copy.controls.soundOn}
-                {/if}
-              </Button>
-              <Button onclick={requestNewGame}>
-                <RotateCcw size={16} aria-hidden="true" />
-                {copy.controls.newGame}
-              </Button>
-            {/snippet}
-          </GameDetailsPanel>
-        </GameActionsMenu>
 
         {#if status.isSpaceMaking}
           <BoardNotice
@@ -204,45 +210,25 @@
         name={playerName(seating.bottom)}
         railState={railStateFor(status, seating.bottom)}
         instruction={instructionKeyFor(status, seating.bottom, orientation)}
-        onResign={resignOwner === seating.bottom
-          ? () => requestResign(seating.bottom)
-          : null}
       />
-    {/snippet}
-
-    {#snippet details()}
-      <GameDetailsPanel {status} {playerName}>
-        {#snippet actions()}
-          <Button ariaPressed={soundEnabled} onclick={toggleSound}>
-            {#if soundEnabled}
-              <Volume2 size={16} aria-hidden="true" />
-              {copy.controls.soundOff}
-            {:else}
-              <VolumeX size={16} aria-hidden="true" />
-              {copy.controls.soundOn}
-            {/if}
-          </Button>
-          <Button onclick={requestNewGame}>
-            <RotateCcw size={16} aria-hidden="true" />
-            {copy.controls.newGame}
-          </Button>
-        {/snippet}
-      </GameDetailsPanel>
     {/snippet}
   </TabletopShell>
 </div>
 
-<ConfirmSheet
+<ConfirmDialog
   open={pendingConfirm !== null}
   title={pendingConfirm === "resign"
     ? copy.controls.resign
-    : copy.controls.newGame}
+    : pendingConfirm === "exit"
+      ? copy.controls.exit
+      : copy.controls.newGame}
   body={pendingConfirm === "resign"
     ? copy.prompts.resign
-    : copy.prompts.newGame}
+    : pendingConfirm === "exit"
+      ? copy.prompts.leave
+      : copy.prompts.newGame}
   cancelLabel={copy.tabletop.cancel}
   confirmLabel={copy.tabletop.confirm}
-  edge={confirmEdge}
   background={tabletopBackground}
   onClose={() => (pendingConfirm = null)}
   onConfirm={confirmAction}

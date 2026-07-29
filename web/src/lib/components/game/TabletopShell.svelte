@@ -5,7 +5,6 @@
     topRail: Snippet;
     board: Snippet;
     bottomRail: Snippet;
-    details?: Snippet;
     compactRails?: boolean;
     orientation: "shared" | "solo";
   }
@@ -14,7 +13,6 @@
     topRail,
     board,
     bottomRail,
-    details,
     compactRails = false,
     orientation,
   }: Props = $props();
@@ -23,21 +21,17 @@
 <section class="route-shell" data-orientation={orientation}>
   <div class="tabletop-frame">
     <div class="tabletop" class:compact={compactRails} data-testid="tabletop">
-      {@render topRail()}
-      <div class="board-stage" data-testid="board-stage">
-        <div class="board-square">
-          {@render board()}
-        </div>
+      <div class="rail-slot">
+        {@render topRail()}
       </div>
-      {@render bottomRail()}
+      <div class="board-square">
+        {@render board()}
+      </div>
+      <div class="rail-slot">
+        {@render bottomRail()}
+      </div>
     </div>
   </div>
-
-  {#if details}
-    <aside class="details">
-      {@render details()}
-    </aside>
-  {/if}
 </section>
 
 <style>
@@ -57,69 +51,68 @@
   }
 
   .tabletop {
+    --rail-h: 3rem;
+    --stack-gap: 0.5rem;
+    --board-min: 13.75rem;
+    --board-size: clamp(
+      var(--board-min),
+      min(
+        100cqw - 1rem,
+        100cqh - 2 * var(--rail-h) - 2 * var(--stack-gap) - 1rem
+      ),
+      44rem
+    );
+
     display: grid;
-    grid-template-rows: 3rem minmax(13.75rem, 1fr) 3rem;
-    gap: 0.25rem;
+    grid-template-rows: var(--rail-h) var(--board-size) var(--rail-h);
+    gap: var(--stack-gap);
+    justify-items: center;
+    align-content: safe center;
     width: 100%;
     height: 100%;
-    min-height: 20.25rem;
+    min-height: calc(
+      var(--board-min) + 2 * var(--rail-h) + 2 * var(--stack-gap) + 1rem
+    );
     max-width: 48rem;
-    padding: 0.25rem;
+    padding: 0.5rem;
   }
 
-  .board-stage {
-    container-name: board-stage;
-    container-type: size;
+  .rail-slot {
+    container-name: rail;
+    container-type: inline-size;
     display: grid;
-    min-width: 0;
-    min-height: 13.75rem;
-    place-items: center;
+    width: var(--board-size);
   }
 
   .board-square {
     position: relative;
-    width: min(100cqw, 100cqh, 44rem);
+    width: var(--board-size);
     aspect-ratio: 1;
-  }
-
-  .details {
-    display: none;
   }
 
   @container tabletop (min-height: 380px) {
     .tabletop {
-      grid-template-rows: 4rem minmax(13.75rem, 1fr) 4rem;
+      --rail-h: 4rem;
     }
 
     .tabletop.compact {
-      grid-template-rows: 3.5rem minmax(13.75rem, 1fr) 3.5rem;
+      --rail-h: 3.5rem;
     }
   }
 
   @container tabletop (min-height: 460px) {
     .tabletop {
-      grid-template-rows: 5.5rem minmax(13.75rem, 1fr) 5.5rem;
+      --rail-h: min(
+        5.5rem,
+        max(4rem, calc((100cqh - 17.5rem - 2 * var(--stack-gap) - 1rem) / 2))
+      );
     }
 
     .tabletop.compact {
-      grid-template-rows: 4.5rem minmax(13.75rem, 1fr) 4.5rem;
-    }
-  }
-
-  @media (min-width: 64rem) {
-    .route-shell {
-      grid-template-columns: minmax(0, 1fr) 20rem;
-      gap: 1rem;
-      height: 100%;
-      padding: 1rem;
-    }
-
-    .details {
-      display: grid;
-      align-content: start;
-      gap: 1rem;
-      min-height: 0;
-      overflow-y: auto;
+      --rail-h: min(
+        4.5rem,
+        max(3.5rem, calc((100cqh - 17.5rem - 2 * var(--stack-gap) - 1rem) / 2))
+      );
     }
   }
 </style>

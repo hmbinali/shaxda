@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LogOut, Trophy, Volume2, VolumeX } from "@lucide/svelte";
+  import { Trophy } from "@lucide/svelte";
   import type { PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
   import Board from "$components/Board.svelte";
@@ -11,9 +11,7 @@
     resolveSeating,
   } from "$lib/game/seating";
   import BoardNotice from "./BoardNotice.svelte";
-  import ConfirmSheet from "./ConfirmSheet.svelte";
-  import GameActionsMenu from "./GameActionsMenu.svelte";
-  import GameDetailsPanel from "./GameDetailsPanel.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import GameResultOverlay from "./GameResultOverlay.svelte";
   import InvalidToast from "./InvalidToast.svelte";
   import PlayerRail from "./PlayerRail.svelte";
@@ -22,22 +20,22 @@
   interface Props {
     controller: OnlineGameController;
     viewer: PlayerId;
-    soundEnabled: boolean;
     invalidMessage: string | null;
     playerName: (player: PlayerId) => string;
     resultReason: string | null;
-    onToggleSound: () => void;
+    pendingConfirm: "resign" | "leave" | null;
+    onRequestConfirm: (action: "resign" | "leave" | null) => void;
     onLeave: () => void;
   }
 
   let {
     controller,
     viewer,
-    soundEnabled,
     invalidMessage,
     playerName,
     resultReason,
-    onToggleSound,
+    pendingConfirm,
+    onRequestConfirm,
     onLeave,
   }: Props = $props();
 
@@ -46,12 +44,11 @@
   const orientation = $derived({ orientation: "solo", viewer } as const);
   const seating = $derived(resolveSeating(orientation));
   const status = $derived(controller.status);
-  let pendingConfirm = $state<"resign" | "leave" | null>(null);
   let tabletopBackground = $state<HTMLElement | null>(null);
 
   function confirmAction(): void {
     const action = pendingConfirm;
-    pendingConfirm = null;
+    onRequestConfirm(null);
 
     if (action === "resign") {
       controller.resign();
@@ -104,46 +101,6 @@
           onSelectPoint={(point) => controller.clickPoint(point)}
         />
 
-        <GameActionsMenu
-          label={gameCopy.tabletop.moreActions}
-          closeLabel={gameCopy.tabletop.cancel}
-        >
-          <GameDetailsPanel
-            {status}
-            {playerName}
-            leadingFields={[
-              {
-                label: copy.connectionLabel,
-                value: copy.connection[controller.connectionStatus],
-              },
-              {
-                label: copy.roomLabel,
-                value: controller.roomCode ?? "",
-                monospaced: true,
-              },
-            ]}
-          >
-            {#snippet actions()}
-              <Button ariaPressed={soundEnabled} onclick={onToggleSound}>
-                {#if soundEnabled}
-                  <Volume2 size={16} aria-hidden="true" />
-                  {gameCopy.controls.soundOff}
-                {:else}
-                  <VolumeX size={16} aria-hidden="true" />
-                  {gameCopy.controls.soundOn}
-                {/if}
-              </Button>
-              <Button onclick={() => (pendingConfirm = "resign")}>
-                {gameCopy.controls.resign}
-              </Button>
-              <Button onclick={() => (pendingConfirm = "leave")}>
-                <LogOut size={16} aria-hidden="true" />
-                {copy.leave}
-              </Button>
-            {/snippet}
-          </GameDetailsPanel>
-        </GameActionsMenu>
-
         {#if controller.canClaimWin}
           <BoardNotice title={copy.notices.claimAvailable}>
             {#snippet actions()}
@@ -187,47 +144,10 @@
         notice={noticeFor(seating.bottom)}
       />
     {/snippet}
-
-    {#snippet details()}
-      <GameDetailsPanel
-        {status}
-        {playerName}
-        leadingFields={[
-          {
-            label: copy.connectionLabel,
-            value: copy.connection[controller.connectionStatus],
-          },
-          {
-            label: copy.roomLabel,
-            value: controller.roomCode ?? "",
-            monospaced: true,
-          },
-        ]}
-      >
-        {#snippet actions()}
-          <Button ariaPressed={soundEnabled} onclick={onToggleSound}>
-            {#if soundEnabled}
-              <Volume2 size={16} aria-hidden="true" />
-              {gameCopy.controls.soundOff}
-            {:else}
-              <VolumeX size={16} aria-hidden="true" />
-              {gameCopy.controls.soundOn}
-            {/if}
-          </Button>
-          <Button onclick={() => (pendingConfirm = "resign")}>
-            {gameCopy.controls.resign}
-          </Button>
-          <Button onclick={() => (pendingConfirm = "leave")}>
-            <LogOut size={16} aria-hidden="true" />
-            {copy.leave}
-          </Button>
-        {/snippet}
-      </GameDetailsPanel>
-    {/snippet}
   </TabletopShell>
 </div>
 
-<ConfirmSheet
+<ConfirmDialog
   open={pendingConfirm !== null}
   title={pendingConfirm === "resign" ? gameCopy.controls.resign : copy.leave}
   body={pendingConfirm === "resign"
@@ -236,6 +156,6 @@
   cancelLabel={gameCopy.tabletop.cancel}
   confirmLabel={gameCopy.tabletop.confirm}
   background={tabletopBackground}
-  onClose={() => (pendingConfirm = null)}
+  onClose={() => onRequestConfirm(null)}
   onConfirm={confirmAction}
 />

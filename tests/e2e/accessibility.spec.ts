@@ -37,6 +37,25 @@ test.describe("Q1 accessibility audit", () => {
     });
   }
 
+  test("the open navigation drawer has no serious or critical axe violations", async ({
+    page,
+  }) => {
+    await page.goto("/local");
+    await page.getByRole("button", { name: "Fur hagaha" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Hagaha bogga" }),
+    ).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const blockingViolations = results.violations.filter((violation) =>
+      ["serious", "critical"].includes(violation.impact ?? ""),
+    );
+
+    expect(blockingViolations).toEqual([]);
+  });
+
   for (const fixture of activeBoardFixtures) {
     test(`/board ${fixture} fixture has no axe violations`, async ({
       page,

@@ -24,6 +24,9 @@ test.describe("O1 guest online game", () => {
       await expect(creator.getByTestId("online-board")).toBeVisible();
       await expect(joiner.getByTestId("online-board")).toBeVisible();
       await expect(
+        creator.getByTestId("game-details-panel"),
+      ).not.toBeAttached();
+      await expect(
         joiner.locator('[data-testid^="player-rail-"]').nth(0),
       ).toHaveAttribute("data-player", "A");
       await expect(
@@ -66,9 +69,6 @@ test.describe("O1 guest online game", () => {
       await creator.reload();
 
       await expect(creator.getByTestId("online-board")).toBeVisible();
-      await expect(
-        creator.getByTestId("game-details-panel").filter({ visible: true }),
-      ).toContainText("Wuu xiran yahay");
       await expect(creator.locator('[data-point-id="O1"]')).toHaveAttribute(
         "data-occupant",
         "A",

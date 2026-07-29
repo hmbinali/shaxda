@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Flag, LockKeyhole } from "@lucide/svelte";
+  import { LockKeyhole } from "@lucide/svelte";
   import { DRAW_TURN_LIMIT, type PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
   import {
@@ -18,7 +18,6 @@
     railState: RailState;
     instruction: RailInstructionKey | null;
     rotate?: boolean;
-    onResign?: (() => void) | null;
     notice?: string | null;
   }
 
@@ -30,7 +29,6 @@
     railState,
     instruction,
     rotate = false,
-    onResign = null,
     notice = null,
   }: Props = $props();
 
@@ -83,19 +81,11 @@
       {/if}
     </div>
 
-    {#if onResign !== null}
-      <button
-        class="resign"
-        type="button"
-        aria-label={copy.controls.resign}
-        onclick={onResign}
-      >
-        <Flag size={16} aria-hidden="true" />
-      </button>
-    {:else if status.phase === "placement"}
-      <ReserveTray {player} count={status.players[player].inHand} />
-    {:else}
-      <dl>
+    <div class="right-slot">
+      {#if status.phase === "placement"}
+        <ReserveTray {player} count={status.players[player].inHand} />
+      {/if}
+      <dl class:placement-stats={status.phase === "placement"}>
         <div>
           <dt>{copy.onBoardLabel}</dt>
           <dd>{status.players[player].onBoard}</dd>
@@ -105,7 +95,7 @@
           <dd>{status.players[player].captured}</dd>
         </div>
       </dl>
-    {/if}
+    </div>
   </div>
 </section>
 
@@ -266,15 +256,14 @@
     margin: 0;
   }
 
-  .resign {
-    display: grid;
-    width: 2.75rem;
-    height: 2.75rem;
-    place-items: center;
-    border: 1px solid rgb(153 27 27 / 0.3);
-    border-radius: 0.6rem;
-    background: rgb(254 242 242 / 0.75);
-    color: #991b1b;
+  .right-slot {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+  }
+
+  dl.placement-stats {
+    display: none;
   }
 
   dl div {
@@ -335,9 +324,17 @@
     p {
       font-size: 0.75rem;
     }
+  }
 
+  @container rail (min-width: 24rem) {
     dt {
       display: block;
+    }
+  }
+
+  @container rail (min-width: 30rem) {
+    dl.placement-stats {
+      display: grid;
     }
   }
 </style>

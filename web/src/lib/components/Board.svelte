@@ -36,8 +36,8 @@
     nonce: number;
   };
 
-  type CaptureFeedback = {
-    action: Extract<GameAction, { type: "capture" }>;
+  type RemovalFeedback = {
+    action: Extract<GameAction, { type: "capture" | "removeInitial" }>;
     nonce: number;
   };
 
@@ -66,8 +66,10 @@
   );
   const copy = messages.so.boardGallery;
   const pieceFeedback = $derived(getPieceFeedback(lastAction));
-  const captureFeedback = $derived(getCaptureFeedback(lastAction));
+  const removalFeedback = $derived(getRemovalFeedback(lastAction));
   let focusedPoint = $state<PointId>("O1");
+  let inputModality = $state<"keyboard" | "pointer">("pointer");
+  let pressedPoint = $state<PointId | null>(null);
   let boardShell: HTMLDivElement | null = null;
   let boardSvg: SVGSVGElement | null = null;
   let shouldPreserveBoardFocus = false;
@@ -96,7 +98,9 @@
       return;
     }
 
-    const handleOutsidePointerDown = (event: PointerEvent) => {
+    const handlePointerDown = (event: PointerEvent) => {
+      inputModality = "pointer";
+
       if (
         selected !== null &&
         boardShell !== null &&
@@ -106,15 +110,19 @@
         onCancelSelection?.();
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isBoardKeyboardKey(event.key)) {
+        inputModality = "keyboard";
+      }
+    };
 
-    document.addEventListener("pointerdown", handleOutsidePointerDown, true);
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("keydown", handleKeyDown, true);
 
-    return () =>
-      document.removeEventListener(
-        "pointerdown",
-        handleOutsidePointerDown,
-        true,
-      );
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
   });
 
   $effect(() => {
@@ -200,6 +208,14 @@
   function handlePointClick(point: PointId): void {
     focusedPoint = point;
     onSelectPoint?.(point);
+  }
+
+  function handlePointPointerDown(point: PointId): void {
+    pressedPoint = point;
+  }
+
+  function clearPressedPoint(): void {
+    pressedPoint = null;
   }
 
   function handlePointFocus(point: PointId): void {
@@ -309,13 +325,19 @@
   }
 
   function pieceAnimationClass(point: PointId): string {
+    const selectionClass =
+      view.points.find((candidate) => candidate.id === point)?.isSelected ===
+      true
+        ? " shaxda-piece-selected"
+        : "";
+
     if (!isPieceFeedbackDestination(point) || pieceFeedback === null) {
-      return "shaxda-piece-group";
+      return `shaxda-piece-group${selectionClass}`;
     }
 
     return pieceFeedback.action.type === "move"
-      ? "shaxda-piece-group shaxda-piece-slide"
-      : "shaxda-piece-group shaxda-piece-pop";
+      ? `shaxda-piece-group shaxda-piece-slide${selectionClass}`
+      : `shaxda-piece-group shaxda-piece-pop${selectionClass}`;
   }
 
   function pieceAnimationTestId(point: PointId): string | undefined {
@@ -335,12 +357,31 @@
       : undefined;
   }
 
-  function getCaptureFeedback(
+  function getRemovalFeedback(
     feedback: Props["lastAction"],
-  ): CaptureFeedback | null {
-    return feedback?.action.type === "capture"
+  ): RemovalFeedback | null {
+    return feedback?.action.type === "capture" ||
+      feedback?.action.type === "removeInitial"
       ? { action: feedback.action, nonce: feedback.nonce }
       : null;
+  }
+
+  function removedPlayer(action: RemovalFeedback["action"]): PlayerId {
+    return action.player === "A" ? "B" : "A";
+  }
+
+  function isBoardKeyboardKey(key: string): boolean {
+    return [
+      "Tab",
+      "Enter",
+      " ",
+      "Escape",
+      "Home",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+    ].includes(key);
   }
 
   function moveAnimationStyle(
@@ -364,6 +405,7 @@
   class="shaxda-board-shell mx-auto aspect-square w-full max-w-[34rem]"
   data-testid="board"
   data-invalid-shake={invalidNonce > 0 ? invalidNonce : undefined}
+  data-input-modality={inputModality}
 >
   <svg
     bind:this={boardSvg}
@@ -387,20 +429,23 @@
         <stop offset="55%" stop-color="var(--color-board-700)" />
         <stop offset="100%" stop-color="var(--color-board-900)" />
       </radialGradient>
-      <linearGradient
-        id="shaxda-board-surface"
-        x1="0%"
-        y1="0%"
-        x2="100%"
-        y2="100%"
-      >
-        <stop offset="0%" stop-color="#f3dfc6" />
-        <stop offset="44%" stop-color="var(--color-board-100)" />
-        <stop offset="100%" stop-color="#b67a45" />
+      <radialGradient id="shaxda-board-surface" cx="50%" cy="45%" r="72%">
+        <stop offset="0%" stop-color="#f6e3c7" />
+        <stop offset="58%" stop-color="#d7aa78" />
+        <stop offset="100%" stop-color="#a86638" />
+      </radialGradient>
+      <radialGradient id="shaxda-board-vignette" cx="50%" cy="50%" r="68%">
+        <stop offset="62%" stop-color="#4b2714" stop-opacity="0" />
+        <stop offset="100%" stop-color="#4b2714" stop-opacity="0.24" />
+      </radialGradient>
+      <linearGradient id="shaxda-board-frame" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#9a6036" />
+        <stop offset="48%" stop-color="#74411f" />
+        <stop offset="100%" stop-color="#4d2917" />
       </linearGradient>
       <linearGradient id="shaxda-carved-line" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#211209" />
-        <stop offset="100%" stop-color="#8a5730" />
+        <stop offset="0%" stop-color="#2c160c" />
+        <stop offset="100%" stop-color="#5e321b" />
       </linearGradient>
       <pattern
         id="shaxda-wood-grain"
@@ -409,43 +454,86 @@
         height="18"
       >
         <path
-          d="M -2 4 C 4 2, 8 6, 18 3 M -1 11 C 5 9, 11 14, 20 10 M 2 16 C 8 15, 12 18, 19 15"
+          d="M -3 2 C 2 0, 8 4, 20 1 M -2 5 C 5 3, 12 8, 21 4 M -1 10 C 4 8, 11 13, 20 9 M -4 14 C 3 12, 9 17, 20 13 M 1 17 C 7 16, 13 19, 21 16"
           class="shaxda-wood-grain-line"
         />
       </pattern>
     </defs>
 
     <rect
+      x="0.7"
+      y="0.7"
+      width="98.6"
+      height="98.6"
+      rx="5.4"
+      fill="#3d2012"
+      data-testid="board-wood-frame"
+      aria-hidden="true"
+      pointer-events="none"
+    />
+    <rect
       x="1.5"
       y="1.5"
       width="97"
       height="97"
-      rx="3.5"
+      rx="4.7"
+      fill="url(#shaxda-board-frame)"
+      aria-hidden="true"
+      pointer-events="none"
+    />
+    <rect
+      x="3.8"
+      y="3.8"
+      width="92.4"
+      height="92.4"
+      rx="3"
       fill="url(#shaxda-board-surface)"
       data-testid="board-wood-surface"
       aria-hidden="true"
       pointer-events="none"
     />
     <rect
-      x="1.5"
-      y="1.5"
-      width="97"
-      height="97"
-      rx="3.5"
+      x="3.8"
+      y="3.8"
+      width="92.4"
+      height="92.4"
+      rx="3"
       fill="url(#shaxda-wood-grain)"
-      class="opacity-45"
+      class="opacity-55"
       data-testid="board-wood-grain"
       aria-hidden="true"
       pointer-events="none"
     />
     <rect
-      x="4"
-      y="4"
-      width="92"
-      height="92"
-      rx="2.5"
-      class="fill-transparent stroke-board-50/40"
-      stroke-width="0.65"
+      x="3.8"
+      y="3.8"
+      width="92.4"
+      height="92.4"
+      rx="3"
+      fill="url(#shaxda-board-vignette)"
+      data-testid="board-edge-vignette"
+      aria-hidden="true"
+      pointer-events="none"
+    />
+    <rect
+      x="3.25"
+      y="3.25"
+      width="93.5"
+      height="93.5"
+      rx="3.5"
+      class="fill-transparent stroke-board-900/45"
+      stroke-width="0.9"
+      aria-hidden="true"
+      pointer-events="none"
+    />
+    <rect
+      x="4.45"
+      y="4.45"
+      width="91.1"
+      height="91.1"
+      rx="2.45"
+      class="fill-transparent stroke-board-50/35"
+      stroke-width="0.55"
       aria-hidden="true"
       pointer-events="none"
     />
@@ -457,8 +545,8 @@
           y1={POINT_COORDS[line.a].y}
           x2={POINT_COORDS[line.b].x}
           y2={POINT_COORDS[line.b].y}
-          class="stroke-board-50/45"
-          stroke-width="2.45"
+          class="stroke-board-900/38"
+          stroke-width="2.65"
           stroke-linecap="round"
         />
         <line
@@ -468,7 +556,7 @@
           x2={POINT_COORDS[line.b].x}
           y2={POINT_COORDS[line.b].y}
           stroke="url(#shaxda-carved-line)"
-          stroke-width="1.7"
+          stroke-width="1.45"
           stroke-linecap="round"
         />
       {/each}
@@ -493,8 +581,8 @@
             .map((point) => `${POINT_COORDS[point].x},${POINT_COORDS[point].y}`)
             .join(" ")}
           class={line.isActivePendingCapture
-            ? "shaxda-jare-line shaxda-jare-line-active"
-            : "shaxda-jare-line"}
+            ? "shaxda-jare-line shaxda-jare-line-active shaxda-cue-enter"
+            : "shaxda-jare-line shaxda-cue-enter"}
         />
       {/each}
     </g>
@@ -512,6 +600,10 @@
           data-legal-hint={point.isLegalHint ? "true" : undefined}
           data-capture-target={point.isCaptureTarget ? "true" : undefined}
           data-removal-target={point.isRemovalTarget ? "true" : undefined}
+          data-space-making-candidate={point.isSpaceMakingCandidate
+            ? "true"
+            : undefined}
+          data-pressed={pressedPoint === point.id ? "true" : undefined}
           role={interactive ? "button" : undefined}
           tabindex={interactive
             ? point.id === focusedPoint
@@ -520,6 +612,12 @@
             : undefined}
           aria-label={accessiblePointLabel(point)}
           onclick={interactive ? () => handlePointClick(point.id) : undefined}
+          onpointerdown={interactive
+            ? () => handlePointPointerDown(point.id)
+            : undefined}
+          onpointerup={interactive ? clearPressedPoint : undefined}
+          onpointercancel={interactive ? clearPressedPoint : undefined}
+          onpointerleave={interactive ? clearPressedPoint : undefined}
           onfocus={interactive ? () => handlePointFocus(point.id) : undefined}
           onkeydown={interactive
             ? (event) => handlePointKeydown(event, point.id)
@@ -572,9 +670,8 @@
             <circle
               cx={point.x}
               cy={point.y}
-              r={SOCKET_RADIUS + 1.8}
-              class="fill-transparent stroke-board-50"
-              stroke-width="2"
+              r={LEGAL_HINT_RADIUS + 1.35}
+              class="shaxda-cue-enter fill-emerald-50/85"
               aria-hidden="true"
               pointer-events="none"
             />
@@ -582,17 +679,8 @@
               data-testid="board-legal-hint"
               cx={point.x}
               cy={point.y}
-              r={SOCKET_RADIUS + 1.8}
-              class="shaxda-valid-pulse fill-success/15 stroke-success"
-              stroke-width="1"
-              aria-hidden="true"
-              pointer-events="none"
-            />
-            <circle
-              cx={point.x}
-              cy={point.y}
               r={LEGAL_HINT_RADIUS}
-              class="fill-success"
+              class="shaxda-cue-enter fill-success"
               aria-hidden="true"
               pointer-events="none"
             />
@@ -600,21 +688,25 @@
 
           {#if point.isSelected}
             <circle
-              cx={point.x}
-              cy={point.y}
-              r={PIECE_RADIUS + 2.4}
-              class="fill-transparent stroke-board-50"
-              stroke-width="2.6"
-              aria-hidden="true"
-              pointer-events="none"
-            />
-            <circle
               data-testid="board-selected-ring"
               cx={point.x}
               cy={point.y}
-              r={PIECE_RADIUS + 2.4}
-              class="shaxda-selected-glow fill-transparent stroke-selected"
-              stroke-width="1.15"
+              r={PIECE_RADIUS + 1.65}
+              class="shaxda-selected-halo shaxda-cue-enter fill-transparent stroke-selected"
+              stroke-width="1.85"
+              aria-hidden="true"
+              pointer-events="none"
+            />
+          {/if}
+
+          {#if point.isSpaceMakingCandidate}
+            <circle
+              data-testid="board-space-making-candidate"
+              cx={point.x}
+              cy={point.y}
+              r={PIECE_RADIUS + 1.3}
+              class="shaxda-cue-enter fill-transparent stroke-success/80"
+              stroke-width="0.85"
               aria-hidden="true"
               pointer-events="none"
             />
@@ -672,80 +764,109 @@
 
           {#if point.isCaptureTarget}
             <circle
-              cx={point.x}
-              cy={point.y}
-              r={PIECE_RADIUS + 2.1}
-              class="fill-transparent stroke-board-50"
-              stroke-width="2.7"
-              aria-hidden="true"
-              pointer-events="none"
-            />
-            <circle
               data-testid="board-capture-target"
               cx={point.x}
               cy={point.y}
-              r={PIECE_RADIUS + 2.1}
-              class="shaxda-target-ring fill-transparent stroke-danger"
-              stroke-width="1.25"
-              stroke-dasharray="1.8 1.3"
+              r={PIECE_RADIUS + 1.45}
+              class="shaxda-cue-enter fill-transparent stroke-danger"
+              stroke-width="1"
               aria-hidden="true"
               pointer-events="none"
             />
-            {#each [[-5.7, -5.7, -4.35, -4.35], [5.7, -5.7, 4.35, -4.35], [5.7, 5.7, 4.35, 4.35], [-5.7, 5.7, -4.35, 4.35]] as tick (`${tick[0]}-${tick[1]}`)}
-              <line
-                data-testid="board-capture-tick"
-                x1={point.x + tick[0]}
-                y1={point.y + tick[1]}
-                x2={point.x + tick[2]}
-                y2={point.y + tick[3]}
-                class="stroke-danger"
-                stroke-width="1.15"
-                stroke-linecap="round"
-                aria-hidden="true"
-                pointer-events="none"
+            <g
+              data-testid="board-capture-minus"
+              class="shaxda-cue-enter"
+              aria-hidden="true"
+              pointer-events="none"
+            >
+              <circle
+                cx={point.x + 4.5}
+                cy={point.y - 4.5}
+                r="1.55"
+                class="fill-danger"
               />
-            {/each}
+              <line
+                x1={point.x + 3.75}
+                y1={point.y - 4.5}
+                x2={point.x + 5.25}
+                y2={point.y - 4.5}
+                class="stroke-white"
+                stroke-width="0.55"
+                stroke-linecap="round"
+              />
+            </g>
           {/if}
 
           {#if point.isRemovalTarget}
             <circle
-              cx={point.x}
-              cy={point.y}
-              r={PIECE_RADIUS + 2.1}
-              class="fill-transparent stroke-board-50"
-              stroke-width="2.7"
-              aria-hidden="true"
-              pointer-events="none"
-            />
-            <circle
               data-testid="board-removal-target"
               cx={point.x}
               cy={point.y}
-              r={PIECE_RADIUS + 2.1}
-              class="shaxda-target-ring fill-transparent stroke-warning"
-              stroke-width="1.2"
-              stroke-dasharray="0.1 1.7"
-              stroke-linecap="round"
+              r={PIECE_RADIUS + 1.45}
+              class="shaxda-cue-enter fill-transparent stroke-warning"
+              stroke-width="1"
               aria-hidden="true"
               pointer-events="none"
             />
+            <g
+              data-testid="board-removal-minus"
+              class="shaxda-cue-enter"
+              aria-hidden="true"
+              pointer-events="none"
+            >
+              <circle
+                cx={point.x + 4.5}
+                cy={point.y - 4.5}
+                r="1.55"
+                class="fill-warning"
+              />
+              <line
+                x1={point.x + 3.75}
+                y1={point.y - 4.5}
+                x2={point.x + 5.25}
+                y2={point.y - 4.5}
+                class="stroke-white"
+                stroke-width="0.55"
+                stroke-linecap="round"
+              />
+            </g>
           {/if}
         </g>
       {/each}
     </g>
 
-    {#if captureFeedback !== null}
-      <circle
-        data-testid="board-capture-burst"
-        data-feedback-nonce={captureFeedback.nonce}
-        cx={POINT_COORDS[captureFeedback.action.point].x}
-        cy={POINT_COORDS[captureFeedback.action.point].y}
-        r={PIECE_RADIUS + 0.6}
-        class="shaxda-capture-burst fill-red-500/15 stroke-red-800"
-        stroke-width="1.2"
-        pointer-events="none"
+    {#if removalFeedback !== null}
+      <g
+        data-testid="board-removal-feedback"
+        data-feedback-nonce={removalFeedback.nonce}
         aria-hidden="true"
-      />
+        pointer-events="none"
+      >
+        <g data-testid="board-removal-ghost" class="shaxda-removal-ghost">
+          <circle
+            cx={POINT_COORDS[removalFeedback.action.point].x + 0.65}
+            cy={POINT_COORDS[removalFeedback.action.point].y + 0.9}
+            r={PIECE_RADIUS}
+            class="fill-board-900/25"
+          />
+          <circle
+            cx={POINT_COORDS[removalFeedback.action.point].x}
+            cy={POINT_COORDS[removalFeedback.action.point].y}
+            r={PIECE_RADIUS}
+            fill={pieceFill(removedPlayer(removalFeedback.action))}
+            class={`shaxda-piece ${pieceStrokeClass(removedPlayer(removalFeedback.action))}`}
+            stroke-width="0.65"
+          />
+        </g>
+        <circle
+          data-testid="board-removal-confirmation"
+          cx={POINT_COORDS[removalFeedback.action.point].x}
+          cy={POINT_COORDS[removalFeedback.action.point].y}
+          r={PIECE_RADIUS + 0.6}
+          class="shaxda-removal-confirmation fill-transparent stroke-success"
+          stroke-width="1"
+        />
+      </g>
     {/if}
   </svg>
   {#if interactive}

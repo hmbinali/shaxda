@@ -59,13 +59,11 @@
         {copy.legalHint}
       </span>
       <span class="inline-flex items-center gap-2">
-        <span class="h-3 w-3 rounded-full border-2 border-dashed border-red-700"
-        ></span>
+        <span class="h-3 w-3 rounded-full border border-red-700"></span>
         {copy.captureTarget}
       </span>
       <span class="inline-flex items-center gap-2">
-        <span class="h-3 w-3 rounded-full border-2 border-dotted border-warning"
-        ></span>
+        <span class="h-3 w-3 rounded-full border border-warning"></span>
         {copy.removalTarget}
       </span>
     </div>

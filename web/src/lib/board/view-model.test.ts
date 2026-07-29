@@ -59,6 +59,27 @@ describe("buildBoardView", () => {
       .map((action) => action.to);
 
     expect(legalHintPointIds(view.points)).toEqual(expectedHints);
+    expect(
+      view.points
+        .filter((point) => point.isSpaceMakingCandidate)
+        .map((point) => point.id),
+    ).toEqual([]);
+  });
+
+  it("marks space-making candidates only before one is selected", () => {
+    const unselected = buildBoardView(gameFixtures.blockedPlayer);
+    const selected = buildBoardView(gameFixtures.blockedPlayer, {
+      selected: "O2",
+    });
+
+    expect(
+      unselected.points
+        .filter((point) => point.isSpaceMakingCandidate)
+        .map((point) => point.id),
+    ).toEqual([...unselected.movablePoints]);
+    expect(selected.points.some((point) => point.isSpaceMakingCandidate)).toBe(
+      false,
+    );
   });
 
   it("does not show legal hints when selected point is not current player's piece", () => {

@@ -2,6 +2,7 @@ import {
   JARE_LINES,
   POINT_IDS,
   completedJareLines,
+  getActingPlayer,
   legalActions,
 } from "@shaxda/game-engine";
 import type { JareLine } from "@shaxda/game-engine";
@@ -31,6 +32,7 @@ export interface BoardPointView {
   isLegalHint: boolean;
   isCaptureTarget: boolean;
   isRemovalTarget: boolean;
+  isSpaceMakingCandidate: boolean;
 }
 
 export interface BoardJareLineView {
@@ -57,11 +59,16 @@ export function buildBoardView(
   const legalHintPoints = getLegalHintPoints(state, selected, actions);
   const captureTargetPoints = getCaptureTargetPoints(state, actions);
   const removalTargetPoints = getRemovalTargetPoints(state, actions);
+  const movablePoints = getMovablePoints(actions);
+  const showSpaceMakingCandidates =
+    selected === null &&
+    state.phase === "movement" &&
+    getActingPlayer(state) !== state.currentPlayer;
 
   return {
     lines: BOARD_LINES,
     jareLines: buildJareLineViews(state, options.lastAction ?? null),
-    movablePoints: getMovablePoints(actions),
+    movablePoints,
     points: POINT_IDS.map((id) => {
       const coord = POINT_COORDS[id];
 
@@ -74,6 +81,8 @@ export function buildBoardView(
         isLegalHint: legalHintPoints.has(id),
         isCaptureTarget: captureTargetPoints.has(id),
         isRemovalTarget: removalTargetPoints.has(id),
+        isSpaceMakingCandidate:
+          showSpaceMakingCandidates && movablePoints.has(id),
       };
     }),
   };

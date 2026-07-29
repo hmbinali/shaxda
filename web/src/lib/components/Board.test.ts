@@ -53,13 +53,13 @@ describe("Board", () => {
     ).toHaveLength(1);
     expect(
       screenClass(container, '[data-testid="board-selected-ring"]'),
-    ).toContain("shaxda-selected-glow");
+    ).toContain("shaxda-selected-halo");
     expect(
       screenClass(container, '[data-testid="board-legal-hint"]'),
-    ).toContain("shaxda-valid-pulse");
+    ).toContain("shaxda-cue-enter");
     expect(
       screenClass(container, '[data-testid="board-legal-hint"]'),
-    ).toContain("stroke-success");
+    ).toContain("fill-success");
   });
 
   it("renders capture target state for a pending capture fixture", () => {
@@ -75,14 +75,14 @@ describe("Board", () => {
       container.querySelectorAll('[data-testid="board-capture-target"]'),
     ).toHaveLength(3);
     expect(
-      container.querySelectorAll('[data-testid="board-capture-tick"]'),
-    ).toHaveLength(12);
+      container.querySelectorAll('[data-testid="board-capture-minus"]'),
+    ).toHaveLength(3);
     expect(
       container.querySelector('[data-testid="board-capture-target"]'),
-    ).toHaveAttribute("stroke-dasharray", "1.8 1.3");
+    ).not.toHaveAttribute("stroke-dasharray");
   });
 
-  it("renders dotted initial-removal targets", () => {
+  it("renders thin initial-removal targets with minus badges", () => {
     const { container } = render(Board, {
       props: { state: gameFixtures.initialRemoval },
     });
@@ -91,8 +91,10 @@ describe("Board", () => {
     );
 
     expect(removalTarget).toHaveClass("stroke-warning");
-    expect(removalTarget).toHaveAttribute("stroke-dasharray", "0.1 1.7");
-    expect(removalTarget).toHaveAttribute("stroke-linecap", "round");
+    expect(removalTarget).not.toHaveAttribute("stroke-dasharray");
+    expect(
+      container.querySelectorAll('[data-testid="board-removal-minus"]'),
+    ).toHaveLength(12);
   });
 
   it("uses redundant piece glyphs for player identity", () => {
@@ -116,15 +118,16 @@ describe("Board", () => {
       },
     });
     const css = readFileSync("src/app.css", "utf8");
-    const selectedKeyframes = css.slice(
-      css.indexOf("@keyframes shaxda-selected-glow"),
-      css.indexOf("@keyframes shaxda-valid-pulse"),
-    );
 
     expect(container.querySelector("filter")).not.toBeInTheDocument();
     expect(container.querySelector("feDropShadow")).not.toBeInTheDocument();
     expect(container.querySelector("feGaussianBlur")).not.toBeInTheDocument();
-    expect(selectedKeyframes).not.toContain("stroke-width");
+    expect(css).toContain(
+      "drop-shadow(0 0.35rem 0.55rem rgb(51 32 22 / 0.16))",
+    );
+    expect(css).not.toMatch(
+      /shaxda-(?:cue|selected|target)[^{]*{[^}]*infinite/s,
+    );
   });
 
   it("temporarily renders only the first-advantage placement jare", async () => {
@@ -142,6 +145,12 @@ describe("Board", () => {
 
     expect(
       container.querySelector('[data-testid="board-wood-surface"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="board-wood-frame"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="board-edge-vignette"]'),
     ).toBeInTheDocument();
     expect(
       container.querySelector('[data-testid="board-wood-grain"]'),
@@ -247,14 +256,41 @@ describe("Board", () => {
       invalidNonce: 0,
     });
 
-    const captureBurst = container.querySelector(
-      '[data-testid="board-capture-burst"]',
+    const removalFeedback = container.querySelector(
+      '[data-testid="board-removal-feedback"]',
     );
 
-    expect(captureBurst).toHaveAttribute("data-feedback-nonce", "8");
-    expect(captureBurst).toHaveClass("shaxda-capture-burst");
-    expect(captureBurst).toHaveAttribute("pointer-events", "none");
-    expect(captureBurst).toHaveAttribute("aria-hidden", "true");
+    expect(removalFeedback).toHaveAttribute("data-feedback-nonce", "8");
+    expect(removalFeedback).toHaveAttribute("pointer-events", "none");
+    expect(removalFeedback).toHaveAttribute("aria-hidden", "true");
+    expect(
+      removalFeedback?.querySelector('[data-testid="board-removal-ghost"]'),
+    ).toHaveClass("shaxda-removal-ghost");
+    expect(
+      removalFeedback?.querySelector(
+        '[data-testid="board-removal-confirmation"]',
+      ),
+    ).toHaveClass("shaxda-removal-confirmation");
+  });
+
+  it("animates an initially removed stone with the same removal feedback", () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.movement,
+        lastAction: {
+          action: { type: "removeInitial", player: "A", point: "O2" },
+          nonce: 9,
+          formedJare: false,
+        },
+      },
+    });
+
+    expect(
+      container.querySelector('[data-testid="board-removal-ghost"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="board-removal-confirmation"]'),
+    ).toBeInTheDocument();
   });
 
   it("pops the full piece group after placement", () => {
@@ -321,12 +357,23 @@ describe("Board", () => {
   });
 
   it("keeps static board points non-interactive by default", () => {
+    const addEventListener = vi.spyOn(document, "addEventListener");
     const { container } = render(Board, {
       props: { state: gameFixtures.emptyBoard },
     });
 
     expect(point(container, "O1")).not.toHaveAttribute("role");
     expect(point(container, "O1")).not.toHaveAttribute("tabindex");
+    expect(
+      addEventListener.mock.calls.some(
+        ([event, , options]) => event === "pointerdown" && options === true,
+      ),
+    ).toBe(false);
+    expect(
+      addEventListener.mock.calls.some(
+        ([event, , options]) => event === "keydown" && options === true,
+      ),
+    ).toBe(false);
   });
 
   it("calls point callbacks for interactive clicks and keyboard activation", async () => {
@@ -449,7 +496,7 @@ describe("Board", () => {
     await waitFor(() => expect(point(container, "O1")).toHaveFocus());
   });
 
-  it("provides keyboard instructions and a distinct focus-visible cue", () => {
+  it("tracks pointer and keyboard modality only for interactive boards", async () => {
     const { container } = render(Board, {
       props: {
         state: gameFixtures.emptyBoard,
@@ -463,12 +510,63 @@ describe("Board", () => {
       "aria-describedby",
       "shaxda-board-keyboard-help",
     );
+    expect(container.querySelector('[data-testid="board"]')).toHaveAttribute(
+      "data-input-modality",
+      "pointer",
+    );
+
+    await fireEvent.keyDown(point(container, "O1"), { key: "Tab" });
+    expect(container.querySelector('[data-testid="board"]')).toHaveAttribute(
+      "data-input-modality",
+      "keyboard",
+    );
+
+    await fireEvent.pointerDown(point(container, "O1"));
+    expect(container.querySelector('[data-testid="board"]')).toHaveAttribute(
+      "data-input-modality",
+      "pointer",
+    );
     expect(container.querySelector(".shaxda-focus-ring")).toHaveClass(
       "stroke-focus",
     );
     expect(css).toContain(
-      ".shaxda-board-point:focus-visible .shaxda-focus-ring",
+      '.shaxda-board-shell[data-input-modality="keyboard"]',
     );
+    expect(css).toContain("-webkit-tap-highlight-color: transparent");
+  });
+
+  it("shows a pressed response while a pointer is down", async () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.midPlacement,
+        interactive: true,
+      },
+    });
+
+    await fireEvent.pointerDown(point(container, "O1"));
+    expect(point(container, "O1")).toHaveAttribute("data-pressed", "true");
+
+    await fireEvent.pointerUp(point(container, "O1"));
+    expect(point(container, "O1")).not.toHaveAttribute("data-pressed");
+  });
+
+  it("marks only unselected blocked space-making candidates", async () => {
+    const { container, rerender } = render(Board, {
+      props: { state: gameFixtures.blockedPlayer },
+    });
+
+    expect(
+      container.querySelectorAll(
+        '[data-testid="board-space-making-candidate"]',
+      ),
+    ).not.toHaveLength(0);
+
+    await rerender({ state: gameFixtures.blockedPlayer, selected: "O2" });
+    expect(
+      container.querySelectorAll(
+        '[data-testid="board-space-making-candidate"]',
+      ),
+    ).toHaveLength(0);
   });
 
   it("defines reduced-motion CSS that disables animated L2 effects", () => {
@@ -477,10 +575,11 @@ describe("Board", () => {
       css.indexOf("@media (prefers-reduced-motion: reduce)"),
     );
 
-    expect(reducedMotionBlock).toContain(".shaxda-valid-pulse");
+    expect(reducedMotionBlock).toContain(".shaxda-cue-enter");
     expect(reducedMotionBlock).toContain(".shaxda-piece-slide");
     expect(reducedMotionBlock).toContain(".shaxda-piece-pop");
-    expect(reducedMotionBlock).toContain(".shaxda-capture-burst");
+    expect(reducedMotionBlock).toContain(".shaxda-removal-ghost");
+    expect(reducedMotionBlock).toContain(".shaxda-removal-confirmation");
     expect(reducedMotionBlock).toContain(
       ".shaxda-invalid-shake .shaxda-board-svg",
     );

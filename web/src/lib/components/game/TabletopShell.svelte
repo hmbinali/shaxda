@@ -39,6 +39,13 @@
     display: grid;
     min-height: 100%;
     min-width: 0;
+    background:
+      radial-gradient(
+        circle at 50% 46%,
+        rgb(255 253 249 / 0.98),
+        rgb(247 238 227 / 0.9)
+      ),
+      var(--color-board-50);
   }
 
   .tabletop-frame {

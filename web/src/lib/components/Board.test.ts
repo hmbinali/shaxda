@@ -6,10 +6,14 @@ import {
 } from "@shaxda/game-engine";
 import { gameFixtures } from "@shaxda/shared";
 import { readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Board from "./Board.svelte";
 
 describe("Board", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders one socket per point and pieces from fixture occupancy", () => {
     const { container } = render(Board, {
       props: { state: gameFixtures.midPlacement },
@@ -123,9 +127,17 @@ describe("Board", () => {
     expect(selectedKeyframes).not.toContain("stroke-width");
   });
 
-  it("renders wooden board layers and completed jare highlights", () => {
+  it("temporarily renders only the first-advantage placement jare", async () => {
+    vi.useFakeTimers();
     const { container } = render(Board, {
-      props: { state: gameFixtures.placementJare },
+      props: {
+        state: gameFixtures.placementJare,
+        lastAction: {
+          action: { type: "place", player: "A", point: "O3" },
+          nonce: 5,
+          formedJare: true,
+        },
+      },
     });
 
     expect(
@@ -146,6 +158,28 @@ describe("Board", () => {
     expect(
       container.querySelector(".shaxda-jare-line-underlay"),
     ).toBeInTheDocument();
+
+    await vi.advanceTimersByTimeAsync(1_400);
+    expect(
+      container.querySelector('[data-testid="board-jare-line"]'),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not render standing or later placement jare lines", () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.placementJare,
+        lastAction: {
+          action: { type: "place", player: "A", point: "O3" },
+          nonce: 5,
+          formedJare: false,
+        },
+      },
+    });
+
+    expect(
+      container.querySelector('[data-testid="board-jare-line"]'),
+    ).not.toBeInTheDocument();
   });
 
   it("renders the active pending-capture jare line", () => {
@@ -173,7 +207,7 @@ describe("Board", () => {
     const { container, rerender } = render(Board, {
       props: {
         state: movedState,
-        lastAction: { action, nonce: 7 },
+        lastAction: { action, nonce: 7, formedJare: false },
         invalidNonce: 2,
       },
     });
@@ -208,6 +242,7 @@ describe("Board", () => {
       lastAction: {
         action: { type: "capture", player: "A", point: "O5" },
         nonce: 8,
+        formedJare: false,
       },
       invalidNonce: 0,
     });
@@ -229,6 +264,7 @@ describe("Board", () => {
         lastAction: {
           action: { type: "place", player: "B", point: "M3" },
           nonce: 4,
+          formedJare: false,
         },
       },
     });
@@ -255,6 +291,7 @@ describe("Board", () => {
         lastAction: {
           action: { type: "move", player: "B", from: "O8", to: "O1" },
           nonce: 7,
+          formedJare: false,
         },
         invalidNonce: 1,
       },
@@ -273,6 +310,7 @@ describe("Board", () => {
       lastAction: {
         action: { type: "move", player: "B", from: "O8", to: "O1" },
         nonce: 9,
+        formedJare: false,
       },
       invalidNonce: 2,
     });
@@ -341,18 +379,43 @@ describe("Board", () => {
 
   it("uses Escape to deselect the current piece", async () => {
     const onSelectPoint = vi.fn();
+    const onCancelSelection = vi.fn();
     const { container } = render(Board, {
       props: {
         state: gameFixtures.movement,
         selected: "O8",
         interactive: true,
         onSelectPoint,
+        onCancelSelection,
       },
     });
 
     await fireEvent.keyDown(point(container, "O8"), { key: "Escape" });
 
-    expect(onSelectPoint).toHaveBeenCalledWith("O8");
+    expect(onCancelSelection).toHaveBeenCalledOnce();
+    expect(onSelectPoint).not.toHaveBeenCalled();
+  });
+
+  it("silently cancels selection after an outside pointer tap", async () => {
+    const onCancelSelection = vi.fn();
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.movement,
+        selected: "O8",
+        interactive: true,
+        onCancelSelection,
+      },
+    });
+    const outside = document.createElement("button");
+    document.body.append(outside);
+
+    await fireEvent.pointerDown(point(container, "O1"));
+    expect(onCancelSelection).not.toHaveBeenCalled();
+
+    await fireEvent.pointerDown(outside);
+    expect(onCancelSelection).toHaveBeenCalledOnce();
+
+    outside.remove();
   });
 
   it("syncs the roving tab stop to pointer activation", async () => {

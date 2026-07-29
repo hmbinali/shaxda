@@ -171,8 +171,9 @@
           selected={controller.selected}
           lastAction={controller.lastAction}
           invalidNonce={controller.invalidNonce}
-          interactive
+          interactive={status.phase !== "gameOver"}
           onSelectPoint={(point) => controller.clickPoint(point)}
+          onCancelSelection={() => controller.cancelSelection()}
         />
 
         {#if status.isSpaceMaking}
@@ -185,7 +186,11 @@
         {/if}
 
         {#if invalidMessage !== null}
-          <InvalidToast message={invalidMessage} testId="invalid-feedback" />
+          <InvalidToast
+            message={invalidMessage}
+            nonce={controller.invalid?.nonce ?? 0}
+            testId="invalid-feedback"
+          />
         {/if}
 
         {#if status.phase === "gameOver"}

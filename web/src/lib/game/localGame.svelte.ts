@@ -82,6 +82,7 @@ export class LocalGameController {
     }
 
     if (result.type === "invalid") {
+      this.cancelSelection();
       this.markInvalid(result.reason);
       return;
     }
@@ -101,6 +102,10 @@ export class LocalGameController {
     }
 
     this.apply(action);
+  }
+
+  cancelSelection(): void {
+    this.selected = null;
   }
 
   startNewGame(): void {

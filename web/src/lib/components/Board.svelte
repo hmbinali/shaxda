@@ -22,7 +22,12 @@
     selected?: PointId | null;
     interactive?: boolean;
     onSelectPoint?: (point: PointId) => void;
-    lastAction?: { action: GameAction; nonce: number } | null;
+    onCancelSelection?: () => void;
+    lastAction?: {
+      action: GameAction;
+      nonce: number;
+      formedJare: boolean;
+    } | null;
     invalidNonce?: number;
   }
 
@@ -41,11 +46,24 @@
     selected = null,
     interactive = false,
     onSelectPoint,
+    onCancelSelection,
     lastAction = null,
     invalidNonce = 0,
   }: Props = $props();
 
-  const view = $derived(buildBoardView(gameState, { selected }));
+  let visiblePlacementJareNonce = $state<number | null>(null);
+  const presentedLastAction = $derived(
+    lastAction?.action.type === "place" &&
+      lastAction.nonce !== visiblePlacementJareNonce
+      ? null
+      : lastAction,
+  );
+  const view = $derived(
+    buildBoardView(gameState, {
+      selected,
+      lastAction: presentedLastAction,
+    }),
+  );
   const copy = messages.so.boardGallery;
   const pieceFeedback = $derived(getPieceFeedback(lastAction));
   const captureFeedback = $derived(getCaptureFeedback(lastAction));
@@ -54,6 +72,50 @@
   let boardSvg: SVGSVGElement | null = null;
   let shouldPreserveBoardFocus = false;
   let pointElements = $state<Partial<Record<PointId, SVGGElement>>>({});
+
+  $effect(() => {
+    const feedback = lastAction;
+
+    if (feedback?.action.type !== "place" || !feedback.formedJare) {
+      visiblePlacementJareNonce = null;
+      return;
+    }
+
+    visiblePlacementJareNonce = feedback.nonce;
+    const timeout = window.setTimeout(() => {
+      if (visiblePlacementJareNonce === feedback.nonce) {
+        visiblePlacementJareNonce = null;
+      }
+    }, 1_400);
+
+    return () => window.clearTimeout(timeout);
+  });
+
+  $effect(() => {
+    if (!interactive) {
+      return;
+    }
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (
+        selected !== null &&
+        boardShell !== null &&
+        event.target instanceof Node &&
+        !boardShell.contains(event.target)
+      ) {
+        onCancelSelection?.();
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown, true);
+
+    return () =>
+      document.removeEventListener(
+        "pointerdown",
+        handleOutsidePointerDown,
+        true,
+      );
+  });
 
   $effect(() => {
     const shell = boardShell;
@@ -110,7 +172,7 @@
     if (event.key === "Escape") {
       if (selected !== null) {
         event.preventDefault();
-        onSelectPoint?.(selected);
+        onCancelSelection?.();
       }
       return;
     }
@@ -413,7 +475,7 @@
     </g>
 
     <g data-testid="board-jare-lines" aria-hidden="true" pointer-events="none">
-      {#each view.jareLines.filter((line) => line.isCompleted) as line (line.id)}
+      {#each view.jareLines as line (line.id)}
         <polyline
           points={line.points
             .map((point) => `${POINT_COORDS[point].x},${POINT_COORDS[point].y}`)

@@ -99,6 +99,7 @@
           invalidNonce={controller.invalidNonce}
           interactive={controller.canInteract}
           onSelectPoint={(point) => controller.clickPoint(point)}
+          onCancelSelection={() => controller.cancelSelection()}
         />
 
         {#if controller.canClaimWin}
@@ -117,7 +118,11 @@
         {/if}
 
         {#if invalidMessage !== null}
-          <InvalidToast message={invalidMessage} testId="online-feedback" />
+          <InvalidToast
+            message={invalidMessage}
+            nonce={controller.invalid?.nonce ?? 0}
+            testId="online-feedback"
+          />
         {/if}
 
         {#if status.phase === "gameOver"}

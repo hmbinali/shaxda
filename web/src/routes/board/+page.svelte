@@ -14,6 +14,13 @@
     movement: "O8",
     repeatedJare: "O4",
   };
+  const latestActions = {
+    placementJare: {
+      action: { type: "place", player: "A", point: "O3" },
+      nonce: 1,
+      formedJare: true,
+    },
+  } as const;
 </script>
 
 <svelte:head>
@@ -78,7 +85,13 @@
             </p>
           </div>
 
-          <Board {state} selected={selectedPoints[key] ?? null} />
+          <Board
+            {state}
+            selected={selectedPoints[key] ?? null}
+            lastAction={key === "placementJare"
+              ? latestActions.placementJare
+              : null}
+          />
         </article>
       {/each}
     </div>

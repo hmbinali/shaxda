@@ -85,6 +85,24 @@ describe("LocalGameController", () => {
     expect(game.feedback?.cues).toEqual(["move"]);
   });
 
+  it("cancels selection after an invalid destination and on request", () => {
+    const game = createLocalGameController({
+      initialState: gameFixtures.movement,
+      storage,
+    });
+
+    game.clickPoint("O8");
+    expect(game.selected).toBe("O8");
+
+    game.clickPoint("O7");
+    expect(game.selected).toBeNull();
+    expect(game.invalid?.reason).toBe("illegalMove");
+
+    game.clickPoint("O8");
+    game.cancelSelection();
+    expect(game.selected).toBeNull();
+  });
+
   it("emits move and jare feedback for movement-phase jare", () => {
     const game = createLocalGameController({
       initialState: gameFixtures.repeatedJare,

@@ -445,36 +445,6 @@
         <stop offset="62%" stop-color="#4b2714" stop-opacity="0" />
         <stop offset="100%" stop-color="#4b2714" stop-opacity="0.24" />
       </radialGradient>
-      <linearGradient
-        id="shaxda-board-frame-dark"
-        x1="0%"
-        y1="0%"
-        x2="0%"
-        y2="100%"
-      >
-        <stop offset="0%" stop-color="#5C361F" />
-        <stop offset="100%" stop-color="#3D2013" />
-      </linearGradient>
-      <linearGradient
-        id="shaxda-board-frame-mid"
-        x1="0%"
-        y1="0%"
-        x2="0%"
-        y2="100%"
-      >
-        <stop offset="0%" stop-color="#7E4A25" />
-        <stop offset="100%" stop-color="#5C361F" />
-      </linearGradient>
-      <linearGradient
-        id="shaxda-board-frame-light"
-        x1="0%"
-        y1="0%"
-        x2="0%"
-        y2="100%"
-      >
-        <stop offset="0%" stop-color="#D3B08F" />
-        <stop offset="100%" stop-color="#7E4A25" />
-      </linearGradient>
       <linearGradient id="shaxda-carved-line" x1="0%" y1="0%" x2="0%" y2="100%">
         <stop offset="0%" stop-color="#2c160c" />
         <stop offset="100%" stop-color="#5e321b" />
@@ -510,7 +480,7 @@
       width="97.4"
       height="97.4"
       rx="4.9"
-      fill="url(#shaxda-board-frame-dark)"
+      fill="#3D2013"
       data-testid="board-frame-layer"
       data-frame-layer="dark"
       aria-hidden="true"
@@ -522,7 +492,7 @@
       width="95.8"
       height="95.8"
       rx="4.25"
-      fill="url(#shaxda-board-frame-mid)"
+      fill="#5C361F"
       data-testid="board-frame-layer"
       data-frame-layer="mid"
       aria-hidden="true"
@@ -534,7 +504,7 @@
       width="94"
       height="94"
       rx="3.6"
-      fill="url(#shaxda-board-frame-light)"
+      fill="#7E4A25"
       data-testid="board-frame-layer"
       data-frame-layer="light"
       aria-hidden="true"

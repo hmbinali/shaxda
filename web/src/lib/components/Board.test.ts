@@ -180,18 +180,11 @@ describe("Board", () => {
     expect(
       container.querySelector('[data-frame-layer="outer"]'),
     ).toHaveAttribute("fill", "#3D2013");
-    const frameStopColors = Array.from(
-      container.querySelectorAll('[id^="shaxda-board-frame-"] stop'),
-      (stop) => stop.getAttribute("stop-color"),
-    );
-    expect(frameStopColors).toEqual([
-      "#5C361F",
-      "#3D2013",
-      "#7E4A25",
-      "#5C361F",
-      "#D3B08F",
-      "#7E4A25",
-    ]);
+    expect(
+      Array.from(container.querySelectorAll("[data-frame-layer]"), (layer) =>
+        layer.getAttribute("fill"),
+      ),
+    ).toEqual(["#3D2013", "#3D2013", "#5C361F", "#7E4A25"]);
     expect(
       container.querySelector('[data-testid="board-edge-vignette"]'),
     ).toBeInTheDocument();

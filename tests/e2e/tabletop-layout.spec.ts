@@ -139,6 +139,7 @@ test.describe("tabletop layout", () => {
     await expect(page.getByRole("dialog")).toBeHidden();
 
     await trigger.click();
+    await expect(page.getByTestId("game-actions-close")).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(trigger).toBeFocused();

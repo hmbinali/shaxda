@@ -174,7 +174,7 @@ test.describe("tabletop layout", () => {
       {
         name: "blocked",
         state: blockedState,
-        testId: "blocked-prompt",
+        testId: "board-space-making-candidate",
       },
       {
         name: "near-draw",
@@ -215,7 +215,7 @@ test.describe("tabletop layout", () => {
           .click();
       }
       if (fixture.testId !== null) {
-        await expect(page.getByTestId(fixture.testId)).toBeVisible();
+        await expect(page.getByTestId(fixture.testId).first()).toBeVisible();
       }
 
       const geometry = await measureTabletop(page);

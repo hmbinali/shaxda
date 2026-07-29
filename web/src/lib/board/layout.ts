@@ -13,13 +13,13 @@ export interface BoardLine {
 
 export const BOARD_VIEWBOX_SIZE = 100;
 export const BOARD_CENTER = BOARD_VIEWBOX_SIZE / 2;
-export const SOCKET_RADIUS = 2.6;
+export const SOCKET_RADIUS = 2.3;
 export const HIT_RADIUS = 6.2;
 export const PIECE_RADIUS = 4.2;
 export const LEGAL_HINT_RADIUS = 1.55;
 
 const RING_HALF_SIZES = {
-  O: 42,
+  O: 41.45,
   M: 29,
   I: 16,
 } as const satisfies Record<Ring, number>;

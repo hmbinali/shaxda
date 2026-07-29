@@ -11,9 +11,9 @@ const cueColors = {
 } as const;
 
 const boardPalette = {
-  lightGrain: "#f3dfc6",
-  surface: "#ead8c2",
-  darkGrain: "#b67a45",
+  centerLight: "#f6e3c7",
+  surface: "#d7aa78",
+  edgeWood: "#a86638",
   signalUnderlay: "#f8f1e8",
 } as const;
 

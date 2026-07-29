@@ -62,7 +62,17 @@
     </div>
 
     <div class="copy">
-      <h2>{name}</h2>
+      <div class="name-row">
+        <h2>{name}</h2>
+        {#if status.firstAdvantage === player && (status.phase === "placement" || status.phase === "initialRemoval")}
+          <span
+            class="advantage-chip"
+            data-testid={`first-advantage-${player}`}
+          >
+            {copy.firstAdvantageLabel}
+          </span>
+        {/if}
+      </div>
       <p>
         {instruction === null
           ? copy.tabletop.states[
@@ -203,6 +213,17 @@
     min-width: 0;
   }
 
+  .name-row {
+    display: flex;
+    min-width: 0;
+    gap: 0.3rem;
+    align-items: center;
+  }
+
+  h2 {
+    min-width: 0;
+  }
+
   h2,
   p {
     overflow: hidden;
@@ -230,6 +251,19 @@
     font-size: 0.62rem;
     font-weight: 700;
     text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .advantage-chip {
+    flex: none;
+    border: 1px solid rgb(146 97 10 / 0.3);
+    border-radius: 999px;
+    background: #f8e9bd;
+    padding: 0.05rem 0.3rem;
+    color: #713f12;
+    font-size: 0.55rem;
+    font-weight: 850;
+    line-height: 1.3;
     white-space: nowrap;
   }
 

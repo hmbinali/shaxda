@@ -15,7 +15,6 @@
     saveSoundPreference,
   } from "$lib/audio/sound";
   import Board from "$components/Board.svelte";
-  import BoardNotice from "$components/game/BoardNotice.svelte";
   import ConfirmDialog from "$components/game/ConfirmDialog.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
   import GameResultOverlay from "$components/game/GameResultOverlay.svelte";
@@ -171,21 +170,17 @@
           selected={controller.selected}
           lastAction={controller.lastAction}
           invalidNonce={controller.invalidNonce}
-          interactive
+          interactive={status.phase !== "gameOver"}
           onSelectPoint={(point) => controller.clickPoint(point)}
+          onCancelSelection={() => controller.cancelSelection()}
         />
 
-        {#if status.isSpaceMaking}
-          <BoardNotice
-            title={copy.tabletop.instructions.makeSpace}
-            body={copy.blockedPrompt}
-            sided
-            testId="blocked-prompt"
-          />
-        {/if}
-
         {#if invalidMessage !== null}
-          <InvalidToast message={invalidMessage} testId="invalid-feedback" />
+          <InvalidToast
+            message={invalidMessage}
+            nonce={controller.invalid?.nonce ?? 0}
+            testId="invalid-feedback"
+          />
         {/if}
 
         {#if status.phase === "gameOver"}
@@ -196,8 +191,8 @@
               ? null
               : copy.result.reasons[status.endReason]}
             testId="game-result"
-            orientation="shared"
             onNewGame={() => controller.startNewGame()}
+            onExit={() => void goto(resolve("/"))}
           />
         {/if}
       </div>

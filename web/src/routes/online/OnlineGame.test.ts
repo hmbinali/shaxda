@@ -189,11 +189,37 @@ describe("/online", () => {
     expect(screen.getByTestId("online-game-result")).not.toHaveTextContent(
       copy.result.reasons.opponentAbandoned.winner,
     );
+    expect(screen.getAllByTestId("game-result-panel")).toHaveLength(1);
+    expect(screen.getByTestId("online-game-result")).toHaveAttribute(
+      "role",
+      "dialog",
+    );
+    expect(screen.getByTestId("online-game-result")).not.toHaveAttribute(
+      "aria-modal",
+    );
+    expect(
+      within(screen.getByTestId("online-game-result")).getByRole("button", {
+        name: copy.leave,
+      }),
+    ).toHaveFocus();
+    expect(document.querySelector('[data-point-id="O1"]')).not.toHaveAttribute(
+      "role",
+    );
     expect(
       within(screen.getByTestId("app-top-bar")).getByRole("button", {
         name: messages.so.localGame.controls.exit,
       }),
     ).toBeVisible();
+    within(screen.getByTestId("app-top-bar"))
+      .getByRole("button", {
+        name: messages.so.localGame.controls.exit,
+      })
+      .focus();
+    expect(
+      within(screen.getByTestId("app-top-bar")).getByRole("button", {
+        name: messages.so.localGame.controls.exit,
+      }),
+    ).toHaveFocus();
   });
 
   it("seats a player B viewer at the bottom without rotating or remapping colour", async () => {

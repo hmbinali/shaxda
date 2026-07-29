@@ -155,6 +155,7 @@ export class OnlineGameController {
     }
 
     if (result.type === "invalid") {
+      this.cancelSelection();
       this.markInvalid(result.reason);
       return;
     }
@@ -169,6 +170,10 @@ export class OnlineGameController {
     }
 
     this.sendAction({ type: "resign", player: this.mySlot });
+  }
+
+  cancelSelection(): void {
+    this.selected = null;
   }
 
   claimWin(): void {

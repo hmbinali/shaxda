@@ -59,6 +59,27 @@ describe("buildBoardView", () => {
       .map((action) => action.to);
 
     expect(legalHintPointIds(view.points)).toEqual(expectedHints);
+    expect(
+      view.points
+        .filter((point) => point.isSpaceMakingCandidate)
+        .map((point) => point.id),
+    ).toEqual([]);
+  });
+
+  it("marks space-making candidates only before one is selected", () => {
+    const unselected = buildBoardView(gameFixtures.blockedPlayer);
+    const selected = buildBoardView(gameFixtures.blockedPlayer, {
+      selected: "O2",
+    });
+
+    expect(
+      unselected.points
+        .filter((point) => point.isSpaceMakingCandidate)
+        .map((point) => point.id),
+    ).toEqual([...unselected.movablePoints]);
+    expect(selected.points.some((point) => point.isSpaceMakingCandidate)).toBe(
+      false,
+    );
   });
 
   it("does not show legal hints when selected point is not current player's piece", () => {
@@ -88,13 +109,18 @@ describe("buildBoardView", () => {
     expect(captureTargetPointIds(view.points)).toEqual([]);
   });
 
-  it("exposes jare line metadata separately from structural lines", () => {
-    const view = buildBoardView(gameFixtures.placementJare);
+  it("exposes only the latest first-advantage placement jare", () => {
+    const view = buildBoardView(gameFixtures.placementJare, {
+      lastAction: {
+        action: { type: "place", player: "A", point: "O3" },
+        formedJare: true,
+      },
+    });
     const line = view.jareLines.find(
       (candidate) => candidate.id === "O1-O2-O3",
     );
 
-    expect(view.jareLines).toHaveLength(16);
+    expect(view.jareLines).toHaveLength(1);
     expect(line).toMatchObject({
       id: "O1-O2-O3",
       points: ["O1", "O2", "O3"],
@@ -102,6 +128,50 @@ describe("buildBoardView", () => {
       owner: "A",
       isActivePendingCapture: false,
     });
+  });
+
+  it("suppresses standing, later-placement, and reloaded placement jare lines", () => {
+    expect(buildBoardView(gameFixtures.placementJare).jareLines).toEqual([]);
+    expect(
+      buildBoardView(gameFixtures.placementJare, {
+        lastAction: {
+          action: { type: "place", player: "A", point: "O3" },
+          formedJare: false,
+        },
+      }).jareLines,
+    ).toEqual([]);
+    expect(buildBoardView(gameFixtures.initialRemoval).jareLines).toEqual([]);
+  });
+
+  it("shows every new line formed through the latest placement point", () => {
+    const state: GameState = {
+      ...gameFixtures.emptyBoard,
+      board: {
+        ...gameFixtures.emptyBoard.board,
+        O1: "A",
+        O2: "A",
+        O3: "A",
+        M2: "A",
+        I2: "A",
+      },
+      players: {
+        ...gameFixtures.emptyBoard.players,
+        A: { inHand: 7, captured: 0 },
+      },
+      currentPlayer: "B",
+      firstAdvantage: "A",
+    };
+    const view = buildBoardView(state, {
+      lastAction: {
+        action: { type: "place", player: "A", point: "O2" },
+        formedJare: true,
+      },
+    });
+
+    expect(view.jareLines.map((line) => line.id)).toEqual([
+      "O1-O2-O3",
+      "O2-M2-I2",
+    ]);
   });
 
   it("marks the pending-capture jare line through the engine helper", () => {

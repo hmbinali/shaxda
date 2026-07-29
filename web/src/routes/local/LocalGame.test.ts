@@ -81,6 +81,23 @@ describe("/local", () => {
     expect(screen.getByTestId("game-announcer")).toHaveTextContent(
       `${copy.playerNames.A} ${copy.announce.placed} O3. ${copy.announce.jareFormed}.`,
     );
+    expect(screen.getByTestId("first-advantage-A")).toHaveTextContent(
+      copy.firstAdvantageLabel,
+    );
+  });
+
+  it("keeps first advantage on the rail without restoring an old jare line", () => {
+    window.localStorage.setItem(
+      LOCAL_GAME_STORAGE_KEY,
+      serialize(gameFixtures.placementJare),
+    );
+
+    renderLocalGame();
+
+    expect(screen.getByTestId("first-advantage-A")).toHaveTextContent(
+      copy.firstAdvantageLabel,
+    );
+    expect(screen.queryByTestId("board-jare-line")).not.toBeInTheDocument();
   });
 
   it("shows invalid feedback for illegal taps", async () => {
@@ -150,9 +167,22 @@ describe("/local", () => {
     expect(screen.getByTestId("game-result")).toHaveTextContent(
       copy.result.reasons.resignation,
     );
+    expect(screen.getAllByTestId("game-result-panel")).toHaveLength(1);
+    expect(screen.getByTestId("game-result")).toHaveAttribute("role", "dialog");
+    expect(screen.getByTestId("game-result")).not.toHaveAttribute("aria-modal");
+    expect(
+      within(screen.getByTestId("game-result")).getByRole("button", {
+        name: copy.controls.newGame,
+      }),
+    ).toHaveFocus();
+    expect(point(container, "O1")).not.toHaveAttribute("role");
     expect(
       topBar.getByRole("button", { name: copy.controls.exit }),
     ).toBeVisible();
+    topBar.getByRole("button", { name: copy.controls.exit }).focus();
+    expect(
+      topBar.getByRole("button", { name: copy.controls.exit }),
+    ).toHaveFocus();
     expect(
       topBar.queryByRole("button", { name: copy.controls.resign }),
     ).not.toBeInTheDocument();
@@ -193,6 +223,41 @@ describe("/local", () => {
     expect(
       screen.getByText(copy.tabletop.instructions.move),
     ).toBeInTheDocument();
+  });
+
+  it("keeps blocked guidance on the rails and eligible stones", async () => {
+    window.localStorage.setItem(
+      LOCAL_GAME_STORAGE_KEY,
+      serialize(gameFixtures.blockedPlayer),
+    );
+
+    const { container } = renderLocalGame();
+
+    expect(screen.queryByTestId("blocked-prompt")).not.toBeInTheDocument();
+    expect(screen.getByTestId("player-rail-B")).toHaveAttribute(
+      "data-rail-state",
+      "blocked",
+    );
+    expect(screen.getByTestId("player-rail-A")).toHaveAttribute(
+      "data-rail-state",
+      "spaceMaking",
+    );
+    expect(
+      container.querySelectorAll(
+        '[data-testid="board-space-making-candidate"]',
+      ),
+    ).not.toHaveLength(0);
+
+    await fireEvent.click(point(container, "O2"));
+    expect(
+      container.querySelectorAll(
+        '[data-testid="board-space-making-candidate"]',
+      ),
+    ).toHaveLength(0);
+    expect(point(container, "O3")).toHaveAttribute("data-legal-hint", "true");
+
+    await fireEvent.click(point(container, "O3"));
+    expect(point(container, "O3")).toHaveAttribute("data-occupant", "A");
   });
 });
 

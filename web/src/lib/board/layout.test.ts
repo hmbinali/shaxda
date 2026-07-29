@@ -1,6 +1,12 @@
 import { JARE_LINES, POINT_IDS } from "@shaxda/game-engine";
 import { describe, expect, it } from "vitest";
-import { BOARD_CENTER, BOARD_LINES, HIT_RADIUS, POINT_COORDS } from "./layout";
+import {
+  BOARD_CENTER,
+  BOARD_LINES,
+  HIT_RADIUS,
+  PIECE_RADIUS,
+  POINT_COORDS,
+} from "./layout";
 import type { BoardLine } from "./layout";
 
 describe("board layout", () => {
@@ -37,6 +43,15 @@ describe("board layout", () => {
     expect(distanceFromCenter("M1")).toBeGreaterThan(distanceFromCenter("I1"));
     expect(POINT_COORDS.O2.y).toBeLessThan(POINT_COORDS.M2.y);
     expect(POINT_COORDS.M2.y).toBeLessThan(POINT_COORDS.I2.y);
+  });
+
+  it("keeps outer corner stones clear of the wooden surface edge", () => {
+    const surfaceInset = 3.8;
+
+    expect(POINT_COORDS.O1.x - PIECE_RADIUS).toBeGreaterThan(surfaceInset);
+    expect(POINT_COORDS.O1.y - PIECE_RADIUS).toBeGreaterThan(surfaceInset);
+    expect(POINT_COORDS.O5.x + PIECE_RADIUS).toBeLessThan(100 - surfaceInset);
+    expect(POINT_COORDS.O5.y + PIECE_RADIUS).toBeLessThan(100 - surfaceInset);
   });
 
   it("derives de-duplicated line segments from jare lines", () => {

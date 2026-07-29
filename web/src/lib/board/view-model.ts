@@ -2,6 +2,7 @@ import {
   JARE_LINES,
   POINT_IDS,
   completedJareLines,
+  getActingPlayer,
   legalActions,
 } from "@shaxda/game-engine";
 import type { JareLine } from "@shaxda/game-engine";
@@ -16,6 +17,10 @@ import { BOARD_LINES, POINT_COORDS } from "./layout";
 
 export interface BoardViewOptions {
   selected?: PointId | null;
+  lastAction?: {
+    action: GameAction;
+    formedJare: boolean;
+  } | null;
 }
 
 export interface BoardPointView {
@@ -27,6 +32,7 @@ export interface BoardPointView {
   isLegalHint: boolean;
   isCaptureTarget: boolean;
   isRemovalTarget: boolean;
+  isSpaceMakingCandidate: boolean;
 }
 
 export interface BoardJareLineView {
@@ -53,11 +59,16 @@ export function buildBoardView(
   const legalHintPoints = getLegalHintPoints(state, selected, actions);
   const captureTargetPoints = getCaptureTargetPoints(state, actions);
   const removalTargetPoints = getRemovalTargetPoints(state, actions);
+  const movablePoints = getMovablePoints(actions);
+  const showSpaceMakingCandidates =
+    selected === null &&
+    state.phase === "movement" &&
+    getActingPlayer(state) !== state.currentPlayer;
 
   return {
     lines: BOARD_LINES,
-    jareLines: buildJareLineViews(state),
-    movablePoints: getMovablePoints(actions),
+    jareLines: buildJareLineViews(state, options.lastAction ?? null),
+    movablePoints,
     points: POINT_IDS.map((id) => {
       const coord = POINT_COORDS[id];
 
@@ -70,26 +81,38 @@ export function buildBoardView(
         isLegalHint: legalHintPoints.has(id),
         isCaptureTarget: captureTargetPoints.has(id),
         isRemovalTarget: removalTargetPoints.has(id),
+        isSpaceMakingCandidate:
+          showSpaceMakingCandidates && movablePoints.has(id),
       };
     }),
   };
 }
 
-function buildJareLineViews(state: GameState): BoardJareLineView[] {
+function buildJareLineViews(
+  state: GameState,
+  lastAction: BoardViewOptions["lastAction"],
+): BoardJareLineView[] {
   const activePendingCaptureLineIds = getActivePendingCaptureLineIds(state);
+  const visibleLineIds = getVisibleJareLineIds(
+    state,
+    lastAction,
+    activePendingCaptureLineIds,
+  );
 
-  return JARE_LINES.map((line) => {
-    const owner = getLineOwner(state, line);
-    const id = line.join("-");
+  return JARE_LINES.filter((line) => visibleLineIds.has(line.join("-"))).map(
+    (line) => {
+      const owner = getLineOwner(state, line);
+      const id = line.join("-");
 
-    return {
-      id,
-      points: line,
-      isCompleted: owner !== null,
-      owner,
-      isActivePendingCapture: activePendingCaptureLineIds.has(id),
-    };
-  });
+      return {
+        id,
+        points: line,
+        isCompleted: owner !== null,
+        owner,
+        isActivePendingCapture: activePendingCaptureLineIds.has(id),
+      };
+    },
+  );
 }
 
 function getLineOwner(state: GameState, line: JareLine): PlayerId | null {
@@ -115,6 +138,32 @@ function getActivePendingCaptureLineIds(state: GameState): Set<string> {
       state.board,
       state.pendingCapture.formedAt,
       state.pendingCapture.player,
+    ).map((line) => line.join("-")),
+  );
+}
+
+function getVisibleJareLineIds(
+  state: GameState,
+  lastAction: BoardViewOptions["lastAction"],
+  activePendingCaptureLineIds: Set<string>,
+): Set<string> {
+  if (activePendingCaptureLineIds.size > 0) {
+    return activePendingCaptureLineIds;
+  }
+
+  if (
+    lastAction?.action.type !== "place" ||
+    !lastAction.formedJare ||
+    state.board[lastAction.action.point] !== lastAction.action.player
+  ) {
+    return new Set();
+  }
+
+  return new Set(
+    completedJareLines(
+      state.board,
+      lastAction.action.point,
+      lastAction.action.player,
     ).map((line) => line.join("-")),
   );
 }

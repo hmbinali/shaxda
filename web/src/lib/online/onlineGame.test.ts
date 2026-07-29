@@ -106,6 +106,32 @@ describe("OnlineGameController", () => {
     expect(game.feedback?.cues).toEqual(["place"]);
   });
 
+  it("cancels online selection after an invalid destination and on request", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    client.message({
+      v: protocolVersion,
+      type: "state",
+      roomCode: "ABCDEFGH",
+      state: gameFixtures.blockedPlayer,
+    });
+
+    game.clickPoint("O2");
+    expect(game.selected).toBe("O2");
+
+    game.clickPoint("O1");
+    expect(game.selected).toBeNull();
+    expect(game.invalid?.reason).toBe("illegalMove");
+
+    game.clickPoint("O2");
+    game.cancelSelection();
+    expect(game.selected).toBeNull();
+  });
+
   it("marks an inferred placement jare for announcement", () => {
     const client = new FakeClient();
     const game = createOnlineGameController({

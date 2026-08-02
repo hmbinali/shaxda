@@ -6,7 +6,6 @@
     FileText,
     Gamepad2,
     House,
-    ScrollText,
     ShieldCheck,
     Users,
     X,
@@ -39,7 +38,6 @@
     { href: "/local", label: nav.localPlay, icon: Gamepad2 },
     { href: "/online", label: nav.onlinePlay, icon: Users },
     { href: "/learn", label: nav.learn, icon: BookOpen },
-    { href: "/rules", label: nav.rules, icon: ScrollText },
   ] as const;
   const footerItems = [
     { href: "/privacy", label: nav.privacy, icon: ShieldCheck },

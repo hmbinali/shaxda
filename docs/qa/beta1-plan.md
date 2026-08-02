@@ -49,7 +49,8 @@ only.
 
 Each tester session should cover the following V1.0 surfaces:
 
-1. Open `/`, `/learn`, and `/rules`.
+1. Open `/` and the complete rules guide at `/learn`; confirm `/rules` returns
+   404 and is not linked from navigation.
 2. Confirm content is Somali-only and does not show English UI, language toggle,
    accounts, leaderboard, chat, tournaments, ads, sponsors, or payment UI.
 3. Start `/local` and play through placement.

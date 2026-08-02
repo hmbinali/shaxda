@@ -7,7 +7,7 @@
     PlayerId,
   } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
-  import { tick } from "svelte";
+  import { tick, type Snippet } from "svelte";
   import {
     HIT_RADIUS,
     LEGAL_HINT_RADIUS,
@@ -29,6 +29,9 @@
       formedJare: boolean;
     } | null;
     invalidNonce?: number;
+    overlay?: Snippet;
+    ariaLabel?: string;
+    ariaDescribedBy?: string;
   }
 
   type PieceFeedback = {
@@ -51,7 +54,26 @@
     onCancelSelection,
     lastAction = null,
     invalidNonce = 0,
+    overlay,
+    ariaLabel = messages.so.boardGallery.title,
+    ariaDescribedBy,
   }: Props = $props();
+
+  const instanceId = $props.id();
+  const svgDefinitionIds = {
+    pieceA: `${instanceId}-shaxda-piece-a`,
+    pieceB: `${instanceId}-shaxda-piece-b`,
+    surface: `${instanceId}-shaxda-board-surface`,
+    vignette: `${instanceId}-shaxda-board-vignette`,
+    carvedLine: `${instanceId}-shaxda-carved-line`,
+    woodGrain: `${instanceId}-shaxda-wood-grain`,
+  } as const;
+  const effectiveAriaDescribedBy = $derived(
+    mergeDescriptionIds(
+      interactive ? "shaxda-board-keyboard-help" : undefined,
+      ariaDescribedBy,
+    ),
+  );
 
   let visiblePlacementJareNonce = $state<number | null>(null);
   const presentedLastAction = $derived(
@@ -295,7 +317,9 @@
   }
 
   function pieceFill(player: PlayerId): string {
-    return player === "A" ? "url(#shaxda-piece-a)" : "url(#shaxda-piece-b)";
+    return player === "A"
+      ? `url(#${svgDefinitionIds.pieceA})`
+      : `url(#${svgDefinitionIds.pieceB})`;
   }
 
   function pieceStrokeClass(player: PlayerId): string {
@@ -404,6 +428,15 @@
       boardShell?.classList.remove("shaxda-invalid-shake");
     }
   }
+
+  function mergeDescriptionIds(
+    ...values: Array<string | undefined>
+  ): string | undefined {
+    const tokens = values.flatMap((value) => value?.trim().split(/\s+/) ?? []);
+    const uniqueTokens = [...new Set(tokens.filter(Boolean))];
+
+    return uniqueTokens.length > 0 ? uniqueTokens.join(" ") : undefined;
+  }
 </script>
 
 <div
@@ -419,38 +452,44 @@
     viewBox="0 0 100 100"
     preserveAspectRatio="xMidYMid meet"
     role="group"
-    aria-label={copy.title}
-    aria-describedby={interactive ? "shaxda-board-keyboard-help" : undefined}
+    aria-label={ariaLabel}
+    aria-describedby={effectiveAriaDescribedBy}
     style={`--shaxda-selected-offset: ${SELECTED_PIECE_OFFSET}px;`}
     onfocusout={handleBoardFocusOut}
     onanimationend={handleBoardAnimationEnd}
   >
     <defs>
-      <radialGradient id="shaxda-piece-a" cx="34%" cy="28%" r="72%">
+      <radialGradient id={svgDefinitionIds.pieceA} cx="34%" cy="28%" r="72%">
         <stop offset="0%" stop-color="#fff6e6" />
         <stop offset="58%" stop-color="var(--color-board-100)" />
         <stop offset="100%" stop-color="#8a5730" />
       </radialGradient>
-      <radialGradient id="shaxda-piece-b" cx="34%" cy="28%" r="72%">
+      <radialGradient id={svgDefinitionIds.pieceB} cx="34%" cy="28%" r="72%">
         <stop offset="0%" stop-color="#9a6a49" />
         <stop offset="55%" stop-color="var(--color-board-700)" />
         <stop offset="100%" stop-color="var(--color-board-900)" />
       </radialGradient>
-      <radialGradient id="shaxda-board-surface" cx="50%" cy="45%" r="72%">
+      <radialGradient id={svgDefinitionIds.surface} cx="50%" cy="45%" r="72%">
         <stop offset="0%" stop-color="#f6e3c7" />
         <stop offset="58%" stop-color="#d7aa78" />
         <stop offset="100%" stop-color="#a86638" />
       </radialGradient>
-      <radialGradient id="shaxda-board-vignette" cx="50%" cy="50%" r="68%">
+      <radialGradient id={svgDefinitionIds.vignette} cx="50%" cy="50%" r="68%">
         <stop offset="62%" stop-color="#4b2714" stop-opacity="0" />
         <stop offset="100%" stop-color="#4b2714" stop-opacity="0.24" />
       </radialGradient>
-      <linearGradient id="shaxda-carved-line" x1="0%" y1="0%" x2="0%" y2="100%">
+      <linearGradient
+        id={svgDefinitionIds.carvedLine}
+        x1="0%"
+        y1="0%"
+        x2="0%"
+        y2="100%"
+      >
         <stop offset="0%" stop-color="#2c160c" />
         <stop offset="100%" stop-color="#5e321b" />
       </linearGradient>
       <pattern
-        id="shaxda-wood-grain"
+        id={svgDefinitionIds.woodGrain}
         patternUnits="userSpaceOnUse"
         width="18"
         height="18"
@@ -516,7 +555,7 @@
       width="92.4"
       height="92.4"
       rx="3"
-      fill="url(#shaxda-board-surface)"
+      fill={`url(#${svgDefinitionIds.surface})`}
       data-testid="board-wood-surface"
       aria-hidden="true"
       pointer-events="none"
@@ -527,7 +566,7 @@
       width="92.4"
       height="92.4"
       rx="3"
-      fill="url(#shaxda-wood-grain)"
+      fill={`url(#${svgDefinitionIds.woodGrain})`}
       class="opacity-55"
       data-testid="board-wood-grain"
       aria-hidden="true"
@@ -539,7 +578,7 @@
       width="92.4"
       height="92.4"
       rx="3"
-      fill="url(#shaxda-board-vignette)"
+      fill={`url(#${svgDefinitionIds.vignette})`}
       data-testid="board-edge-vignette"
       aria-hidden="true"
       pointer-events="none"
@@ -584,7 +623,7 @@
           y1={POINT_COORDS[line.a].y}
           x2={POINT_COORDS[line.b].x}
           y2={POINT_COORDS[line.b].y}
-          stroke="url(#shaxda-carved-line)"
+          stroke={`url(#${svgDefinitionIds.carvedLine})`}
           stroke-width="1.45"
           stroke-linecap="round"
         />
@@ -639,7 +678,7 @@
               ? 0
               : -1
             : undefined}
-          aria-label={accessiblePointLabel(point)}
+          aria-label={interactive ? accessiblePointLabel(point) : undefined}
           onclick={interactive ? () => handlePointClick(point.id) : undefined}
           onpointerdown={interactive
             ? () => handlePointPointerDown(point.id)
@@ -661,9 +700,11 @@
             aria-hidden="true"
             pointer-events="all"
           />
-          <title>
-            {accessiblePointLabel(point)}
-          </title>
+          {#if interactive}
+            <title>
+              {accessiblePointLabel(point)}
+            </title>
+          {/if}
 
           <circle
             cx={point.x}
@@ -873,6 +914,12 @@
           class={`shaxda-removal-confirmation fill-transparent ${removalConfirmationClass(removalFeedback.action)}`}
           stroke-width="1"
         />
+      </g>
+    {/if}
+
+    {#if overlay}
+      <g data-testid="board-overlay" aria-hidden="true" pointer-events="none">
+        {@render overlay()}
       </g>
     {/if}
   </svg>

@@ -114,7 +114,8 @@ Confirm Cloudflare DNS, custom domains, and SSL are active for both hosts.
 
 Check these flows on production before announcing launch:
 
-- `/`, `/learn`, and `/rules` load successfully.
+- `/` and `/learn` load successfully, `/learn` contains the complete public
+  rules guide, and `/rules` returns 404.
 - Visible UI remains Somali-only and there is no language toggle.
 - A full local game can be completed.
 - Online room create, join-by-link/code, move sync, reconnect, and claim-win

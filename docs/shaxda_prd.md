@@ -464,9 +464,14 @@ Required routes:
 
 - `/`;
 - `/learn`;
-- `/rules`;
 - `/privacy`;
 - `/terms`.
+
+`/learn` is the single public learning and rules route. `/rules` is retired and
+must return 404 rather than redirecting. `/help` and `/legal` are separate
+follow-ups and are not part of the finalized V1.0 public route set. `/board`
+remains an unlinked internal fixture gallery pending a separate pre-launch
+decision to remove, gate, or retain it.
 
 Requirements:
 
@@ -1016,9 +1021,8 @@ Includes:
 - homepage;
 - cultural explanation;
 - play links;
-- learn page;
-- beginner guide;
-- rules page;
+- one complete learn/rules page at `/learn`;
+- beginner guide and full rules in the same progressive page;
 - jare/irmaan/movement explanations;
 - quick start;
 - privacy;

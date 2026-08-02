@@ -34,6 +34,16 @@ body {
   color: var(--color-ink);
 }
 
+.learn-section {
+  scroll-margin-top: 5.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #main-content {
+    scroll-behavior: smooth;
+  }
+}
+
 button,
 input,
 textarea,

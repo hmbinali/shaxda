@@ -571,6 +571,65 @@ describe("Board", () => {
     expect(css).toContain("-webkit-tap-highlight-color: transparent");
   });
 
+  it("uses a caller description for a non-interactive teaching board", () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.emptyBoard,
+        ariaLabel: "Looxa barashada",
+        ariaDescribedBy: "cashar-sharaxaad",
+      },
+    });
+
+    expect(boardSvg(container)).toHaveAttribute(
+      "aria-label",
+      "Looxa barashada",
+    );
+    expect(boardSvg(container)).toHaveAttribute(
+      "aria-describedby",
+      "cashar-sharaxaad",
+    );
+  });
+
+  it("merges and deduplicates keyboard and caller description IDs", () => {
+    const { container } = render(Board, {
+      props: {
+        state: gameFixtures.emptyBoard,
+        interactive: true,
+        ariaDescribedBy:
+          "cashar-sharaxaad shaxda-board-keyboard-help cashar-sharaxaad",
+      },
+    });
+
+    expect(boardSvg(container)).toHaveAttribute(
+      "aria-describedby",
+      "shaxda-board-keyboard-help cashar-sharaxaad",
+    );
+  });
+
+  it("namespaces SVG definitions for every board instance", () => {
+    render(Board, { props: { state: gameFixtures.emptyBoard } });
+    render(Board, { props: { state: gameFixtures.emptyBoard } });
+
+    const definitions = Array.from(
+      document.querySelectorAll<SVGElement>("defs [id]"),
+    );
+    const ids = definitions.map((definition) => definition.id);
+
+    expect(definitions).toHaveLength(12);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    for (const reference of document.querySelectorAll<SVGElement>(
+      '[fill^="url(#"], [stroke^="url(#"]',
+    )) {
+      const value =
+        reference.getAttribute("fill") ?? reference.getAttribute("stroke");
+      const id = value?.match(/^url\(#(.+)\)$/)?.[1];
+
+      expect(id).toBeDefined();
+      expect(document.getElementById(id ?? "")).toBeInTheDocument();
+    }
+  });
+
   it("shows a pressed response while a pointer is down", async () => {
     const { container } = render(Board, {
       props: {

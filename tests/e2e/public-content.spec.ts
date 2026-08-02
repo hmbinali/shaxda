@@ -3,7 +3,6 @@ import { expect, test } from "@playwright/test";
 const routes = [
   { path: "/", heading: "Shaxda" },
   { path: "/learn", heading: "Baro shaxda" },
-  { path: "/rules", heading: "Xeerarka shaxda" },
   { path: "/privacy", heading: "Asturnaanta" },
   { path: "/terms", heading: "Shuruudaha" },
 ] as const;
@@ -44,7 +43,7 @@ test.describe("C1 public content", () => {
       );
       await expect(page.locator("meta[property='og:title']")).toHaveAttribute(
         "content",
-        /Shaxda|Baro shaxda|Xeerarka shaxda|Asturnaanta|Shuruudaha/,
+        /Shaxda|Baro shaxda|Asturnaanta|Shuruudaha/,
       );
       const ogDescription = page.locator("meta[property='og:description']");
       await expect(ogDescription).toHaveAttribute("content", /.+/);
@@ -78,7 +77,7 @@ test.describe("C1 public content", () => {
       );
       await expect(page.locator("meta[name='twitter:title']")).toHaveAttribute(
         "content",
-        /Shaxda|Baro shaxda|Xeerarka shaxda|Asturnaanta|Shuruudaha/,
+        /Shaxda|Baro shaxda|Asturnaanta|Shuruudaha/,
       );
 
       const bodyText = (await page.locator("body").innerText()).toLowerCase();
@@ -163,7 +162,6 @@ test.describe("C1 public content", () => {
       "Ciyaar qalabkan",
       "Ciyaar marti ah",
       "Baro",
-      "Xeerarka",
       "Asturnaanta",
       "Shuruudaha",
     ]) {
@@ -200,20 +198,38 @@ test.describe("C1 public content", () => {
     expect(await response.text()).not.toContain('data-testid="pwa-notices"');
   });
 
-  test("rules page includes required draw, win, and jare-line content", async ({
+  test("learn page includes every required draw, win, and jare-line group", async ({
     page,
   }) => {
-    await page.goto("/rules");
+    await page.goto("/learn");
 
-    await expect(page.getByText("Dhammaan 16-ka sadar ee jare")).toBeVisible();
-    await expect(page.getByText("O1 - O2 - O3")).toBeVisible();
-    await expect(page.getByText("O8 - M8 - I8")).toBeVisible();
-    await expect(page.getByText(/80 dhaqaaq/)).toBeVisible();
-    await expect(page.getByText(/saddex jeer soo noqdo/)).toBeVisible();
+    await expect(page.getByText(/16 sadar oo jare ah/)).toBeVisible();
+    await expect(
+      page.getByText(/4 dhinac oo afar-geeska dibadda ah/),
+    ).toBeVisible();
+    await expect(page.getByText(/4 kan dhexe ah/)).toBeVisible();
+    await expect(page.getByText(/4 kan gudaha ah/)).toBeVisible();
+    await expect(
+      page.getByText(/4 khad oo bartamaha dhinacyada/),
+    ).toBeVisible();
+    await expect(page.getByText(/80 wareeg/)).toBeVisible();
+    await expect(page.getByText(/3 jeer soo noqda/)).toBeVisible();
     await expect(page.getByText(/wax ka yar 3 dhagax/)).toBeVisible();
     await expect(
-      page.getByText(/Dhagax lama saaro xilligii dhigista/),
+      page.getByText(
+        /Jare la sameeyo xilliga dhigista qabasho ama ka saarid ma keeno/,
+      ),
     ).toBeVisible();
+  });
+
+  test("retired rules route returns a Somali 404 page", async ({ page }) => {
+    const response = await page.goto("/rules");
+
+    expect(response?.status()).toBe(404);
+    await expect(
+      page.getByRole("heading", { name: "Bogga lama helin" }),
+    ).toBeVisible();
+    await expect(page.getByText("Not Found", { exact: true })).toHaveCount(0);
   });
 
   test("manifest uses Somali public copy", async ({ request }) => {

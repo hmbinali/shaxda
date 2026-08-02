@@ -20,8 +20,8 @@
 
 <ol
   class="mt-6 grid gap-4"
-  class:md:grid-cols-2={columns >= 2}
-  class:xl:grid-cols-3={columns === 3}
+  class:md:grid-cols-2={columns >= 2 && frames.length > 1}
+  class:xl:grid-cols-3={columns === 3 && frames.length > 2}
   aria-label={label}
 >
   {#each frames as frame, index (frame.id)}

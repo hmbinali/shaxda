@@ -35,10 +35,7 @@
   <figcaption class="px-1 pb-1 pt-4">
     <span class="block font-semibold text-board-900">{title}</span>
     <span class="mt-1 block text-sm leading-6 text-board-700">{caption}</span>
-    <span
-      id={descriptionId}
-      class="mt-2 block text-sm leading-6 text-board-700"
-    >
+    <span id={descriptionId} class="sr-only">
       {description}
     </span>
   </figcaption>

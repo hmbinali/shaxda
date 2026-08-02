@@ -1,78 +1,173 @@
 <script lang="ts">
-  import { siteContent } from "@shaxda/i18n";
-  import { gameFixtures } from "@shaxda/shared";
-  import Board from "$components/Board.svelte";
+  import { base, resolve } from "$app/paths";
+  import { siteContent, type LearnPageContent } from "@shaxda/i18n";
   import PageMeta from "$components/PageMeta.svelte";
+  import DiagramSequence from "$lib/components/learn/DiagramSequence.svelte";
+  import LearnSectionNav from "$lib/components/learn/LearnSectionNav.svelte";
+  import RuleCallout from "$lib/components/learn/RuleCallout.svelte";
 
-  const page = siteContent.so.pages.learn;
+  const page: LearnPageContent = siteContent.so.pages.learn;
+  const sectionLinks = page.sections.map(({ id, navLabel }) => ({
+    id,
+    label: navLabel,
+  }));
+  const ctaToneClasses = {
+    emerald:
+      "border-emerald-900/25 bg-emerald-700 text-white hover:bg-emerald-800",
+    sky: "border-sky-900/25 bg-sky-700 text-white hover:bg-sky-800",
+  } as const;
 </script>
 
 <PageMeta title={page.title} description={page.description} path={page.path} />
 
-<div>
-  <section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-    <div class="grid gap-10 lg:grid-cols-[1fr_28rem] lg:items-start">
-      <div>
-        <p class="text-sm font-semibold uppercase tracking-normal text-red-800">
-          Shaxda
-        </p>
-        <h1 class="mt-3 text-4xl font-semibold tracking-normal sm:text-6xl">
-          {page.heading}
-        </h1>
-        <p class="mt-5 max-w-3xl text-lg leading-8 text-board-700">
-          {page.intro}
-        </p>
-      </div>
-
-      <div class="rounded border border-board-700/20 bg-white/55 p-4">
-        <Board state={gameFixtures.placementJare} />
-      </div>
+<div data-testid="learn-page">
+  <header class="border-b border-board-700/15 bg-white/35">
+    <div class="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+      <p class="text-sm font-bold uppercase tracking-wider text-red-800">
+        {page.hero.eyebrow}
+      </p>
+      <h1 class="mt-3 text-4xl font-semibold tracking-normal sm:text-6xl">
+        {page.hero.heading}
+      </h1>
+      <p class="mt-5 max-w-3xl text-lg leading-8 text-board-700">
+        {page.hero.intro}
+      </p>
     </div>
-  </section>
+  </header>
 
-  <section class="bg-board-100/35">
-    <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-semibold tracking-normal">
-        {page.quickStartTitle}
-      </h2>
-      <ol class="mt-5 grid gap-3 md:grid-cols-2">
-        {#each page.quickStart as step, index (step)}
-          <li class="rounded border border-board-700/20 bg-board-50 p-4">
-            <span class="text-sm font-semibold text-red-800">
-              {index + 1}
-            </span>
-            <p class="mt-2 leading-7 text-board-700">{step}</p>
-          </li>
-        {/each}
-      </ol>
-    </div>
-  </section>
+  <div
+    class="mx-auto grid min-w-0 max-w-[76rem] items-start gap-8 px-4 pb-10 sm:px-6 sm:pb-12 lg:grid-cols-[15rem_minmax(0,65ch)] lg:gap-12 lg:px-8 lg:pt-12"
+  >
+    <LearnSectionNav sections={sectionLinks} label={page.navigationLabel} />
 
-  <section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-    <div class="grid gap-5 md:grid-cols-2">
-      {#each page.topics as topic (topic.title)}
-        <article class="rounded border border-board-700/20 bg-white/55 p-5">
-          <h2 class="text-xl font-semibold tracking-normal">{topic.title}</h2>
-          <p class="mt-3 leading-7 text-board-700">{topic.body}</p>
-        </article>
+    <article class="min-w-0">
+      {#each page.sections as section (section.id)}
+        <section
+          id={section.id}
+          data-learn-section={section.id}
+          class={`learn-section border-b border-board-700/15 py-10 first:pt-10 last:border-b-0 last:pb-0 lg:py-14 lg:first:pt-0 ${
+            section.id === "talooyin"
+              ? "rounded-2xl border border-amber-800/25 bg-amber-50/45 px-5 sm:px-7"
+              : ""
+          }`}
+        >
+          <h2 class="text-3xl font-semibold tracking-normal text-board-900">
+            {section.heading}
+          </h2>
+
+          {#if section.paragraphs.length > 0}
+            <div class="mt-5 grid gap-4 text-base leading-8 text-board-700">
+              {#each section.paragraphs as paragraph (paragraph)}
+                <p>{paragraph}</p>
+              {/each}
+            </div>
+          {/if}
+
+          {#if section.photo !== undefined}
+            <figure
+              class="mt-6 overflow-hidden rounded-2xl border border-board-700/20 bg-white/65 shadow-sm"
+              data-testid="irmaan-photo"
+            >
+              <img
+                src={`${base}${section.photo.src}`}
+                alt={section.photo.alt}
+                width={section.photo.width}
+                height={section.photo.height}
+                loading="lazy"
+                decoding="async"
+                class="h-auto w-full bg-board-100/30 object-cover"
+              />
+              <figcaption
+                class="border-t border-board-700/15 px-4 py-3 text-sm leading-6 text-board-700"
+              >
+                {section.photo.caption}
+              </figcaption>
+            </figure>
+          {/if}
+
+          {#each section.subsections as subsection (subsection.heading)}
+            <div class="mt-8">
+              <h3 class="text-xl font-semibold tracking-normal text-board-900">
+                {subsection.heading}
+              </h3>
+              {#if subsection.paragraphs.length > 0}
+                <div class="mt-3 grid gap-4 leading-8 text-board-700">
+                  {#each subsection.paragraphs as paragraph (paragraph)}
+                    <p>{paragraph}</p>
+                  {/each}
+                </div>
+              {/if}
+              {#if subsection.rules.length > 0}
+                <ul
+                  class="mt-4 grid list-disc gap-2 pl-6 leading-7 text-board-700"
+                >
+                  {#each subsection.rules as rule (rule)}
+                    <li>{rule}</li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+          {/each}
+
+          {#if section.rules.length > 0}
+            <ul class="mt-5 grid list-disc gap-2 pl-6 leading-7 text-board-700">
+              {#each section.rules as rule (rule)}
+                <li>{rule}</li>
+              {/each}
+            </ul>
+          {/if}
+
+          {#if section.callouts.length > 0}
+            <div class="mt-6 grid gap-3">
+              {#each section.callouts as callout (callout.body)}
+                <RuleCallout variant={callout.variant}>
+                  <p>{callout.body}</p>
+                </RuleCallout>
+              {/each}
+            </div>
+          {/if}
+
+          {#each section.diagramGroups as group (group.label)}
+            <DiagramSequence
+              label={group.label}
+              frames={group.frames}
+              columns={group.columns}
+            />
+          {/each}
+
+          {#if section.summary.length > 0}
+            <dl class="mt-6 grid gap-3 sm:grid-cols-2">
+              {#each section.summary as item (item.term)}
+                <div
+                  class="rounded-xl border border-board-700/20 bg-white/65 p-4"
+                >
+                  <dt class="font-bold text-board-900">{item.term}</dt>
+                  <dd class="mt-1 text-sm leading-6 text-board-700">
+                    {item.detail}
+                  </dd>
+                </div>
+              {/each}
+            </dl>
+          {/if}
+
+          {#if section.ctas.length > 0}
+            <div
+              class="mt-6 grid gap-3 sm:grid-cols-2"
+              data-testid="learn-actions"
+            >
+              {#each section.ctas as cta (cta.href)}
+                <a
+                  href={resolve(cta.href)}
+                  data-tone={cta.tone}
+                  class={`inline-flex min-h-11 items-center justify-center rounded-lg border px-4 py-2.5 text-center text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2 motion-reduce:transition-none ${ctaToneClasses[cta.tone]}`}
+                >
+                  {cta.label}
+                </a>
+              {/each}
+            </div>
+          {/if}
+        </section>
       {/each}
-    </div>
-  </section>
-
-  <section class="bg-white/45">
-    <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-semibold tracking-normal">
-        {page.mistakesTitle}
-      </h2>
-      <ul class="mt-5 grid gap-3 md:grid-cols-2">
-        {#each page.mistakes as mistake (mistake)}
-          <li
-            class="rounded border border-red-900/20 bg-red-50/70 p-4 leading-7 text-board-700"
-          >
-            {mistake}
-          </li>
-        {/each}
-      </ul>
-    </div>
-  </section>
+    </article>
+  </div>
 </div>

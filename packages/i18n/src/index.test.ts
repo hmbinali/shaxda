@@ -15,7 +15,6 @@ describe("i18n scaffold", () => {
       "home",
       "learn",
       "privacy",
-      "rules",
       "terms",
     ]);
 
@@ -34,10 +33,17 @@ describe("i18n scaffold", () => {
     expect(content).toContain("irmaan");
   });
 
-  it("lists every valid jare line on the rules page", () => {
-    expect(siteContent.so.pages.rules.jareLines).toHaveLength(16);
-    expect(siteContent.so.pages.rules.jareLines).toContain("O1 - O2 - O3");
-    expect(siteContent.so.pages.rules.jareLines).toContain("O8 - M8 - I8");
+  it("uses learn as the only public rules destination", () => {
+    expect(siteContent.so.pages.learn.path).toBe("/learn");
+    expect(siteContent.so.nav).not.toHaveProperty("rules");
+    expect(siteContent.so.pages).not.toHaveProperty("rules");
+  });
+
+  it("provides Somali copy for not-found and unexpected errors", () => {
+    expect(siteContent.so.errorPage).toMatchObject({
+      notFound: { title: "Bogga lama helin" },
+      unexpected: { title: "Waxbaa khaldamay" },
+    });
   });
 
   it("covers every current local game end reason", () => {

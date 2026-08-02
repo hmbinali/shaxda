@@ -19,9 +19,19 @@
 
   onMount(() => {
     const root = document.getElementById("main-content");
+    const syncFromHash = () => {
+      const id = window.location.hash.slice(1);
+
+      if (sections.some((section) => section.id === id)) {
+        selectSection(id);
+      }
+    };
+
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
 
     if (root === null || typeof IntersectionObserver === "undefined") {
-      return;
+      return () => window.removeEventListener("hashchange", syncFromHash);
     }
 
     const targets = sections
@@ -56,14 +66,26 @@
       observer.observe(target);
     }
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("hashchange", syncFromHash);
+    };
   });
+
+  function selectSection(id: string): void {
+    observedSection = id;
+    keepMobileLinkVisible(id);
+  }
 
   function keepMobileLinkVisible(id: string): void {
     const strip = mobileStrip;
     const link = strip?.querySelector<HTMLElement>(`[href="#${id}"]`);
 
     if (strip === null || link === null || link === undefined) {
+      return;
+    }
+
+    if (typeof strip.scrollTo !== "function") {
       return;
     }
 
@@ -77,20 +99,23 @@
 </script>
 
 <div
-  class="sticky top-0 z-30 -mx-4 border-y border-board-700/15 bg-board-50/95 px-4 py-2 backdrop-blur lg:static lg:z-auto lg:mx-0 lg:h-full lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+  class="sticky top-0 z-30 -mx-4 min-w-0 max-w-full border-y border-board-700/15 bg-board-50/95 px-4 py-2 backdrop-blur lg:static lg:z-auto lg:mx-0 lg:self-start lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
 >
-  <nav class="lg:hidden" aria-label={label}>
+  <nav class="min-w-0 lg:hidden" aria-label={label}>
     <div
       bind:this={mobileStrip}
-      class="flex snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain pb-1"
+      class="flex max-w-full snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain pb-1"
     >
       {#each sections as section (section.id)}
         <a
           href={`#${section.id}`}
+          onclick={() => selectSection(section.id)}
           aria-current={activeSection === section.id ? "location" : undefined}
-          class="inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border border-board-700/20 bg-white/80 px-4 text-sm font-semibold text-board-700 outline-none transition-colors hover:border-board-700/40 hover:text-board-900 focus-visible:ring-2 focus-visible:ring-red-800 motion-reduce:transition-none"
-          class:bg-board-900={activeSection === section.id}
-          class:text-board-50={activeSection === section.id}
+          class={`inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border border-board-700/20 px-4 text-sm font-semibold outline-none transition-colors hover:border-board-700/40 focus-visible:ring-2 focus-visible:ring-red-800 motion-reduce:transition-none ${
+            activeSection === section.id
+              ? "bg-board-900 text-board-50"
+              : "bg-white/80 text-board-700 hover:text-board-900"
+          }`}
         >
           {section.label}
         </a>
@@ -107,10 +132,13 @@
         <li>
           <a
             href={`#${section.id}`}
+            onclick={() => selectSection(section.id)}
             aria-current={activeSection === section.id ? "location" : undefined}
-            class="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-board-700 outline-none transition-colors hover:bg-board-100/65 hover:text-board-900 focus-visible:ring-2 focus-visible:ring-red-800 motion-reduce:transition-none"
-            class:bg-board-900={activeSection === section.id}
-            class:text-board-50={activeSection === section.id}
+            class={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-red-800 motion-reduce:transition-none ${
+              activeSection === section.id
+                ? "bg-board-900 text-board-50"
+                : "text-board-700 hover:bg-board-100/65 hover:text-board-900"
+            }`}
           >
             <span aria-hidden="true">{index + 1}</span>
             <span>{section.label}</span>

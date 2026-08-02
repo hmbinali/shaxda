@@ -1,4 +1,4 @@
-import { render } from "@testing-library/svelte";
+import { fireEvent, render } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import LearnSectionNav from "./LearnSectionNav.svelte";
 import RuleDiagram from "./RuleDiagram.svelte";
@@ -26,7 +26,7 @@ describe("learn components", () => {
     expect(container.textContent).toContain("Boodis");
   });
 
-  it("keeps section links as normal anchors with a progressive default", () => {
+  it("keeps normal anchors and immediately highlights the clicked section", async () => {
     const sections = [
       { id: "bilowga", label: "Bilowga" },
       { id: "jare", label: "Jare" },
@@ -37,6 +37,24 @@ describe("learn components", () => {
 
     expect(container.querySelectorAll('a[href="#bilowga"]')).toHaveLength(2);
     expect(container.querySelectorAll('a[href="#jare"]')).toHaveLength(2);
+    expect(
+      container.querySelectorAll('a[href="#bilowga"][aria-current="location"]'),
+    ).toHaveLength(2);
+
+    const jareLink =
+      container.querySelector<HTMLAnchorElement>('a[href="#jare"]');
+    const bilowgaLink =
+      container.querySelector<HTMLAnchorElement>('a[href="#bilowga"]');
+
+    expect(jareLink).not.toBeNull();
+    expect(bilowgaLink).not.toBeNull();
+
+    await fireEvent.click(jareLink!);
+    expect(
+      container.querySelectorAll('a[href="#jare"][aria-current="location"]'),
+    ).toHaveLength(2);
+
+    await fireEvent.click(bilowgaLink!);
     expect(
       container.querySelectorAll('a[href="#bilowga"][aria-current="location"]'),
     ).toHaveLength(2);

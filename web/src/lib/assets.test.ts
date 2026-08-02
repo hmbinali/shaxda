@@ -32,6 +32,7 @@ const documentedAssets = [
   "web/static/og-image.svg",
   ...Object.keys(pngFiles).map((file) => `web/static/${file}`),
   ...soundFiles.map((file) => `web/static/sounds/${file}`),
+  "web/static/images/learn/irmaan-example.jpg",
   "web/scripts/generate-audio.mjs",
   "web/scripts/generate-icons.mjs",
 ] as const;
@@ -56,6 +57,24 @@ describe("E1 assets", () => {
     }
   });
 
+  it("commits the optimized Irmaan photograph at its display dimensions", async () => {
+    const photoPath = resolve(
+      staticDir,
+      "images",
+      "learn",
+      "irmaan-example.jpg",
+    );
+    const sourcePath = resolve(docsDir, "shaxda_irmaan_example.jpg");
+    const [photo, photoMetadata, sourceMetadata] = await Promise.all([
+      readFile(photoPath),
+      stat(photoPath),
+      stat(sourcePath),
+    ]);
+
+    expect(readJpegDimensions(photo)).toEqual([960, 1280]);
+    expect(photoMetadata.size).toBeLessThan(sourceMetadata.size);
+  });
+
   it("documents source and licensing notes for every E1 asset", async () => {
     const docs = await readFile(resolve(docsDir, "shaxda_assets.md"), "utf8");
 
@@ -75,4 +94,34 @@ function readPngDimensions(data: Buffer): [number, number] {
   );
 
   return [data.readUInt32BE(16), data.readUInt32BE(20)];
+}
+
+function readJpegDimensions(data: Buffer): [number, number] {
+  expect(data.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+
+  let offset = 2;
+
+  while (offset + 9 < data.length) {
+    if (data[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+
+    const marker = data[offset + 1];
+    const segmentLength = data.readUInt16BE(offset + 2);
+    const isStartOfFrame =
+      marker !== undefined &&
+      ((marker >= 0xc0 && marker <= 0xc3) ||
+        (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) ||
+        (marker >= 0xcd && marker <= 0xcf));
+
+    if (isStartOfFrame) {
+      return [data.readUInt16BE(offset + 7), data.readUInt16BE(offset + 5)];
+    }
+
+    offset += segmentLength + 2;
+  }
+
+  throw new Error("JPEG start-of-frame marker not found");
 }

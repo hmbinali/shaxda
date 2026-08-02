@@ -75,20 +75,32 @@ test.describe("Q1 mobile responsive smoke", () => {
       page.getByRole("heading", { name: "Ciyaar qalabkan", exact: true }),
     ).toBeVisible();
     await expect(page.getByTestId("board")).toBeInViewport();
-    const topRailBox = await page.getByTestId("player-rail-B").boundingBox();
-    const boardBox = await page.getByTestId("board").boundingBox();
-    const bottomRailBox = await page.getByTestId("player-rail-A").boundingBox();
+    const { topRailBox, boardBox, bottomRailBox } = await page.evaluate(() => {
+      const rect = (testId: string) => {
+        const element = document.querySelector(`[data-testid="${testId}"]`);
+
+        if (!(element instanceof HTMLElement)) {
+          throw new Error(`Missing ${testId}`);
+        }
+
+        const { x, y, width, height } = element.getBoundingClientRect();
+        return { x, y, width, height };
+      };
+
+      return {
+        topRailBox: rect("player-rail-B"),
+        boardBox: rect("board"),
+        bottomRailBox: rect("player-rail-A"),
+      };
+    });
     const playerName = page.getByTestId("player-rail-A").locator("h2");
     const instruction = page.getByTestId("player-rail-A").locator("p").first();
 
-    expect(topRailBox).not.toBeNull();
-    expect(boardBox).not.toBeNull();
-    expect(bottomRailBox).not.toBeNull();
+    expect(boardBox.y - (topRailBox.y + topRailBox.height)).toBeLessThanOrEqual(
+      12,
+    );
     expect(
-      boardBox!.y - (topRailBox!.y + topRailBox!.height),
-    ).toBeLessThanOrEqual(12);
-    expect(
-      bottomRailBox!.y - (boardBox!.y + boardBox!.height),
+      bottomRailBox.y - (boardBox.y + boardBox.height),
     ).toBeLessThanOrEqual(12);
     await expect(playerName).toBeVisible();
     await expect(instruction).toBeVisible();

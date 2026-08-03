@@ -24,9 +24,10 @@ Use this checklist before BETA1 sign-off. Q1 validates launch confidence only; d
 
 ## Responsive And Accessibility Spot Checks
 
-- Check `/`, `/learn`, `/privacy`, `/terms`, `/local`, and `/online` at 320px, 390px, 768px, and 1440px widths.
+- Check `/`, `/learn`, `/legal`, `/local`, and `/online` at 320px, 390px, 768px, and 1440px widths.
 - Confirm `/learn` contains the complete rules, all seven teaching frames, working section anchors, a sticky mobile navigator, and a sticky desktop contents rail.
 - Confirm `/rules` returns 404 and is absent from navigation and route inventories.
+- Confirm `/privacy` and `/terms` return 404 and are absent from navigation and route inventories.
 - Confirm keyboard-only navigation reaches primary links, local controls, online form fields, and game buttons in a sensible order.
 - Confirm visible focus styles are present on links, buttons, and inputs.
 - Confirm reduced-motion OS/browser settings do not block gameplay feedback or make the board unusable.

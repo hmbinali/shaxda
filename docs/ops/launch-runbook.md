@@ -188,8 +188,20 @@ pnpm deploy:web
 
 Check these flows on `https://shaxda.app` before announcing launch:
 
-- `/`, `/learn`, `/privacy`, and `/terms` load successfully; `/rules` returns
-  the Somali 404 page.
+- `/`, `/learn`, and `/legal` load successfully; `/rules`, `/privacy`, and
+  `/terms` return the Somali 404 page.
+- [ ] BLOCKER — `/legal` is not launch-ready until:
+  - all five placeholder tokens are replaced with real values
+    (`[MAGACA MULKIILAHA]`, `[EMAIL XIRIIRKA]`, `[WADDANKA SHARCIGA]`,
+    `[TAARIIKHDA CUSBOONAYSIINTA]`, `[RUQSADDA ASTAAMAHA]`);
+  - the Turnstile pre-clearance / cookie wording is confirmed against the
+    Cloudflare dashboard;
+  - the Web Analytics and Workers Logs retention figures are confirmed against
+    current Cloudflare docs;
+  - a fluent Somali speaker has reviewed the copy;
+  - a qualified legal reviewer has signed off;
+  - searching `packages/i18n/src/content/legal.so.ts` for the five placeholder
+    token names returns nothing.
 - Canonical and Open Graph URLs use `https://shaxda.app`, with no
   `shaxda.example` values.
 - Visible UI remains Somali-only and there is no language toggle.

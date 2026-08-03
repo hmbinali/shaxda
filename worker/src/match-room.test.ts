@@ -86,6 +86,35 @@ describe("match room hibernation spike", () => {
     await expect(response.json()).resolves.toEqual({ error: "Room not found" });
   });
 
+  it("caps concurrent sockets per room and keeps accepted sockets usable", async () => {
+    const roomCode = await createRoom();
+    const sockets = await Promise.all(
+      Array.from({ length: 8 }, () => connectRoom(roomCode)),
+    );
+
+    const rejected = await websocketResponse(roomCode);
+    expect(rejected.status).toBe(429);
+    await expect(rejected.json()).resolves.toEqual({
+      error: "tooManyConnections",
+    });
+
+    for (const [index, socket] of sockets.entries()) {
+      sendJson(socket, {
+        v: protocolVersion,
+        type: "ping",
+        nonce: `socket-${index}`,
+      });
+      await expect(nextJson(socket)).resolves.toMatchObject({
+        type: "pong",
+        nonce: `socket-${index}`,
+      });
+    }
+
+    for (const socket of sockets) {
+      socket.close();
+    }
+  });
+
   it("assigns two slots and rejects a third guest", async () => {
     const roomCode = await createRoom();
     const first = await connectRoom(roomCode);
@@ -205,6 +234,61 @@ describe("match room hibernation spike", () => {
     });
 
     socket.close();
+  });
+
+  it("throttles stored activity writes for repeated unjoined pings", async () => {
+    const initialTime = 1_000_000;
+    const firstPingTime = initialTime + 31_000;
+    vi.spyOn(Date, "now").mockReturnValue(initialTime);
+    const roomCode = await createRoom();
+    const socket = await connectRoom(roomCode);
+
+    for (let index = 0; index < 20; index += 1) {
+      vi.mocked(Date.now).mockReturnValue(firstPingTime + index * 100);
+      sendJson(socket, {
+        v: protocolVersion,
+        type: "ping",
+        nonce: `activity-${index}`,
+      });
+      await expect(nextJson(socket)).resolves.toMatchObject({
+        type: "pong",
+        nonce: `activity-${index}`,
+      });
+    }
+
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      lastActivityAt: firstPingTime,
+    });
+
+    socket.close();
+  });
+
+  it("persists activity immediately with a valid game action", async () => {
+    const initialTime = 1_000_000;
+    const actionTime = initialTime + 1_000;
+    vi.spyOn(Date, "now").mockReturnValue(initialTime);
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    const firstPresenceAfterSecondJoin = waitForMessage(first, "presence");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await firstPresenceAfterSecondJoin;
+
+    vi.mocked(Date.now).mockReturnValue(actionTime);
+    const firstState = waitForMessage(first, "state");
+    const secondState = waitForMessage(second, "state");
+    sendAction(first, roomCode, { type: "place", player: "A", point: "O1" });
+    await firstState;
+    await secondState;
+
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      lastActivityAt: actionTime,
+    });
+
+    first.close();
+    second.close();
   });
 
   it("reports invalid messages and keeps the socket usable", async () => {

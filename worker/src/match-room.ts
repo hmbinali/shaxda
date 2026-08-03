@@ -28,6 +28,8 @@ const IDLE_CLAIM_MS = 180_000;
 const MAX_MESSAGE_BYTES = 4_096;
 const MESSAGE_RATE_WINDOW_MS = 10_000;
 const MESSAGE_RATE_MAX = 30;
+const MAX_SOCKETS_PER_ROOM = 8;
+const ACTIVITY_WRITE_MIN_INTERVAL_MS = 30_000;
 const PLAYER_SLOTS = ["A", "B"] as const;
 
 type OnlineMatchEndReason = "opponentAbandoned" | "opponentIdleTimeout";
@@ -93,12 +95,16 @@ export class MatchRoom implements DurableObject {
       return Response.json({ error: "Room not found" }, { status: 404 });
     }
 
+    if (this.ctx.getWebSockets().length >= MAX_SOCKETS_PER_ROOM) {
+      return Response.json({ error: "tooManyConnections" }, { status: 429 });
+    }
+
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
 
     this.ctx.acceptWebSocket(server);
-    await this.refreshActivity(room);
+    await this.refreshActivityIfStale(room, Date.now());
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -107,7 +113,8 @@ export class MatchRoom implements DurableObject {
     ws: WebSocket,
     message: string | ArrayBuffer,
   ): Promise<void> {
-    if (!this.consumeMessageQuota(ws, Date.now())) {
+    const now = Date.now();
+    if (!this.consumeMessageQuota(ws, now)) {
       this.sendError(ws, "rateLimited", "Too many messages.");
       return;
     }
@@ -126,15 +133,16 @@ export class MatchRoom implements DurableObject {
 
     switch (parsed.message.type) {
       case "joinRoom":
-        await this.handleJoin(ws, room, parsed.message);
+        await this.handleJoin(ws, room, parsed.message, now);
         return;
       case "gameAction":
-        await this.handleGameAction(ws, room, parsed.message);
+        await this.handleGameAction(ws, room, parsed.message, now);
         return;
       case "claimWin":
-        await this.handleClaimWin(ws, room, parsed.message);
+        await this.handleClaimWin(ws, room, parsed.message, now);
         return;
       case "ping":
+        await this.refreshActivityIfStale(room, now);
         ws.send(
           JSON.stringify(
             serverMessageSchema.parse({
@@ -146,7 +154,11 @@ export class MatchRoom implements DurableObject {
         );
         return;
       case "echo":
-        this.handleEcho(ws, room, parsed.message);
+        this.handleEcho(
+          ws,
+          await this.refreshActivityIfStale(room, now),
+          parsed.message,
+        );
         return;
     }
   }
@@ -229,14 +241,17 @@ export class MatchRoom implements DurableObject {
     ws: WebSocket,
     room: RoomState,
     message: Extract<RoomInboundMessage, { type: "joinRoom" }>,
+    now: number,
   ): Promise<void> {
     if (message.roomCode !== room.roomCode) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "roomMismatch", "Room code does not match this room.");
       return;
     }
 
     const updated = this.assignSlot(room, message.guestId, message.displayName);
     if (!updated) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "roomFull", "Room already has two guests.");
       return;
     }
@@ -248,7 +263,6 @@ export class MatchRoom implements DurableObject {
       slot,
     } satisfies SocketAttachment);
 
-    const now = Date.now();
     const updatedRoom = this.reconcileClaimability(
       this.ensureTurnStarted(
         this.markSlotConnected(updated.room, slot, now),
@@ -296,43 +310,50 @@ export class MatchRoom implements DurableObject {
     ws: WebSocket,
     room: RoomState,
     message: Extract<RoomInboundMessage, { type: "gameAction" }>,
+    now: number,
   ): Promise<void> {
     if (message.roomCode !== room.roomCode) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "roomMismatch", "Room code does not match this room.");
       return;
     }
 
     const attachment = socketAttachment(ws);
     if (!attachment) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notJoined", "Join the room before playing.");
       return;
     }
 
     if (!room.slots.A || !room.slots.B) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "waitingForOpponent", "Wait for an opponent.");
       return;
     }
 
     if (message.action.player !== attachment.slot) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notYourTurn", "It is not your turn.");
       return;
     }
 
     const state = deserialize(room.gameState);
     if (getActingPlayer(state) !== attachment.slot) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notYourTurn", "It is not your turn.");
       return;
     }
 
     const result = applyAction(state, message.action);
     if (!result.ok) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, result.error, "Action rejected by game rules.");
       return;
     }
 
-    const now = Date.now();
     const updatedRoom = {
       ...room,
+      lastActivityAt: now,
       gameState: serialize(result.state),
       turnStartedAt: result.state.phase === "gameOver" ? null : now,
       nudgedTurnAt: null,
@@ -349,21 +370,24 @@ export class MatchRoom implements DurableObject {
     ws: WebSocket,
     room: RoomState,
     message: Extract<RoomInboundMessage, { type: "claimWin" }>,
+    now: number,
   ): Promise<void> {
     if (message.roomCode !== room.roomCode) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "roomMismatch", "Room code does not match this room.");
       return;
     }
 
     const attachment = socketAttachment(ws);
     if (!attachment) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notJoined", "Join the room before claiming a win.");
       return;
     }
 
-    const now = Date.now();
     const reason = this.claimReasonFor(room, attachment.slot, now);
     if (reason === null) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notClaimable", "Claim win is not available.");
       return;
     }
@@ -372,12 +396,14 @@ export class MatchRoom implements DurableObject {
     const opponent = otherSlot(attachment.slot);
     const result = applyAction(state, { type: "resign", player: opponent });
     if (!result.ok || result.state.winner === null) {
+      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notClaimable", "Claim win is not available.");
       return;
     }
 
     const updatedRoom: RoomState = {
       ...room,
+      lastActivityAt: now,
       gameState: serialize(result.state),
       turnStartedAt: null,
       nudgedTurnAt: null,
@@ -760,12 +786,18 @@ export class MatchRoom implements DurableObject {
   }
 
   private async refreshStoredActivity(): Promise<RoomState | null> {
-    const room = await this.readRoom();
-    return room ? this.refreshActivity(room) : null;
+    return this.readRoom();
   }
 
-  private async refreshActivity(room: RoomState): Promise<RoomState> {
-    const updatedRoom = { ...room, lastActivityAt: Date.now() };
+  private async refreshActivityIfStale(
+    room: RoomState,
+    now: number,
+  ): Promise<RoomState> {
+    if (now - room.lastActivityAt < ACTIVITY_WRITE_MIN_INTERVAL_MS) {
+      return room;
+    }
+
+    const updatedRoom = { ...room, lastActivityAt: now };
     await this.persistRoom(updatedRoom);
     return updatedRoom;
   }

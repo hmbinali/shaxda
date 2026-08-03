@@ -3,8 +3,7 @@ import { expect, test } from "@playwright/test";
 const routes = [
   { path: "/", heading: "Shaxda" },
   { path: "/learn", heading: "Baro shaxda" },
-  { path: "/privacy", heading: "Asturnaanta" },
-  { path: "/terms", heading: "Shuruudaha" },
+  { path: "/legal", heading: "Sharciga iyo asturnaanta" },
 ] as const;
 
 const excludedVisibleTerms = [
@@ -43,7 +42,7 @@ test.describe("C1 public content", () => {
       );
       await expect(page.locator("meta[property='og:title']")).toHaveAttribute(
         "content",
-        /Shaxda|Baro shaxda|Asturnaanta|Shuruudaha/,
+        /Shaxda|Baro shaxda|Sharciga/,
       );
       const ogDescription = page.locator("meta[property='og:description']");
       await expect(ogDescription).toHaveAttribute("content", /.+/);
@@ -77,7 +76,7 @@ test.describe("C1 public content", () => {
       );
       await expect(page.locator("meta[name='twitter:title']")).toHaveAttribute(
         "content",
-        /Shaxda|Baro shaxda|Asturnaanta|Shuruudaha/,
+        /Shaxda|Baro shaxda|Sharciga/,
       );
 
       const bodyText = (await page.locator("body").innerText()).toLowerCase();
@@ -162,8 +161,7 @@ test.describe("C1 public content", () => {
       "Ciyaar qalabkan",
       "Ciyaar marti ah",
       "Baro",
-      "Asturnaanta",
-      "Shuruudaha",
+      "Sharciga",
     ]) {
       await expect(
         drawer.getByRole("link", { name, exact: true }),
@@ -231,6 +229,20 @@ test.describe("C1 public content", () => {
     ).toBeVisible();
     await expect(page.getByText("Not Found", { exact: true })).toHaveCount(0);
   });
+
+  for (const route of ["/privacy", "/terms"] as const) {
+    test(`${route} is retired and returns the Somali 404 page`, async ({
+      page,
+    }) => {
+      const response = await page.goto(route);
+
+      expect(response?.status()).toBe(404);
+      await expect(
+        page.getByRole("heading", { name: "Bogga lama helin" }),
+      ).toBeVisible();
+      await expect(page.getByText("Not Found", { exact: true })).toHaveCount(0);
+    });
+  }
 
   test("manifest uses Somali public copy", async ({ request }) => {
     const response = await request.get("/manifest.webmanifest");

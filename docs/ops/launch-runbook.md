@@ -69,14 +69,15 @@ pnpm --filter @shaxda/worker exec wrangler deploy --config wrangler.production.t
 ## 4. Temporary workers.dev Preview
 
 Use `workers.dev` to smoke-test both Workers before attaching `shaxda.app`.
-Temporarily set `workers_dev` to `true` and comment out the `routes` blocks in
-both Wrangler configs. These are local scratch changes: do not commit them, and
-restore the tracked production configuration before section 6.
+The committed preview configs enable `workers_dev` without production routes, so
+no scratch edits or later restoration are needed. The API preview allows any CORS
+origin because its web preview runs on a separate `workers.dev` hostname; the
+production config remains restricted to `https://shaxda.app`.
 
 Deploy the API Worker first:
 
 ```bash
-pnpm --filter @shaxda/worker exec wrangler deploy --config wrangler.production.toml
+pnpm deploy:preview:worker
 ```
 
 Confirm its reported URL returns the health response:
@@ -107,8 +108,8 @@ The always-passing test secret is
 hostname; do not authorize the preview host on the production widget.
 
 ```bash
-pnpm --filter @shaxda/worker exec wrangler secret put TURNSTILE_SECRET --config wrangler.production.toml
-pnpm deploy:web
+pnpm --filter @shaxda/worker exec wrangler secret put TURNSTILE_SECRET --config wrangler.preview.toml
+pnpm deploy:preview:web
 ```
 
 Smoke-test the reported web URL. Confirm room creation, joining, moves, reconnect,
@@ -117,9 +118,9 @@ must show API requests to the Worker preview URL and a `wss://` room connection.
 
 ## 5. Production Web Build Environment
 
-Restore both Wrangler configs to their tracked state: `workers_dev` must be
-`false`, and all `shaxda.app` routes must be present. Then replace the preview
-values in the untracked `web/.env.production` with production values:
+Replace the preview values in the untracked `web/.env.production` with production
+values. The production deploy scripts select the production configs, where
+`workers_dev` is `false` and all `shaxda.app` routes are present:
 
 ```bash
 PUBLIC_SITE_ORIGIN=https://shaxda.app

@@ -9,6 +9,8 @@
     "dev:web": "pnpm --filter @shaxda/web dev",
     "dev:worker": "pnpm --filter @shaxda/worker dev",
     "deploy": "pnpm deploy:worker && pnpm deploy:web",
+    "deploy:preview:web": "pnpm --filter @shaxda/web deploy:preview",
+    "deploy:preview:worker": "pnpm --filter @shaxda/worker deploy:preview",
     "deploy:web": "pnpm --filter @shaxda/web deploy",
     "deploy:worker": "pnpm --filter @shaxda/worker deploy",
     "build": "turbo run build",

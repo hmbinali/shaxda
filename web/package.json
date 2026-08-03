@@ -9,6 +9,7 @@
     "assets:icons": "node scripts/generate-icons.mjs",
     "build": "vite build",
     "deploy": "SHAXDA_REQUIRE_PUBLIC_ENV=1 vite build && node ../scripts/check-production-bundle.mjs && wrangler deploy",
+    "deploy:preview": "SHAXDA_REQUIRE_PUBLIC_ENV=1 vite build && node ../scripts/check-production-bundle.mjs && wrangler deploy --config wrangler.preview.jsonc",
     "dev": "vite dev",
     "format": "prettier --write .",
     "lint": "eslint .",

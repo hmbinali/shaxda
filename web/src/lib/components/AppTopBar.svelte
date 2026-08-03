@@ -21,7 +21,7 @@
   <button
     bind:this={menuButton}
     type="button"
-    class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-board-900 outline-none transition-colors hover:bg-board-100/65 focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2 motion-reduce:transition-none"
+    class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-board-900 outline-none transition-colors hover:bg-board-100/65 focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 motion-reduce:transition-none"
     aria-label={sidebar.openMenu}
     aria-expanded={shell.drawerOpen}
     aria-controls="app-navigation-drawer"
@@ -32,7 +32,7 @@
 
   <a
     href={resolve("/")}
-    class="rounded px-2 text-lg font-semibold tracking-normal outline-none focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2"
+    class="rounded-lg px-2 text-lg font-semibold outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
   >
     {messages.so.appName}
   </a>
@@ -41,7 +41,7 @@
     {#each shell.actions as action (action.id)}
       <button
         type="button"
-        class="action inline-flex size-11 shrink-0 items-center justify-center rounded-xl outline-none transition-colors hover:bg-board-100/65 focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2 motion-reduce:transition-none"
+        class="action inline-flex size-11 shrink-0 items-center justify-center rounded-xl outline-none transition-colors hover:bg-board-100/65 focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 motion-reduce:transition-none"
         aria-label={action.label}
         title={action.label}
         aria-pressed={action.pressed === undefined ? undefined : action.pressed}
@@ -61,15 +61,11 @@
   }
 
   .action[data-pressed="true"] {
-    background: color-mix(
-      in srgb,
-      var(--color-success, #176b55) 14%,
-      transparent
-    );
-    color: var(--color-success, #176b55);
+    background: color-mix(in srgb, var(--color-success) 14%, transparent);
+    color: var(--color-success);
   }
 
   .action[data-tone="danger"] {
-    color: var(--color-accent, #991b1b);
+    color: var(--color-accent);
   }
 </style>

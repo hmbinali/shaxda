@@ -157,14 +157,7 @@ test.describe("C1 public content", () => {
     );
     expect(mainWidthWithDrawer).toBe(mainWidthBefore);
 
-    for (const name of [
-      "Hoy",
-      "Ciyaar qalabkan",
-      "Ciyaar marti ah",
-      "Baro",
-      "Asturnaanta",
-      "Shuruudaha",
-    ]) {
+    for (const name of ["Hoy", "Ciyaar qalabkan", "Ciyaar marti ah", "Baro"]) {
       await expect(
         drawer.getByRole("link", { name, exact: true }),
       ).toBeVisible();

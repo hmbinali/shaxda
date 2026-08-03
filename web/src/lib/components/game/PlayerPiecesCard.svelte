@@ -14,13 +14,13 @@
   const players = ["A", "B"] as const;
 </script>
 
-<section class="rounded border border-board-700/20 bg-white/60 p-4">
-  <h2 class="text-base font-semibold tracking-normal">
+<section class="rounded-lg border border-board-700/20 bg-white/60 p-4">
+  <h2 class="text-base font-semibold">
     {copy.piecesLabel}
   </h2>
   <div class="mt-3 grid gap-3">
     {#each players as player (player)}
-      <article class="rounded border border-board-700/15 bg-board-50 p-3">
+      <article class="rounded-lg border border-board-700/15 bg-board-50 p-3">
         <h3 class="font-semibold">{playerName(player)}</h3>
         <dl class="mt-2 grid grid-cols-3 gap-2 text-sm text-board-700">
           <div>

@@ -1,8 +1,9 @@
 # Shaxda V1.0 Production Launch Runbook
 
 This runbook is for the product owner to execute after Q1 and BETA1 are signed
-off. It assumes the placeholder production hosts `shaxda.so` and
-`api.shaxda.so`; replace both before deployment if the real domain differs.
+off. Production uses one hostname, `https://shaxda.app`, for the site, API, and
+WebSocket traffic. Cloudflare routes `/rooms*` and `/health` to `shaxda-worker`;
+the broader `/*` route sends all other traffic to `shaxda-web`.
 
 Do not run the live deploy until:
 
@@ -12,13 +13,17 @@ Do not run the live deploy until:
 
 ## 1. Domain And DNS
 
-1. Buy the domain in Namecheap.
-2. Add the domain to Cloudflare.
-3. Point Namecheap nameservers to the Cloudflare nameservers.
-4. Wait until Cloudflare marks DNS as active.
-5. Confirm the intended hosts:
-   - web: `https://shaxda.so`
-   - API worker: `https://api.shaxda.so`
+1. Add `shaxda.app` to Cloudflare on the Free zone plan.
+2. Point the domain's Namecheap nameservers to the nameservers Cloudflare
+   provides.
+3. Wait until Cloudflare marks the zone active and Universal SSL is issued.
+4. Enable the Workers Paid plan for Durable Objects and SQLite-backed Durable
+   Object storage.
+5. In Cloudflare DNS, add a proxied `AAAA` record for `@` with the value `100::`.
+   Worker routes do not create DNS records, so the apex will not resolve without
+   this placeholder record.
+6. Set SSL/TLS encryption mode to **Full (strict)** and enable **Always Use
+   HTTPS**.
 
 ## 2. Cloudflare Account Setup
 
@@ -34,66 +39,50 @@ Do not run the live deploy until:
    export CLOUDFLARE_ACCOUNT_ID="<cloudflare-account-id>"
    ```
 
-3. Create a Turnstile widget for `shaxda.so` and record:
+3. Create a Managed Turnstile widget for `shaxda.app` and record:
    - site key;
    - secret key.
 
-4. Store the Worker secret:
-
-   ```bash
-   pnpm --filter @shaxda/worker exec wrangler secret put TURNSTILE_SECRET --config wrangler.production.toml
-   ```
-
-5. Create billing alerts before traffic is announced. Use
+4. Create billing alerts before traffic is announced. Use
    `docs/ops/billing-alerts.md`.
 
-## 3. Web Build Environment
+Store the production Turnstile secret immediately before the production Worker
+deploy in section 6. Never pass the secret on the command line or commit it to a
+file.
 
-Create an untracked `web/.env.production` from `web/.env.example`:
+## 3. Local Validation
 
-```bash
-PUBLIC_SITE_ORIGIN=https://shaxda.so
-PUBLIC_WORKER_ORIGIN=https://api.shaxda.so
-PUBLIC_TURNSTILE_SITE_KEY="<turnstile-site-key>"
-PUBLIC_CF_BEACON_TOKEN="<cloudflare-web-analytics-token>"
-```
-
-If Cloudflare Web Analytics automatic injection is used instead, leave
-`PUBLIC_CF_BEACON_TOKEN` empty.
-
-## 4. Preflight Checks
-
-Run the local checks from a clean worktree:
+Run the complete local check from a clean worktree:
 
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:worker
-pnpm build
+pnpm install --frozen-lockfile
 pnpm check
+pnpm test:e2e
 ```
 
-Validate deploy packaging without publishing:
+Validate the Worker package without publishing:
 
 ```bash
 pnpm --filter @shaxda/worker exec wrangler deploy --config wrangler.production.toml --dry-run --outdir /tmp/shaxda-worker-dry
-pnpm --filter @shaxda/web build
-pnpm --filter @shaxda/web exec wrangler deploy --dry-run --outdir /tmp/shaxda-web-dry
 ```
 
-## 5. Deploy
+## 4. Temporary workers.dev Preview
 
-Deploy the API worker first:
+Use `workers.dev` to smoke-test both Workers before attaching `shaxda.app`.
+Temporarily set `workers_dev` to `true` and comment out the `routes` blocks in
+both Wrangler configs. These are local scratch changes: do not commit them, and
+restore the tracked production configuration before section 6.
+
+Deploy the API Worker first:
 
 ```bash
-pnpm deploy:worker
+pnpm --filter @shaxda/worker exec wrangler deploy --config wrangler.production.toml
 ```
 
-Verify health:
+Confirm its reported URL returns the health response:
 
 ```bash
-curl https://api.shaxda.so/health
+curl https://shaxda-worker.<workers-dev-subdomain>.workers.dev/health
 ```
 
 Expected response:
@@ -102,31 +91,123 @@ Expected response:
 { "ok": true, "service": "shaxda" }
 ```
 
-Deploy the web app:
+For preview only, create `web/.env.production` with the reported Worker URL and
+Cloudflare's always-passing Turnstile test site key. Use the matching test secret
+when prompted by `wrangler secret put`:
 
 ```bash
+PUBLIC_SITE_ORIGIN=https://shaxda-web.<workers-dev-subdomain>.workers.dev
+PUBLIC_WORKER_ORIGIN=https://shaxda-worker.<workers-dev-subdomain>.workers.dev
+PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
+PUBLIC_CF_BEACON_TOKEN=
+```
+
+The always-passing test secret is
+`1x0000000000000000000000000000000AA`. These test credentials work on any
+hostname; do not authorize the preview host on the production widget.
+
+```bash
+pnpm --filter @shaxda/worker exec wrangler secret put TURNSTILE_SECRET --config wrangler.production.toml
 pnpm deploy:web
 ```
 
-Confirm Cloudflare DNS, custom domains, and SSL are active for both hosts.
+Smoke-test the reported web URL. Confirm room creation, joining, moves, reconnect,
+and claim-win across two devices or browser profiles. The browser network panel
+must show API requests to the Worker preview URL and a `wss://` room connection.
 
-## 6. Production Smoke Test
+## 5. Production Web Build Environment
 
-Check these flows on production before announcing launch:
+Restore both Wrangler configs to their tracked state: `workers_dev` must be
+`false`, and all `shaxda.app` routes must be present. Then replace the preview
+values in the untracked `web/.env.production` with production values:
 
-- `/` and `/learn` load successfully, `/learn` contains the complete public
-  rules guide, and `/rules` returns 404.
+```bash
+PUBLIC_SITE_ORIGIN=https://shaxda.app
+PUBLIC_WORKER_ORIGIN=https://shaxda.app
+PUBLIC_TURNSTILE_SITE_KEY=<turnstile-site-key>
+PUBLIC_CF_BEACON_TOKEN=<cloudflare-web-analytics-token-or-empty>
+```
+
+The site key is public, but `web/.env.production` remains untracked. Never put the
+Turnstile secret in this file. If Cloudflare Web Analytics is not configured,
+leave `PUBLIC_CF_BEACON_TOKEN` empty.
+
+Build the production bundle, then guard against the silent development fallbacks:
+
+```bash
+pnpm --filter @shaxda/web build
+grep -r "127.0.0.1:8787\|shaxda.example" web/.svelte-kit/cloudflare/ | head
+```
+
+The `grep` command must produce no output. Any match means the production env was
+not applied; stop and fix the build before deploying. Then validate the web
+package without publishing:
+
+```bash
+pnpm --filter @shaxda/web exec wrangler deploy --dry-run --outdir /tmp/shaxda-web-dry
+```
+
+## 6. Production Deploy
+
+Confirm the proxied apex `AAAA @` record, Universal SSL certificate, production
+Turnstile widget, and both production env values are ready. Replace the preview
+Turnstile secret with the production secret:
+
+```bash
+pnpm --filter @shaxda/worker exec wrangler secret put TURNSTILE_SECRET --config wrangler.production.toml
+```
+
+Deploy the API Worker first:
+
+```bash
+pnpm deploy:worker
+```
+
+Verify the more-specific `/health` route reaches the API Worker:
+
+```bash
+curl -sS https://shaxda.app/health
+```
+
+Expected response:
+
+```json
+{ "ok": true, "service": "shaxda" }
+```
+
+Rebuild with the production environment, repeat the fallback guard, and deploy
+the web Worker:
+
+```bash
+pnpm --filter @shaxda/web build
+grep -r "127.0.0.1:8787\|shaxda.example" web/.svelte-kit/cloudflare/ | head
+pnpm deploy:web
+```
+
+The second `grep` must also produce no output.
+
+## 7. Production Smoke Test
+
+Check these flows on `https://shaxda.app` before announcing launch:
+
+- `/`, `/learn`, `/privacy`, and `/terms` load successfully; `/rules` returns
+  the Somali 404 page.
+- Canonical and Open Graph URLs use `https://shaxda.app`, with no
+  `shaxda.example` values.
 - Visible UI remains Somali-only and there is no language toggle.
+- Browser requests use only `https://` and `wss://`, with no mixed-content
+  warnings, localhost requests, or preview URLs.
 - A full local game can be completed.
-- Online room create, join-by-link/code, move sync, reconnect, and claim-win
-  work across two devices or browsers.
-- Turnstile is visible for room creation and rejects invalid tokens.
-- PWA install prompt/app install works on a supported browser.
-- Offline local play works after the app shell is cached.
-- Cloudflare Web Analytics records site traffic.
+- Turnstile is visible, room creation succeeds after verification, and invalid
+  tokens are rejected.
+- Online room create, join-by-link/code, move sync, reconnect, and claim-win work
+  across two devices or browser profiles.
+- The online socket connects to `wss://shaxda.app/rooms/<code>/ws`.
+- PWA install and offline local play work after the app shell is cached.
+- Cloudflare Web Analytics records traffic if configured.
 - Worker logs show no repeated errors during smoke testing.
 
-## 7. Rollback
+## 8. Rollback
 
 List recent deployments:
 
@@ -142,3 +223,7 @@ blocker:
 pnpm --filter @shaxda/worker exec wrangler rollback --config wrangler.production.toml
 pnpm --filter @shaxda/web exec wrangler rollback
 ```
+
+Rolling back code leaves Durable Object storage intact. Do not rename the Worker,
+edit migration tags or class names, delete either Worker, or remove the Cloudflare
+zone as part of a rollback.

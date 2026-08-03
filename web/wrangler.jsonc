@@ -11,8 +11,8 @@
   },
   "routes": [
     {
-      "pattern": "shaxda.so",
-      "custom_domain": true,
+      "pattern": "shaxda.app/*",
+      "zone_name": "shaxda.app",
     },
   ],
   "observability": {

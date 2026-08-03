@@ -2,11 +2,42 @@ import tailwindcss from "@tailwindcss/vite";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
 import { SvelteKitPWA } from "@vite-pwa/sveltekit";
+import { loadEnv, type Plugin } from "vite";
 import { defineConfig } from "vitest/config";
+
+function requireProductionPublicEnv(): Plugin {
+  return {
+    name: "shaxda-require-production-public-env",
+    configResolved(config) {
+      if (
+        config.command !== "build" ||
+        process.env.SHAXDA_REQUIRE_PUBLIC_ENV !== "1"
+      ) {
+        return;
+      }
+
+      const env = loadEnv(config.mode, config.envDir, "PUBLIC_");
+      const requiredOrigins = [
+        "PUBLIC_SITE_ORIGIN",
+        "PUBLIC_WORKER_ORIGIN",
+      ] as const;
+      const invalidOrigins = requiredOrigins.filter(
+        (name) => !env[name]?.trim().startsWith("https://"),
+      );
+
+      if (invalidOrigins.length > 0) {
+        throw new Error(
+          `Production build requires HTTPS values for: ${invalidOrigins.join(", ")}`,
+        );
+      }
+    },
+  };
+}
 
 export default defineConfig({
   envPrefix: ["VITE_", "PUBLIC_"],
   plugins: [
+    requireProductionPublicEnv(),
     tailwindcss(),
     sveltekit(),
     svelteTesting(),

@@ -132,16 +132,17 @@ The site key is public, but `web/.env.production` remains untracked. Never put t
 Turnstile secret in this file. If Cloudflare Web Analytics is not configured,
 leave `PUBLIC_CF_BEACON_TOKEN` empty.
 
-Build the production bundle, then guard against the silent development fallbacks:
+Build the production bundle, then confirm the expected public origins were applied:
 
 ```bash
-pnpm --filter @shaxda/web build
-grep -r "127.0.0.1:8787\|shaxda.example" web/.svelte-kit/cloudflare/ | head
+SHAXDA_REQUIRE_PUBLIC_ENV=1 pnpm --filter @shaxda/web build
+pnpm check:bundle
 ```
 
-The `grep` command must produce no output. Any match means the production env was
-not applied; stop and fix the build before deploying. Then validate the web
-package without publishing:
+The build rejects missing or non-HTTPS public origins. The bundle check positively
+confirms both expected origins are present; fallback literals may remain in optimized
+code even when the production values were applied. Then validate the web package
+without publishing:
 
 ```bash
 pnpm --filter @shaxda/web exec wrangler deploy --dry-run --outdir /tmp/shaxda-web-dry
@@ -175,16 +176,12 @@ Expected response:
 { "ok": true, "service": "shaxda" }
 ```
 
-Rebuild with the production environment, repeat the fallback guard, and deploy
-the web Worker:
+Deploy the web Worker. The package script rebuilds with the production environment,
+enforces the HTTPS origin guard, and runs the bundle check before publishing:
 
 ```bash
-pnpm --filter @shaxda/web build
-grep -r "127.0.0.1:8787\|shaxda.example" web/.svelte-kit/cloudflare/ | head
 pnpm deploy:web
 ```
-
-The second `grep` must also produce no output.
 
 ## 7. Production Smoke Test
 

@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "test:perf": "lhci autorun",
     "check": "pnpm format:check && pnpm check:hibernation && pnpm lint && pnpm typecheck && pnpm test && pnpm test:worker && pnpm build",
+    "check:bundle": "node scripts/check-production-bundle.mjs",
     "check:hibernation": "node scripts/check-hibernation.mjs",
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",

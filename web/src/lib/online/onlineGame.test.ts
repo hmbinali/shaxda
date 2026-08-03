@@ -86,6 +86,28 @@ describe("OnlineGameController", () => {
     expect(game.feedback?.cues).toEqual(["place"]);
   });
 
+  it("keeps the board actionable for opponent-turn feedback", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    client.message({
+      v: protocolVersion,
+      type: "state",
+      roomCode: "ABCDEFGH",
+      state: { ...gameFixtures.emptyBoard, currentPlayer: "B" },
+    });
+
+    expect(game.boardInteractive).toBe(true);
+    expect(game.canInteract).toBe(false);
+    game.clickPoint("O1");
+    expect(game.invalid?.reason).toBe("notYourTurn");
+    expect(game.feedback?.cues).toEqual(["invalid"]);
+    expect(client.actions).toHaveLength(0);
+  });
+
   it("infers an action from a remote state without a pending action", () => {
     const client = new FakeClient();
     const game = createOnlineGameController({

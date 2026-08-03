@@ -2,6 +2,7 @@
   import { Trophy } from "@lucide/svelte";
   import type { PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
+  import { onMount } from "svelte";
   import Board from "$components/Board.svelte";
   import Button from "$components/ui/Button.svelte";
   import type { OnlineGameController } from "$lib/online/onlineGame.svelte";
@@ -11,51 +12,35 @@
     resolveSeating,
   } from "$lib/game/seating";
   import BoardNotice from "./BoardNotice.svelte";
-  import ConfirmDialog from "./ConfirmDialog.svelte";
   import GameResultOverlay from "./GameResultOverlay.svelte";
   import InvalidToast from "./InvalidToast.svelte";
   import PlayerRail from "./PlayerRail.svelte";
   import TabletopShell from "./TabletopShell.svelte";
+  import type { TransientToastMessage } from "$lib/notices/toast.svelte";
 
   interface Props {
     controller: OnlineGameController;
     viewer: PlayerId;
-    invalidMessage: string | null;
+    toast: TransientToastMessage | null;
     playerName: (player: PlayerId) => string;
     resultReason: string | null;
-    pendingConfirm: "resign" | "leave" | null;
-    onRequestConfirm: (action: "resign" | "leave" | null) => void;
     onLeave: () => void;
   }
 
-  let {
-    controller,
-    viewer,
-    invalidMessage,
-    playerName,
-    resultReason,
-    pendingConfirm,
-    onRequestConfirm,
-    onLeave,
-  }: Props = $props();
+  let { controller, viewer, toast, playerName, resultReason, onLeave }: Props =
+    $props();
 
   const copy = messages.so.onlineGame;
-  const gameCopy = messages.so.localGame;
   const orientation = $derived({ orientation: "solo", viewer } as const);
   const seating = $derived(resolveSeating(orientation));
   const status = $derived(controller.status);
-  let tabletopBackground = $state<HTMLElement | null>(null);
+  let topRailElement = $state<HTMLElement | null>(null);
+  let bottomRailElement = $state<HTMLElement | null>(null);
+  let topBar = $state<HTMLElement | null>(null);
 
-  function confirmAction(): void {
-    const action = pendingConfirm;
-    onRequestConfirm(null);
-
-    if (action === "resign") {
-      controller.resign();
-    } else if (action === "leave") {
-      onLeave();
-    }
-  }
+  onMount(() => {
+    topBar = document.querySelector<HTMLElement>('[data-testid="app-top-bar"]');
+  });
 
   function noticeFor(player: PlayerId): string | null {
     if (player === viewer) {
@@ -76,10 +61,11 @@
 
 <h1 class="sr-only">{copy.heading}</h1>
 
-<div bind:this={tabletopBackground} class="h-full min-h-full">
+<div class="h-full min-h-full">
   <TabletopShell orientation="solo" compactRails={status.phase !== "placement"}>
     {#snippet topRail()}
       <PlayerRail
+        bind:element={topRailElement}
         player={seating.top}
         {status}
         {viewer}
@@ -87,6 +73,7 @@
         railState={railStateFor(status, seating.top)}
         instruction={instructionKeyFor(status, seating.top, orientation)}
         notice={noticeFor(seating.top)}
+        connected={controller.connections[seating.top]}
       />
     {/snippet}
 
@@ -97,7 +84,7 @@
           selected={controller.selected}
           lastAction={controller.lastAction}
           invalidNonce={controller.invalidNonce}
-          interactive={controller.canInteract}
+          interactive={controller.boardInteractive}
           onSelectPoint={(point) => controller.clickPoint(point)}
           onCancelSelection={() => controller.cancelSelection()}
         />
@@ -117,10 +104,10 @@
           </BoardNotice>
         {/if}
 
-        {#if invalidMessage !== null}
+        {#if toast !== null}
           <InvalidToast
-            message={invalidMessage}
-            nonce={controller.invalid?.nonce ?? 0}
+            message={toast.message}
+            nonce={toast.nonce}
             testId="online-feedback"
           />
         {/if}
@@ -132,6 +119,7 @@
             reason={resultReason}
             testId="online-game-result"
             {onLeave}
+            inertTargets={[topBar, topRailElement, bottomRailElement]}
           />
         {/if}
       </div>
@@ -139,27 +127,17 @@
 
     {#snippet bottomRail()}
       <PlayerRail
+        bind:element={bottomRailElement}
         player={seating.bottom}
         {status}
         {viewer}
-        name={`${playerName(seating.bottom)} (${copy.youLabel})`}
+        name={playerName(seating.bottom)}
+        badge={`(${copy.youLabel})`}
         railState={railStateFor(status, seating.bottom)}
         instruction={instructionKeyFor(status, seating.bottom, orientation)}
         notice={noticeFor(seating.bottom)}
+        connected={controller.connections[seating.bottom]}
       />
     {/snippet}
   </TabletopShell>
 </div>
-
-<ConfirmDialog
-  open={pendingConfirm !== null}
-  title={pendingConfirm === "resign" ? gameCopy.controls.resign : copy.leave}
-  body={pendingConfirm === "resign"
-    ? gameCopy.prompts.resign
-    : gameCopy.prompts.leave}
-  cancelLabel={gameCopy.tabletop.cancel}
-  confirmLabel={gameCopy.tabletop.confirm}
-  background={tabletopBackground}
-  onClose={() => onRequestConfirm(null)}
-  onConfirm={confirmAction}
-/>

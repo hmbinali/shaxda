@@ -16,6 +16,7 @@
     showFirstAdvantage?: boolean;
     showTurnsSinceCapture?: boolean;
     blockedPrompt?: string | null;
+    showGameFields?: boolean;
   }
 
   let {
@@ -25,12 +26,13 @@
     showFirstAdvantage = true,
     showTurnsSinceCapture = true,
     blockedPrompt = null,
+    showGameFields = true,
   }: Props = $props();
 
   const copy = messages.so.localGame;
 </script>
 
-<section class="rounded border border-board-700/20 bg-white/60 p-4">
+<section class="rounded-lg border border-board-700/20 bg-white/60 p-4">
   <dl class="grid gap-3 text-sm">
     {#each leadingFields as field (`${field.label}-${field.value}`)}
       <div>
@@ -40,39 +42,41 @@
         </dd>
       </div>
     {/each}
-    <div>
-      <dt class="font-semibold text-board-900">{copy.phaseLabel}</dt>
-      <dd class="mt-1 text-board-700">{copy.phases[status.phase]}</dd>
-    </div>
-    <div>
-      <dt class="font-semibold text-board-900">{copy.turnLabel}</dt>
-      <dd class="mt-1 text-board-700">
-        {playerName(status.currentPlayer)}
-      </dd>
-    </div>
-    <div>
-      <dt class="font-semibold text-board-900">{copy.actingLabel}</dt>
-      <dd class="mt-1 text-board-700">
-        {playerName(status.actingPlayer)}
-      </dd>
-    </div>
-    {#if showFirstAdvantage && status.firstAdvantage !== null}
+    {#if showGameFields}
       <div>
-        <dt class="font-semibold text-board-900">
-          {copy.firstAdvantageLabel}
-        </dt>
+        <dt class="font-semibold text-board-900">{copy.phaseLabel}</dt>
+        <dd class="mt-1 text-board-700">{copy.phases[status.phase]}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-board-900">{copy.turnLabel}</dt>
         <dd class="mt-1 text-board-700">
-          {playerName(status.firstAdvantage)}
+          {playerName(status.currentPlayer)}
         </dd>
       </div>
-    {/if}
-    {#if showTurnsSinceCapture}
       <div>
-        <dt class="font-semibold text-board-900">
-          {copy.turnsSinceCaptureLabel}
-        </dt>
-        <dd class="mt-1 text-board-700">{status.turnsSinceCapture}</dd>
+        <dt class="font-semibold text-board-900">{copy.actingLabel}</dt>
+        <dd class="mt-1 text-board-700">
+          {playerName(status.actingPlayer)}
+        </dd>
       </div>
+      {#if showFirstAdvantage && status.firstAdvantage !== null}
+        <div>
+          <dt class="font-semibold text-board-900">
+            {copy.firstAdvantageLabel}
+          </dt>
+          <dd class="mt-1 text-board-700">
+            {playerName(status.firstAdvantage)}
+          </dd>
+        </div>
+      {/if}
+      {#if showTurnsSinceCapture}
+        <div>
+          <dt class="font-semibold text-board-900">
+            {copy.turnsSinceCaptureLabel}
+          </dt>
+          <dd class="mt-1 text-board-700">{status.turnsSinceCapture}</dd>
+        </div>
+      {/if}
     {/if}
   </dl>
 

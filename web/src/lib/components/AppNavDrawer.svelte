@@ -3,10 +3,9 @@
   import { page } from "$app/state";
   import {
     BookOpen,
-    FileText,
     Gamepad2,
     House,
-    ShieldCheck,
+    ScrollText,
     Users,
     X,
   } from "@lucide/svelte";
@@ -40,8 +39,7 @@
     { href: "/learn", label: nav.learn, icon: BookOpen },
   ] as const;
   const footerItems = [
-    { href: "/privacy", label: nav.privacy, icon: ShieldCheck },
-    { href: "/terms", label: nav.terms, icon: FileText },
+    { href: "/legal", label: nav.legal, icon: ScrollText },
   ] as const;
 
   let prefersReducedMotion = $state(false);
@@ -222,6 +220,10 @@
           {#each footerItems as item (item.href)}
             <a
               aria-label={item.label}
+              aria-current={page.url.pathname === item.href
+                ? "page"
+                : undefined}
+              class:active-navigation={page.url.pathname === item.href}
               class="inline-flex min-h-11 items-center gap-2 rounded text-board-700 outline-none hover:text-board-900 focus-visible:ring-2 focus-visible:ring-red-800"
               href={resolve(item.href)}
               onclick={() => shell.close()}

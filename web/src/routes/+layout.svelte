@@ -103,12 +103,6 @@
             }
           });
         });
-
-        await navigator.serviceWorker.ready;
-
-        if (mounted) {
-          pwa.setOfflineReady(true);
-        }
       } catch (error) {
         console.error(error);
       }
@@ -126,7 +120,7 @@
   >
     <a
       href="#main-content"
-      class="fixed left-3 top-3 z-50 -translate-y-24 rounded bg-board-900 px-4 py-2 text-sm font-semibold text-board-50 outline-none transition-transform focus:translate-y-0 focus:ring-2 focus:ring-red-800 focus:ring-offset-2 motion-reduce:transition-none"
+      class="fixed left-3 top-3 z-50 -translate-y-24 rounded-lg bg-board-900 px-4 py-2 text-sm font-semibold text-board-50 outline-none transition-transform focus:translate-y-0 focus:ring-2 focus:ring-focus focus:ring-offset-2 motion-reduce:transition-none"
     >
       {siteContent.so.sidebar.skipToContent}
     </a>

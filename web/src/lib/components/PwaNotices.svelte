@@ -12,6 +12,15 @@
         pwa.status.needRefresh ||
         pwa.status.installable),
   );
+
+  $effect(() => {
+    if (pwa?.status.offlineReady !== true) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => pwa.setOfflineReady(false), 8_000);
+    return () => window.clearTimeout(timeout);
+  });
 </script>
 
 {#if pwa !== null && hasNotice}

@@ -42,7 +42,8 @@ export default defineConfig({
     sveltekit(),
     svelteTesting(),
     SvelteKitPWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: [
         "apple-touch-icon.png",
         "favicon.png",
@@ -64,8 +65,8 @@ export default defineConfig({
         lang: "so",
         start_url: "/",
         display: "standalone",
-        background_color: "#f5efe5",
-        theme_color: "#4a2f1f",
+        background_color: "#f8f1e8",
+        theme_color: "#332016",
         icons: [
           {
             src: "/icon.svg",
@@ -108,7 +109,9 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/local",
         navigateFallbackAllowlist: [/\/local$/],
-        globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2,wav,webmanifest}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,webp,wav,webmanifest}"],
+        skipWaiting: false,
+        clientsClaim: true,
       },
     }),
   ],

@@ -26,6 +26,7 @@
 <svelte:head>
   <title>{copy.title} | {messages.so.appName}</title>
   <meta name="description" content={copy.intro} />
+  <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <section

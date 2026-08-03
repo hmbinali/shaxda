@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   SOUND_PREFERENCE_STORAGE_KEY,
   SoundPlayer,
+  getSoundPlayer,
   loadSoundPreference,
   saveSoundPreference,
   type SoundPreferenceStorage,
@@ -60,6 +61,56 @@ describe("SoundPlayer", () => {
     });
 
     await expect(new SoundPlayer().play(["place"])).resolves.toBeUndefined();
+  });
+
+  it("shares one player and preloads every cue in parallel", async () => {
+    let contextCount = 0;
+    let activeFetches = 0;
+    let peakFetches = 0;
+    const releases: Array<() => void> = [];
+
+    class FakeAudioContext {
+      state = "running";
+      destination = {};
+
+      constructor() {
+        contextCount += 1;
+      }
+
+      decodeAudioData = vi.fn(async () => ({}) as AudioBuffer);
+    }
+
+    vi.stubGlobal("AudioContext", FakeAudioContext);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            activeFetches += 1;
+            peakFetches = Math.max(peakFetches, activeFetches);
+            releases.push(() => {
+              activeFetches -= 1;
+              resolve({
+                ok: true,
+                arrayBuffer: async () => new ArrayBuffer(1),
+              } as Response);
+            });
+          }),
+      ),
+    );
+
+    const first = getSoundPlayer();
+    const second = getSoundPlayer();
+    const loading = first.preload();
+    await vi.waitFor(() => expect(releases).toHaveLength(6));
+    for (const release of releases) release();
+    await loading;
+    await second.preload();
+
+    expect(second).toBe(first);
+    expect(contextCount).toBe(1);
+    expect(peakFetches).toBe(6);
+    expect(fetch).toHaveBeenCalledTimes(6);
   });
 });
 

@@ -37,6 +37,15 @@ export class SoundPlayer {
     await this.play([cue]);
   }
 
+  async preload(): Promise<void> {
+    const context = this.getContext();
+    if (context === null) {
+      return;
+    }
+
+    await Promise.all(soundCues.map((cue) => this.loadBuffer(context, cue)));
+  }
+
   private async playCue(cue: SoundCue): Promise<void> {
     try {
       const context = this.getContext();
@@ -104,6 +113,13 @@ export class SoundPlayer {
     this.#buffers.set(cue, loading);
     return loading;
   }
+}
+
+let sharedSoundPlayer: SoundPlayer | null = null;
+
+export function getSoundPlayer(): SoundPlayer {
+  sharedSoundPlayer ??= new SoundPlayer();
+  return sharedSoundPlayer;
 }
 
 export function loadSoundPreference(storage = getBrowserStorage()): boolean {

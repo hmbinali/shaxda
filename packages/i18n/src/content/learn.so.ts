@@ -1,3 +1,5 @@
+import type { ContentCallout, ContentCalloutVariant } from "./types";
+
 export const learnSectionIds = [
   "bilowga",
   "wejiyada",
@@ -21,17 +23,12 @@ export type LearnDiagramContentId =
   | "blocked-player"
   | "blocked-space-made";
 
-export type LearnCalloutVariant = "xeer" | "digniin" | "talo";
+export type LearnCalloutVariant = ContentCalloutVariant;
 
 interface LearnSubsection {
   heading: string;
   paragraphs: readonly string[];
   rules: readonly string[];
-}
-
-interface LearnCallout {
-  variant: LearnCalloutVariant;
-  body: string;
 }
 
 interface LearnDiagramFrame {
@@ -74,7 +71,7 @@ interface LearnSection {
   photo?: LearnSectionPhoto;
   subsections: readonly LearnSubsection[];
   rules: readonly string[];
-  callouts: readonly LearnCallout[];
+  callouts: readonly ContentCallout[];
   diagramGroups: readonly LearnDiagramGroup[];
   summary: readonly LearnSummaryItem[];
   ctas: readonly LearnCta[];

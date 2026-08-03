@@ -54,7 +54,7 @@
     border-radius: 999px;
     background: rgb(254 242 242 / 0.96);
     padding: 0.5rem 0.75rem;
-    color: #991b1b;
+    color: var(--color-accent);
     box-shadow: 0 4px 14px rgb(68 38 22 / 0.14);
     text-align: center;
     font-size: 0.875rem;

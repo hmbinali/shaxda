@@ -19,6 +19,9 @@
     instruction: RailInstructionKey | null;
     rotate?: boolean;
     notice?: string | null;
+    badge?: string | null;
+    connected?: boolean | null;
+    element?: HTMLElement | null;
   }
 
   let {
@@ -30,6 +33,9 @@
     instruction,
     rotate = false,
     notice = null,
+    badge = null,
+    connected = null,
+    element = $bindable(null),
   }: Props = $props();
 
   const copy = messages.so.localGame;
@@ -37,6 +43,7 @@
 </script>
 
 <section
+  bind:this={element}
   class="rail"
   class:acting={railState === "acting"}
   class:space-making={railState === "spaceMaking"}
@@ -64,6 +71,13 @@
     <div class="copy">
       <div class="name-row">
         <h2>{name}</h2>
+        {#if badge !== null}
+          <span class="player-badge">{badge}</span>
+        {/if}
+        {#if connected !== null}
+          <span class="connection-dot" class:connected aria-hidden="true"
+          ></span>
+        {/if}
         {#if status.firstAdvantage === player && (status.phase === "placement" || status.phase === "initialRemoval")}
           <span
             class="advantage-chip"
@@ -121,18 +135,18 @@
 
   .rail.acting,
   .rail.space-making {
-    border-color: #176b55;
+    border-color: var(--color-success);
     background: #d8eee5;
     box-shadow: inset 0 0 0 1px rgb(23 107 85 / 0.2);
   }
 
   .rail.blocked {
-    border-color: #875a12;
+    border-color: var(--color-jare);
     background: #f8e9bd;
   }
 
   .rail.winner {
-    border-color: #176b55;
+    border-color: var(--color-success);
     background: #d8eee5;
   }
 
@@ -168,11 +182,11 @@
   .acting .avatar,
   .space-making .avatar,
   .winner .avatar {
-    border-color: #176b55;
+    border-color: var(--color-success);
   }
 
   .blocked .avatar {
-    border-color: #875a12;
+    border-color: var(--color-jare);
   }
 
   .avatar.light {
@@ -205,7 +219,7 @@
     place-items: center;
     border: 1px solid white;
     border-radius: 999px;
-    background: #875a12;
+    background: var(--color-jare);
     color: white;
   }
 
@@ -245,13 +259,38 @@
   }
 
   .rail-notice {
-    display: block;
+    display: -webkit-box;
     overflow: hidden;
     color: #713f12;
-    font-size: 0.62rem;
+    font-size: 0.7rem;
     font-weight: 700;
-    text-overflow: ellipsis;
+    line-height: 1.2;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .player-badge {
+    flex: none;
+    border-radius: 999px;
+    background: var(--color-board-100);
+    padding: 0.05rem 0.3rem;
+    color: var(--color-board-700);
+    font-size: 0.55rem;
+    font-weight: 800;
     white-space: nowrap;
+  }
+
+  .connection-dot {
+    flex: none;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: var(--color-accent);
+  }
+
+  .connection-dot.connected {
+    background: var(--color-success);
   }
 
   .advantage-chip {

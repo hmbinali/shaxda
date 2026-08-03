@@ -111,7 +111,7 @@
           href={`#${section.id}`}
           onclick={() => selectSection(section.id)}
           aria-current={activeSection === section.id ? "location" : undefined}
-          class={`inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border border-board-700/20 px-4 text-sm font-semibold outline-none transition-colors hover:border-board-700/40 focus-visible:ring-2 focus-visible:ring-red-800 motion-reduce:transition-none ${
+          class={`inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border border-board-700/20 px-4 text-sm font-semibold outline-none transition-colors hover:border-board-700/40 focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none ${
             activeSection === section.id
               ? "bg-board-900 text-board-50"
               : "bg-white/80 text-board-700 hover:text-board-900"
@@ -134,7 +134,7 @@
             href={`#${section.id}`}
             onclick={() => selectSection(section.id)}
             aria-current={activeSection === section.id ? "location" : undefined}
-            class={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-red-800 motion-reduce:transition-none ${
+            class={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none ${
               activeSection === section.id
                 ? "bg-board-900 text-board-50"
                 : "text-board-700 hover:bg-board-100/65 hover:text-board-900"

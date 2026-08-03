@@ -32,7 +32,7 @@ export type OnlineMatchEndReason = Extract<
 >["reason"];
 
 export interface InvalidFeedback {
-  reason: PointInteractionInvalidReason | "actionRejected";
+  reason: PointInteractionInvalidReason | "actionRejected" | "notYourTurn";
   nonce: number;
 }
 
@@ -83,12 +83,14 @@ export class OnlineGameController {
       this.claimableBy === this.mySlot &&
       this.state.phase !== "gameOver",
   );
-  canInteract = $derived(
+  boardInteractive = $derived(
     this.connectionStatus === "connected" &&
       this.started &&
       this.mySlot !== null &&
-      this.state.phase !== "gameOver" &&
-      getActingPlayer(this.state) === this.mySlot,
+      this.state.phase !== "gameOver",
+  );
+  canInteract = $derived(
+    this.boardInteractive && getActingPlayer(this.state) === this.mySlot,
   );
 
   readonly #client: OnlineGameClient;
@@ -135,8 +137,13 @@ export class OnlineGameController {
   }
 
   clickPoint(point: PointId): void {
-    if (!this.canInteract) {
+    if (!this.boardInteractive) {
       this.markInvalid("actionRejected");
+      return;
+    }
+
+    if (!this.canInteract) {
+      this.markInvalid("notYourTurn");
       return;
     }
 

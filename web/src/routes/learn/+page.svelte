@@ -26,7 +26,7 @@
       <p class="text-sm font-bold uppercase tracking-wider text-red-800">
         {page.hero.eyebrow}
       </p>
-      <h1 class="mt-3 text-4xl font-semibold tracking-normal sm:text-6xl">
+      <h1 class="mt-3 text-4xl font-semibold sm:text-6xl">
         {page.hero.heading}
       </h1>
       <p class="mt-5 max-w-3xl text-lg leading-8 text-board-700">
@@ -51,7 +51,7 @@
               : ""
           }`}
         >
-          <h2 class="text-3xl font-semibold tracking-normal text-board-900">
+          <h2 class="text-3xl font-semibold text-board-900">
             {section.heading}
           </h2>
 
@@ -87,7 +87,7 @@
 
           {#each section.subsections as subsection (subsection.heading)}
             <div class="mt-8">
-              <h3 class="text-xl font-semibold tracking-normal text-board-900">
+              <h3 class="text-xl font-semibold text-board-900">
                 {subsection.heading}
               </h3>
               {#if subsection.paragraphs.length > 0}
@@ -159,7 +159,7 @@
                 <a
                   href={resolve(cta.href)}
                   data-tone={cta.tone}
-                  class={`inline-flex min-h-11 items-center justify-center rounded-lg border px-4 py-2.5 text-center text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2 motion-reduce:transition-none ${ctaToneClasses[cta.tone]}`}
+                  class={`inline-flex min-h-11 items-center justify-center rounded-lg border px-4 py-2.5 text-center text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 motion-reduce:transition-none ${ctaToneClasses[cta.tone]}`}
                 >
                   {cta.label}
                 </a>

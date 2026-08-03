@@ -9,9 +9,11 @@ const copy = messages.so.localGame;
 const playerName = (player: "A" | "B") => copy.playerNames[player];
 
 describe("GameResultOverlay", () => {
-  it("renders one labelled non-modal local result and focuses its primary action", async () => {
+  it("renders one labelled modal local result and focuses its primary action", async () => {
     const onNewGame = vi.fn();
     const onExit = vi.fn();
+    const outside = document.createElement("button");
+    document.body.append(outside);
 
     render(GameResultOverlay, {
       status: buildGameStatus(gameFixtures.win),
@@ -20,6 +22,7 @@ describe("GameResultOverlay", () => {
       testId: "game-result",
       onNewGame,
       onExit,
+      inertTargets: [outside],
     });
 
     const dialog = screen.getByRole("dialog", {
@@ -29,18 +32,26 @@ describe("GameResultOverlay", () => {
       name: copy.controls.newGame,
     });
 
-    expect(dialog).not.toHaveAttribute("aria-modal");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(screen.getAllByTestId("game-result-panel")).toHaveLength(1);
     expect(dialog).toHaveTextContent(copy.result.reasons.opponentBelowThree);
     await waitFor(() => expect(newGame).toHaveFocus());
+    expect(outside.inert).toBe(true);
+
+    const exit = screen.getByRole("button", { name: copy.controls.exit });
+    await fireEvent.keyDown(newGame, { key: "Tab", shiftKey: true });
+    expect(exit).toHaveFocus();
+    await fireEvent.keyDown(exit, { key: "Tab" });
+    expect(newGame).toHaveFocus();
+    await fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(dialog).toBeInTheDocument();
 
     await fireEvent.click(newGame);
-    await fireEvent.click(
-      screen.getByRole("button", { name: copy.controls.exit }),
-    );
+    await fireEvent.click(exit);
 
     expect(onNewGame).toHaveBeenCalledOnce();
     expect(onExit).toHaveBeenCalledOnce();
+    outside.remove();
   });
 
   it("renders one online leave action", async () => {
@@ -55,7 +66,7 @@ describe("GameResultOverlay", () => {
 
     expect(
       screen.getByRole("dialog", { name: copy.result.drawLabel }),
-    ).not.toHaveAttribute("aria-modal");
+    ).toHaveAttribute("aria-modal", "true");
     expect(screen.getAllByTestId("game-result-panel")).toHaveLength(1);
     expect(
       screen.queryByRole("button", { name: copy.controls.newGame }),

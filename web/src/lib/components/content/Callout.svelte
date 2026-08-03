@@ -1,11 +1,10 @@
 <script lang="ts">
   import { CircleAlert, Lightbulb, ShieldCheck } from "@lucide/svelte";
+  import type { ContentCalloutVariant } from "@shaxda/i18n";
   import type { Component, Snippet } from "svelte";
 
-  type Variant = "xeer" | "digniin" | "talo";
-
   interface Props {
-    variant: Variant;
+    variant: ContentCalloutVariant;
     children: Snippet;
   }
 
@@ -28,7 +27,7 @@
       className: "border-amber-800/25 bg-amber-50/75 text-amber-950",
     },
   } as const satisfies Record<
-    Variant,
+    ContentCalloutVariant,
     { label: string; icon: Component; className: string }
   >;
 

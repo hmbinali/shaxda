@@ -2,9 +2,9 @@
   import { base, resolve } from "$app/paths";
   import { siteContent, type LearnPageContent } from "@shaxda/i18n";
   import PageMeta from "$components/PageMeta.svelte";
+  import Callout from "$lib/components/content/Callout.svelte";
+  import SectionNav from "$lib/components/content/SectionNav.svelte";
   import DiagramSequence from "$lib/components/learn/DiagramSequence.svelte";
-  import LearnSectionNav from "$lib/components/learn/LearnSectionNav.svelte";
-  import RuleCallout from "$lib/components/learn/RuleCallout.svelte";
 
   const page: LearnPageContent = siteContent.so.pages.learn;
   const sectionLinks = page.sections.map(({ id, navLabel }) => ({
@@ -38,14 +38,14 @@
   <div
     class="mx-auto grid min-w-0 max-w-[76rem] items-start gap-8 px-4 pb-10 sm:px-6 sm:pb-12 lg:grid-cols-[15rem_minmax(0,65ch)] lg:gap-12 lg:px-8 lg:pt-12"
   >
-    <LearnSectionNav sections={sectionLinks} label={page.navigationLabel} />
+    <SectionNav sections={sectionLinks} label={page.navigationLabel} />
 
     <article class="min-w-0">
       {#each page.sections as section (section.id)}
         <section
           id={section.id}
           data-learn-section={section.id}
-          class={`learn-section border-b border-board-700/15 py-10 first:pt-10 last:border-b-0 last:pb-0 lg:py-14 lg:first:pt-0 ${
+          class={`doc-section border-b border-board-700/15 py-10 first:pt-10 last:border-b-0 last:pb-0 lg:py-14 lg:first:pt-0 ${
             section.id === "talooyin"
               ? "rounded-2xl border border-amber-800/25 bg-amber-50/45 px-5 sm:px-7"
               : ""
@@ -120,9 +120,9 @@
           {#if section.callouts.length > 0}
             <div class="mt-6 grid gap-3">
               {#each section.callouts as callout (callout.body)}
-                <RuleCallout variant={callout.variant}>
+                <Callout variant={callout.variant}>
                   <p>{callout.body}</p>
-                </RuleCallout>
+                </Callout>
               {/each}
             </div>
           {/if}

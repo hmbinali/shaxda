@@ -7,11 +7,15 @@ workers_dev = false
 enabled = true
 
 [vars]
-ALLOWED_ORIGIN = "https://shaxda.so"
+ALLOWED_ORIGIN = "https://shaxda.app"
 
 [[routes]]
-pattern = "api.shaxda.so"
-custom_domain = true
+pattern = "shaxda.app/rooms*"
+zone_name = "shaxda.app"
+
+[[routes]]
+pattern = "shaxda.app/health"
+zone_name = "shaxda.app"
 
 [[durable_objects.bindings]]
 name = "MATCH_ROOM"

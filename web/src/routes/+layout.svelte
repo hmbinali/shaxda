@@ -88,6 +88,10 @@
           await registration.update();
         });
 
+        if (registration.waiting !== null) {
+          pwa.setNeedRefresh(true);
+        }
+
         registration.addEventListener("updatefound", () => {
           const worker = registration.installing;
 

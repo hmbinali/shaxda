@@ -67,11 +67,11 @@ describe("AppNavDrawer", () => {
       drawerQueries.getByRole("link", { name: nav.localPlay }),
     ).toHaveAttribute("aria-current", "page");
     expect(
-      drawerQueries.queryByRole("link", { name: nav.privacy }),
-    ).not.toBeInTheDocument();
+      drawerQueries.getByRole("link", { name: nav.privacy }),
+    ).toHaveAttribute("href", "/privacy");
     expect(
-      drawerQueries.queryByRole("link", { name: nav.terms }),
-    ).not.toBeInTheDocument();
+      drawerQueries.getByRole("link", { name: nav.terms }),
+    ).toHaveAttribute("href", "/terms");
     expect(drawer).toHaveTextContent(siteContent.so.footer.tagline);
 
     const focusable = Array.from(

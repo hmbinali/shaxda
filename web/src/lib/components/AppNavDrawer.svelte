@@ -1,7 +1,15 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
-  import { BookOpen, Gamepad2, House, Users, X } from "@lucide/svelte";
+  import {
+    BookOpen,
+    FileText,
+    Gamepad2,
+    House,
+    ShieldCheck,
+    Users,
+    X,
+  } from "@lucide/svelte";
   import { messages, siteContent } from "@shaxda/i18n";
   import { cubicIn, cubicOut } from "svelte/easing";
   import { onMount, tick } from "svelte";
@@ -30,6 +38,10 @@
     { href: "/local", label: nav.localPlay, icon: Gamepad2 },
     { href: "/online", label: nav.onlinePlay, icon: Users },
     { href: "/learn", label: nav.learn, icon: BookOpen },
+  ] as const;
+  const footerItems = [
+    { href: "/privacy", label: nav.privacy, icon: ShieldCheck },
+    { href: "/terms", label: nav.terms, icon: FileText },
   ] as const;
 
   let prefersReducedMotion = $state(false);
@@ -207,7 +219,20 @@
       </nav>
 
       <div class="mt-auto border-t border-board-700/15 p-4">
-        <p class="text-xs leading-5 text-board-700">
+        <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+          {#each footerItems as item (item.href)}
+            <a
+              aria-label={item.label}
+              class="inline-flex min-h-11 items-center gap-2 rounded-lg text-board-700 outline-none hover:text-board-900 focus-visible:ring-2 focus-visible:ring-focus"
+              href={resolve(item.href)}
+              onclick={() => shell.close()}
+            >
+              <item.icon class="shrink-0" size={16} aria-hidden="true" />
+              <span>{item.label}</span>
+            </a>
+          {/each}
+        </div>
+        <p class="mt-3 text-xs leading-5 text-board-700">
           {footer.tagline}
         </p>
       </div>

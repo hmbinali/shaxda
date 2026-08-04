@@ -207,8 +207,9 @@ test.describe("tabletop layout", () => {
       if (fixture.name === "result") {
         await page
           .getByTestId("app-top-bar")
-          .getByRole("button", { name: "Is dhiib" })
+          .getByRole("button", { name: "Fur ficillo kale" })
           .click();
+        await page.getByRole("menuitem", { name: "Is dhiib" }).click();
         await page
           .getByRole("dialog")
           .getByRole("button", { name: "Xaqiiji" })
@@ -278,7 +279,8 @@ test.describe("tabletop layout", () => {
       await page.getByRole("button", { name: "Jooji" }).last().click();
 
       await page.locator('[data-point-id="O1"]').click();
-      await topBar.getByRole("button", { name: "Is dhiib" }).click();
+      await topBar.getByRole("button", { name: "Fur ficillo kale" }).click();
+      await page.getByRole("menuitem", { name: "Is dhiib" }).click();
       await expectCenteredDialog(page, viewport);
       await page.getByRole("button", { name: "Jooji" }).last().click();
     }

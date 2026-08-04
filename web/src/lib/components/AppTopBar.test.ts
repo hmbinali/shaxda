@@ -1,69 +1,110 @@
-import { AudioLines, Flag } from "@lucide/svelte";
+import { AudioLines, Flag, Menu } from "@lucide/svelte";
 import { siteContent } from "@shaxda/i18n";
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import AppShellHarness from "$lib/shell/AppShellHarness.svelte";
 import AppTopBarHarness from "$lib/shell/AppTopBarHarness.svelte";
 
-const sidebar = siteContent.so.sidebar;
+const topBarCopy = siteContent.so.topBar;
 
 describe("AppTopBar", () => {
-  it("toggles the drawer state with the global hamburger", async () => {
-    render(AppShellHarness);
+  it("renders the default Home brand link and account action", () => {
+    render(AppShellHarness, { pathname: "/" });
 
-    const menuButton = screen.getByRole("button", {
-      name: sidebar.openMenu,
-    });
-    expect(menuButton).toHaveAttribute("aria-expanded", "false");
-    expect(menuButton).toHaveAttribute(
-      "aria-controls",
-      "app-navigation-drawer",
-    );
-
-    await fireEvent.click(menuButton);
-    expect(menuButton).toHaveAttribute("aria-expanded", "true");
-
-    await fireEvent.click(menuButton);
-    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("link", { name: topBarCopy.brandLabel }),
+    ).toHaveAttribute("href", "/");
+    expect(
+      screen.getByRole("button", { name: topBarCopy.accountLabel }),
+    ).toBeVisible();
   });
 
-  it("renders registered actions in order with pressed state", () => {
-    const first = vi.fn();
-    const second = vi.fn();
-
+  it("renders a guarded brand button", async () => {
+    const brandGuard = vi.fn();
     render(AppTopBarHarness, {
-      actions: [
-        {
-          id: "sound",
-          label: "Cod",
-          icon: AudioLines,
-          onSelect: first,
-          pressed: true,
-        },
-        {
-          id: "resign",
-          label: "Is dhiib",
-          icon: Flag,
-          onSelect: second,
-          tone: "danger",
-        },
-      ],
+      config: { actions: [], panels: [], brandGuard },
     });
 
-    const topBar = within(screen.getByTestId("app-top-bar"));
-    const buttons = topBar.getAllByRole("button");
+    const brand = screen.getByRole("button", {
+      name: topBarCopy.brandLabel,
+    });
+    await fireEvent.click(brand);
+    expect(brandGuard).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole("link", { name: topBarCopy.brandLabel }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders registered actions in order with responsive labels and pressed state", () => {
+    render(AppTopBarHarness, {
+      config: {
+        actions: [
+          {
+            id: "sound",
+            label: "Codka dami",
+            shortLabel: "Cod",
+            icon: AudioLines,
+            onSelect: vi.fn(),
+            pressed: true,
+          },
+          {
+            id: "resign",
+            label: "Is dhiib",
+            shortLabel: "Is dhiib",
+            icon: Flag,
+            onSelect: vi.fn(),
+            tone: "danger",
+          },
+        ],
+        panels: [],
+        brandGuard: null,
+      },
+    });
+
+    const navigation = screen.getByRole("navigation", {
+      name: topBarCopy.actionsLabel,
+    });
+    const buttons = within(navigation).getAllByRole("button");
 
     expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
-      sidebar.openMenu,
-      "Cod",
+      "Codka dami",
       "Is dhiib",
     ]);
-    expect(topBar.getByRole("button", { name: "Cod" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
+    expect(buttons[0]).toHaveAttribute("aria-pressed", "true");
+    expect(buttons[1]).not.toHaveAttribute("aria-pressed");
+    expect(within(buttons[0]).getByText("Cod")).toHaveClass(
+      "hidden",
+      "md:inline",
     );
-    expect(
-      topBar.getByRole("button", { name: "Is dhiib" }),
-    ).not.toHaveAttribute("aria-pressed");
+  });
+
+  it("toggles the configured panel and expanded state", async () => {
+    render(AppTopBarHarness, {
+      config: {
+        actions: [
+          {
+            id: "menu",
+            label: topBarCopy.menuLabel,
+            shortLabel: topBarCopy.menuShort,
+            icon: Menu,
+            panel: "menu",
+          },
+        ],
+        panels: [],
+        brandGuard: null,
+      },
+    });
+
+    const trigger = screen.getByRole("button", { name: topBarCopy.menuLabel });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("aria-controls", "app-nav-panel");
+
+    await fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("menu")).toHaveAttribute("id", "app-nav-panel");
+
+    await fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });

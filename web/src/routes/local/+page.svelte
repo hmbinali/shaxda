@@ -1,13 +1,20 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
-  import { Flag, LogOut, RotateCcw, Volume2, VolumeX } from "@lucide/svelte";
+  import {
+    Flag,
+    LogOut,
+    Menu,
+    RotateCcw,
+    Volume2,
+    VolumeX,
+  } from "@lucide/svelte";
   import {
     legalActions,
     type GameState,
     type PlayerId,
   } from "@shaxda/game-engine";
-  import { messages } from "@shaxda/i18n";
+  import { messages, siteContent } from "@shaxda/i18n";
   import { onMount } from "svelte";
   import {
     getSoundPlayer,
@@ -28,17 +35,21 @@
     railStateFor,
     resolveSeating,
   } from "$lib/game/seating";
-  import { registerTopBarActions } from "$lib/shell/appShell.svelte";
+  import { registerTopBar } from "$lib/shell/appShell.svelte";
+  import { pagesGroup } from "$lib/shell/topBarConfig";
 
   const copy = messages.so.localGame;
   const orientation = { orientation: "shared" } as const;
   const seating = resolveSeating(orientation);
   const controller = createLocalGameController();
   const soundPlayer = getSoundPlayer();
+  const topBarCopy = siteContent.so.topBar;
 
   let soundEnabled = $state(true);
   let lastFeedbackNonce = 0;
-  let pendingConfirm = $state<"newGame" | "resign" | "exit" | null>(null);
+  let pendingConfirm = $state<"newGame" | "resign" | "exit" | "home" | null>(
+    null,
+  );
   let tabletopBackground = $state<HTMLElement | null>(null);
   let topRailElement = $state<HTMLElement | null>(null);
   let bottomRailElement = $state<HTMLElement | null>(null);
@@ -51,34 +62,59 @@
       : copy.invalid[controller.invalid.reason],
   );
 
-  registerTopBarActions(() => [
-    {
-      id: "sound",
-      label: soundEnabled ? copy.controls.soundOff : copy.controls.soundOn,
-      icon: soundEnabled ? Volume2 : VolumeX,
-      onSelect: toggleSound,
-      pressed: soundEnabled,
-    },
-    {
-      id: "new-game",
-      label: copy.controls.newGame,
-      icon: RotateCcw,
-      onSelect: requestNewGame,
-    },
-    {
-      id: "resign-or-exit",
-      label: resignOwner === null ? copy.controls.exit : copy.controls.resign,
-      icon: resignOwner === null ? LogOut : Flag,
-      onSelect: () => {
-        if (resignOwner === null) {
-          requestExit();
-        } else {
-          requestResign();
-        }
+  registerTopBar(() => ({
+    actions: [
+      {
+        id: "sound",
+        label: soundEnabled ? copy.controls.soundOff : copy.controls.soundOn,
+        shortLabel: copy.controls.soundShort,
+        icon: soundEnabled ? Volume2 : VolumeX,
+        onSelect: toggleSound,
+        pressed: soundEnabled,
       },
-      tone: resignOwner === null ? "default" : "danger",
-    },
-  ]);
+      {
+        id: "new-game",
+        label: copy.controls.newGame,
+        shortLabel: copy.controls.newGame,
+        icon: RotateCcw,
+        onSelect: requestNewGame,
+      },
+      {
+        id: "menu",
+        label: topBarCopy.menuLabel,
+        shortLabel: topBarCopy.menuShort,
+        icon: Menu,
+        panel: "menu",
+      },
+    ],
+    panels: [
+      pagesGroup(),
+      {
+        id: "game",
+        label: topBarCopy.groupGame,
+        items: [
+          ...(resignOwner === null
+            ? []
+            : [
+                {
+                  id: "resign",
+                  label: copy.controls.resign,
+                  icon: Flag,
+                  onSelect: requestResign,
+                  danger: true,
+                },
+              ]),
+          {
+            id: "exit",
+            label: copy.controls.exitGame,
+            icon: LogOut,
+            onSelect: requestExit,
+          },
+        ],
+      },
+    ],
+    brandGuard: resignOwner === null ? null : () => (pendingConfirm = "home"),
+  }));
 
   onMount(() => {
     soundEnabled = loadSoundPreference();
@@ -134,6 +170,8 @@
     } else if (action === "resign") {
       controller.resign();
     } else if (action === "exit") {
+      void goto(resolve("/"));
+    } else if (action === "home") {
       void goto(resolve("/"));
     }
   }
@@ -223,13 +261,17 @@
   title={pendingConfirm === "resign"
     ? copy.controls.resign
     : pendingConfirm === "exit"
-      ? copy.controls.exit
-      : copy.controls.newGame}
+      ? copy.controls.exitGame
+      : pendingConfirm === "home"
+        ? copy.controls.exitGame
+        : copy.controls.newGame}
   body={pendingConfirm === "resign"
     ? copy.prompts.resign
     : pendingConfirm === "exit"
       ? copy.prompts.leave
-      : copy.prompts.newGame}
+      : pendingConfirm === "home"
+        ? copy.prompts.home
+        : copy.prompts.newGame}
   cancelLabel={copy.tabletop.cancel}
   confirmLabel={copy.tabletop.confirm}
   background={tabletopBackground}

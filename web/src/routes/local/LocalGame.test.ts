@@ -1,5 +1,5 @@
 import { deserialize, serialize } from "@shaxda/game-engine";
-import { messages } from "@shaxda/i18n";
+import { messages, siteContent } from "@shaxda/i18n";
 import { gameFixtures } from "@shaxda/shared";
 import {
   fireEvent,
@@ -21,6 +21,7 @@ vi.mock("$lib/site/metadata", () => ({
 import LocalGamePage from "./+page.svelte";
 
 const copy = messages.so.localGame;
+const topBarCopy = siteContent.so.topBar;
 
 describe("/local", () => {
   beforeEach(() => {
@@ -150,7 +151,10 @@ describe("/local", () => {
 
     await fireEvent.click(point(container, "O1"));
     await fireEvent.click(
-      topBar.getByRole("button", { name: copy.controls.resign }),
+      topBar.getByRole("button", { name: topBarCopy.menuLabel }),
+    );
+    await fireEvent.click(
+      screen.getByRole("menuitem", { name: copy.controls.resign }),
     );
     const dialog = screen.getByRole("dialog", {
       name: copy.controls.resign,
@@ -179,15 +183,14 @@ describe("/local", () => {
       }),
     ).toHaveFocus();
     expect(point(container, "O1")).not.toHaveAttribute("role");
+    await fireEvent.click(
+      topBar.getByRole("button", { name: topBarCopy.menuLabel }),
+    );
     expect(
-      topBar.getByRole("button", { name: copy.controls.exit }),
+      screen.getByRole("menuitem", { name: copy.controls.exitGame }),
     ).toBeVisible();
-    topBar.getByRole("button", { name: copy.controls.exit }).focus();
     expect(
-      topBar.getByRole("button", { name: copy.controls.exit }),
-    ).toHaveFocus();
-    expect(
-      topBar.queryByRole("button", { name: copy.controls.resign }),
+      screen.queryByRole("menuitem", { name: copy.controls.resign }),
     ).not.toBeInTheDocument();
   });
 
@@ -265,7 +268,10 @@ describe("/local", () => {
 });
 
 function renderLocalGame() {
-  return render(AppShellHarness, { component: LocalGamePage });
+  return render(AppShellHarness, {
+    component: LocalGamePage,
+    pathname: "/local",
+  });
 }
 
 function point(container: HTMLElement, id: string): Element {

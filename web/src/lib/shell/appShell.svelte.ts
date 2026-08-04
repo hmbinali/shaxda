@@ -3,45 +3,71 @@ import { getContext, setContext } from "svelte";
 
 export const APP_SHELL_CONTEXT_KEY = Symbol("shaxda-app-shell");
 
+export type NavPanelItem =
+  | { id: string; label: string; icon: Component; href: string }
+  | {
+      id: string;
+      label: string;
+      icon: Component;
+      onSelect: () => void;
+      danger?: boolean;
+    };
+
+export type NavPanelGroup = {
+  id: string;
+  label: string;
+  items: NavPanelItem[];
+};
+
 export type TopBarAction = {
   id: string;
   label: string;
+  shortLabel: string;
   icon: Component;
-  onSelect: () => void;
+  onSelect?: () => void;
+  panel?: "menu" | "account";
   pressed?: boolean;
   tone?: "default" | "danger";
+  disabled?: boolean;
+};
+
+export type TopBarConfig = {
+  actions: TopBarAction[];
+  panels: NavPanelGroup[];
+  brandGuard: (() => void) | null;
 };
 
 export class AppShellState {
-  drawerOpen = $state(false);
-  actions = $state<TopBarAction[]>([]);
+  config = $state<TopBarConfig | null>(null);
+  panel = $state<"menu" | "account" | null>(null);
 
   #owner: symbol | null = null;
 
-  open(): void {
-    this.drawerOpen = true;
+  openPanel(panel: "menu" | "account"): void {
+    this.panel = panel;
   }
 
-  close(): void {
-    this.drawerOpen = false;
+  closePanel(): void {
+    this.panel = null;
   }
 
-  toggle(): void {
-    this.drawerOpen = !this.drawerOpen;
+  togglePanel(panel: "menu" | "account"): void {
+    this.panel = this.panel === panel ? null : panel;
   }
 
-  setActions(owner: symbol, next: TopBarAction[]): void {
+  setTopBar(owner: symbol, config: TopBarConfig): void {
     this.#owner = owner;
-    this.actions = next;
+    this.config = config;
   }
 
-  clearActions(owner: symbol): void {
+  clearTopBar(owner: symbol): void {
     if (this.#owner !== owner) {
       return;
     }
 
     this.#owner = null;
-    this.actions = [];
+    this.config = null;
+    this.closePanel();
   }
 }
 
@@ -63,13 +89,13 @@ export function getAppShell(): AppShellState {
   return shell;
 }
 
-export function registerTopBarActions(getActions: () => TopBarAction[]): void {
+export function registerTopBar(getConfig: () => TopBarConfig): void {
   const shell = getAppShell();
-  const owner = Symbol("top-bar-actions");
+  const owner = Symbol("top-bar");
 
   $effect(() => {
-    shell.setActions(owner, getActions());
+    shell.setTopBar(owner, getConfig());
 
-    return () => shell.clearActions(owner);
+    return () => shell.clearTopBar(owner);
   });
 }

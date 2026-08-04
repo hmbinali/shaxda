@@ -1,34 +1,41 @@
 import { AudioLines } from "@lucide/svelte";
 import { describe, expect, it, vi } from "vitest";
-import { createAppShell, type TopBarAction } from "./appShell.svelte";
+import { createAppShell, type TopBarConfig } from "./appShell.svelte";
 
-function action(id: string): TopBarAction {
+function config(id: string): TopBarConfig {
   return {
-    id,
-    label: id,
-    icon: AudioLines,
-    onSelect: vi.fn(),
+    actions: [
+      {
+        id,
+        label: id,
+        shortLabel: id,
+        icon: AudioLines,
+        onSelect: vi.fn(),
+      },
+    ],
+    panels: [],
+    brandGuard: null,
   };
 }
 
 describe("AppShellState", () => {
-  it("ignores action cleanup from a non-owner", () => {
+  it("ignores top-bar cleanup from a non-owner", () => {
     const shell = createAppShell();
     const owner = Symbol("owner");
 
-    shell.setActions(owner, [action("current")]);
-    shell.clearActions(Symbol("stale"));
+    shell.setTopBar(owner, config("current"));
+    shell.clearTopBar(Symbol("stale"));
 
-    expect(shell.actions.map(({ id }) => id)).toEqual(["current"]);
+    expect(shell.config?.actions.map(({ id }) => id)).toEqual(["current"]);
   });
 
   it("lets a second registration replace the first", () => {
     const shell = createAppShell();
 
-    shell.setActions(Symbol("first"), [action("first")]);
-    shell.setActions(Symbol("second"), [action("second")]);
+    shell.setTopBar(Symbol("first"), config("first"));
+    shell.setTopBar(Symbol("second"), config("second"));
 
-    expect(shell.actions.map(({ id }) => id)).toEqual(["second"]);
+    expect(shell.config?.actions.map(({ id }) => id)).toEqual(["second"]);
   });
 
   it("does not let stale teardown wipe the live registration", () => {
@@ -36,10 +43,10 @@ describe("AppShellState", () => {
     const firstOwner = Symbol("first");
     const secondOwner = Symbol("second");
 
-    shell.setActions(firstOwner, [action("first")]);
-    shell.setActions(secondOwner, [action("second")]);
-    shell.clearActions(firstOwner);
+    shell.setTopBar(firstOwner, config("first"));
+    shell.setTopBar(secondOwner, config("second"));
+    shell.clearTopBar(firstOwner);
 
-    expect(shell.actions.map(({ id }) => id)).toEqual(["second"]);
+    expect(shell.config?.actions.map(({ id }) => id)).toEqual(["second"]);
   });
 });

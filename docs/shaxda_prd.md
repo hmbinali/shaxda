@@ -2,7 +2,8 @@
 
 ## 1. Purpose
 
-This document is the technical and product source of truth for building **Shaxda V1.0**.
+This document is the technical and product source of truth for Shaxda. V1.0 has
+launched; **V1.1-A — Accounts and Identity is the active fast-follow milestone**.
 
 It combines the product scope, final tech stack, infrastructure rules, build workflow, and milestone roadmap into one concise file for Codex, Claude, and future developers.
 
@@ -98,22 +99,17 @@ docs/shaxda_brd.md
 
 ## 4. V1.1 Fast-Follow Scope
 
-V1.1 should start after V1.0 launch feedback is understood.
+V1.0 has launched. V1.1 is split into ordered milestones so identity can ship
+without coupling it to game persistence:
 
-V1.1 candidates:
+1. V1.1-A accounts and identity — active;
+2. V1.1-B logged-in matches, history, and replay;
+3. V1.1-C leaderboard and profile statistics;
+4. V1.1-D English and full i18n.
 
-- Google login;
-- permanent usernames;
-- logged-in online games;
-- logged-in match history;
-- compact replay storage;
-- replay viewer;
-- leaderboard;
-- full English support;
-- language toggle;
-- richer onboarding/tutorial improvements.
-
-V1.1 should not be allowed to block V1.0 launch.
+V1.1-A does not change guest play or the game Worker. It establishes permanent
+Google-backed identity, a required public username, privacy-first avatars, public
+profiles, account settings, and session-aware navigation only.
 
 ---
 
@@ -637,6 +633,17 @@ D1 is mainly for V1.1:
 - leaderboard;
 - small analytics summaries.
 
+For active V1.1-A account work:
+
+- D1 is bound only to the SvelteKit web Worker;
+- production and preview use distinct databases;
+- local and automated tests use Wrangler/Miniflare persistence only;
+- Better Auth core tables are generated from the pinned auth configuration;
+- current usernames and historical aliases share one uniqueness authority;
+- all common auth and profile lookups are indexed;
+- schema constraints enforce normalized usernames and allowed avatar modes;
+- account mutations use session-derived ownership and guarded SQL operations.
+
 Do not store:
 
 - one row per move;
@@ -685,14 +692,29 @@ Do not store permanent guest match history by default.
 
 ### 17.3 V1.1 Logged-in Users
 
-When accounts are added later, store:
+V1.1-A stores only the identity foundation:
 
-- user id;
-- Google auth identity;
-- username;
-- basic profile;
-- match history;
-- leaderboard stats.
+- a permanent internal user id;
+- the private verified Google email and Google subject id required for sign-in;
+- a unique, normalized public username;
+- historical username aliases that continue resolving to the account;
+- a private Google image URL and an explicit `initial`/`google` public-avatar
+  preference;
+- session, account, and audit timestamps required by Better Auth.
+
+The Google full name is not retained as a plaintext profile value: the required
+Better Auth `name` field is scrubbed before account creation and becomes the
+confirmed username. Provider access, refresh, and ID tokens are stripped because
+Shaxda does not call Google APIs.
+
+The initial username confirmation starts the 30-day username-change cooldown.
+There is no first-change grace period. Old usernames remain reserved aliases;
+their owner may reclaim them after cooldown. Public loaders never expose internal
+ids, email, provider records, session data, timestamps used for cooldown, or
+tokens. Google avatars are opt-in and fall back to a generated initial avatar.
+
+Match history, replay, leaderboard data, and use of the account id inside online
+rooms belong to V1.1-B/C and are not introduced by V1.1-A.
 
 ### 17.4 V1.1 Matches
 
@@ -1310,15 +1332,34 @@ After V1.0 is launched and feedback is collected, build:
 
 ### V1.1-A — Accounts and Identity
 
+Status: **active**.
+
 Includes:
 
-- Better Auth;
-- Google provider;
-- users table;
-- username;
-- profile menu;
-- logout;
-- account tests.
+- Better Auth in the SvelteKit web Worker at `/api/auth/*`;
+- Google as the only provider, with a canonical per-environment auth origin;
+- D1 user/account/session schema and migrations;
+- required unique 3–20 character lowercase usernames using `[a-z0-9_]`;
+- a 30-day change cooldown beginning at confirmation;
+- alias-preserving `/u/<username>` public profile URLs;
+- generated initial avatars by default and an explicit Google-avatar opt-in;
+- `/login`, `/register`, `/account`, public profile, POST logout, and
+  account-aware server-rendered navigation;
+- unit, D1 integration, route, privacy, and authenticated application e2e tests;
+- an account operations runbook and staged rollout/rollback instructions.
+
+Architecture and privacy constraints:
+
+- `/local` and `/online` remain client-only and prerendered;
+- guest play, Turnstile, and the game Worker are untouched;
+- every mutation is server-authoritative and session-owned;
+- no email/password, public full name, avatar upload, or deletion backend;
+- the disabled deletion notice may explain that deletion support comes later;
+- no logged-in match persistence, history, replay, ratings, leaderboard, or
+  account identity inside Durable Object rooms;
+- no site-wide CSP is added in this milestone; HTTPS image allowlisting,
+  no-referrer policy, opt-in disclosure, and fallback are required, with CSP and
+  an image proxy tracked as follow-up work.
 
 ### V1.1-B — Persistence, History, Replay
 

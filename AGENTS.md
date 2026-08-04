@@ -8,7 +8,7 @@
 
 Shaxda — a free, installable web version of the traditional Somali board game.
 
-V1.0 includes:
+V1.0 shipped with:
 
 - one website for marketing, rules, learning, and the game;
 - local offline 2-player mode;
@@ -39,7 +39,10 @@ V1.0 does **not** include:
 - spectating;
 - app-store wrapper.
 
-Accounts, Google login, logged-in history, leaderboard, replay viewer, Better Auth, and full English/i18n are V1.1 candidates only after V1.0 has launched.
+V1.0 has launched. **V1.1-A — Accounts and Identity is now active** and may add
+Better Auth, Google login, permanent usernames, and public profiles. Logged-in
+game identity, match history, replay, leaderboard, and full English/i18n remain
+out of scope until their later V1.1 milestones are deliberately activated.
 
 ## Source-of-Truth Documents
 
@@ -69,7 +72,7 @@ Read these before relevant work:
 - Cloudflare Workers
 - Cloudflare Durable Objects + WebSockets
 - Cloudflare D1 + Drizzle ORM when persistence is introduced
-- Guest mode for casual invite games
+- Guest mode for casual invite games (preserved when accounts are introduced)
 - Zod for validation
 - Somali-only V1.0 content with future-friendly copy structure
 - `@vite-pwa/sveltekit`
@@ -77,7 +80,10 @@ Read these before relevant work:
 - Workers Vitest pool / Miniflare
 - Playwright
 
-Do not introduce Better Auth, Google OAuth, Paraglide/Inlang, or English routes/content in V1.0 unless `docs/shaxda_prd.md` is deliberately changed first.
+Better Auth and Google OAuth are permitted only for the active V1.1-A account
+milestone and must live in the SvelteKit web Worker. Do not introduce
+Paraglide/Inlang, English routes/content, logged-in game identity, history,
+replays, or leaderboard work until the corresponding PRD milestone is active.
 
 ## Build Principles
 
@@ -130,6 +136,10 @@ pnpm test
 Wrangler/Miniflare simulate Workers, Durable Objects, and D1 locally.
 
 Do not point local work at remote Cloudflare resources unless the task is explicitly about deployment.
+
+V1.1-A account development uses a local D1 database through Wrangler/Miniflare.
+Preview and production D1 migrations are operational deployment steps, never a
+side effect of local tests.
 
 ### 5. No Monetization in V1.0
 
@@ -185,8 +195,22 @@ Monetization is post-V1 only after the game is finished and has users.
 - Somali is the only visible V1.0 language.
 - Do not add English content, `/en` routes, or a language toggle in V1.0.
 - Preserve Somali terms such as `shaxda`, `jare`, and `irmaan`.
-- Marketing/rules pages should be static/prerendered.
+- Marketing/rules pages may use SSR once account-aware navigation is enabled;
+  `/local` and `/online` must remain prerendered, client-only gameplay routes.
 - Gameplay should be client-rendered and not invoke Workers on every local interaction.
+
+### Accounts / Identity (V1.1-A)
+
+- Auth lives in the SvelteKit web Worker at `/api/auth/*`; do not add auth to the
+  game Worker or change Turnstile.
+- Google is the only provider. Do not add email/password authentication.
+- Every mutation derives ownership from the server session and validates all
+  input. Never accept a user id from the browser.
+- Email and provider identity are private. Public profiles expose only the
+  confirmed username and the explicitly selected avatar.
+- Guest local and online play continue to work without an account.
+- Account deletion, logged-in games, history, replay, leaderboard, and English
+  remain later work.
 
 ## Repository Layout
 
@@ -217,7 +241,7 @@ Phase 1: A2/A3 engine, B1 board UI, C1 content, D1 DO spike, E1 assets
 Phase 2: L1 local game, then L2/L3/L4 polish/sound/PWA
 Phase 3: O1/O2/O3 guest online play/resilience/hardening
 Phase 4: Q1 QA, BETA1 community beta, P1 launch
-V1.1: accounts -> history/replay -> leaderboard -> English
+V1.1: A accounts (active) -> B history/replay -> C leaderboard -> D English
 ```
 
 F1 contracts are the parallelism gate for A2, A3, B1, and O1. C1, D1, and E1 may run earlier only if they do not define or consume game state/action contracts.

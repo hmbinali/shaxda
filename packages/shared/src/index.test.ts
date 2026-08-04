@@ -7,6 +7,7 @@ import {
 } from "@shaxda/game-engine";
 import type { GameState } from "@shaxda/game-engine";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   a2ConformanceActionScripts,
   bothBlockedFixture,
@@ -192,6 +193,69 @@ describe("WebSocket protocol schemas", () => {
         A: { displayName: "Ayaan" },
         B: null,
       },
+      started: false,
+    });
+  });
+
+  it("keeps identity additions compatible with protocol version 1", () => {
+    const ticket = `${"a".repeat(24)}.${"b".repeat(43)}`;
+    expect(
+      clientMessageSchema.parse({
+        v: protocolVersion,
+        type: "joinRoom",
+        roomCode: "ABCDEFGH",
+        guestId: "guest-id-a",
+        identityTicket: ticket,
+      }),
+    ).toMatchObject({ identityTicket: ticket });
+    expect(
+      clientMessageSchema.parse({
+        v: protocolVersion,
+        type: "joinRoom",
+        roomCode: "ABCDEFGH",
+        guestId: "guest-id-a",
+      }),
+    ).not.toHaveProperty("identityTicket");
+
+    const presence = serverMessageSchema.parse({
+      v: protocolVersion,
+      type: "presence",
+      roomCode: "ABCDEFGH",
+      players: {
+        A: {
+          displayName: "ayaan_7",
+          kind: "account",
+          username: "ayaan_7",
+          avatar: {
+            mode: "initial",
+            imageUrl: null,
+            color: "#332016",
+            initial: "A",
+          },
+        },
+        B: null,
+      },
+      started: false,
+    });
+    expect(presence).toMatchObject({
+      players: { A: { kind: "account", username: "ayaan_7" } },
+    });
+
+    const legacyPresence = z.object({
+      v: z.literal(1),
+      type: z.literal("presence"),
+      roomCode: roomCodeSchema,
+      players: z.object({
+        A: z.object({ displayName: z.string().optional() }).nullable(),
+        B: z.object({ displayName: z.string().optional() }).nullable(),
+      }),
+      started: z.boolean(),
+    });
+    expect(legacyPresence.parse(presence)).toEqual({
+      v: 1,
+      type: "presence",
+      roomCode: "ABCDEFGH",
+      players: { A: { displayName: "ayaan_7" }, B: null },
       started: false,
     });
   });

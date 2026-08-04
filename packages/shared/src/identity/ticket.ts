@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { avatarModeSchema } from "../account/avatar";
 import { usernameSchema } from "../account/username";
-import { roomCodeSchema } from "../schemas";
+import {
+  identityTicketSchema,
+  roomCodeSchema,
+  ticketActionSchema,
+} from "../schemas";
 
 export const IDENTITY_TICKET_TTL_MS = 90_000;
 export const IDENTITY_TICKET_SKEW_MS = 5_000;
-export const IDENTITY_TICKET_MAX_LENGTH = 1_024;
-
 const base64UrlPattern = /^[A-Za-z0-9_-]+$/;
 const httpsUrlSchema = z
   .string()
@@ -14,7 +16,6 @@ const httpsUrlSchema = z
   .url()
   .refine((value) => new URL(value).protocol === "https:");
 
-export const ticketActionSchema = z.enum(["create", "join", "reconnect"]);
 export type TicketAction = z.infer<typeof ticketActionSchema>;
 
 export const identityTicketPayloadSchema = z
@@ -61,10 +62,7 @@ export type IdentityTicketMintPayload = Omit<
   "iat" | "exp"
 >;
 
-export const identityTicketSchema = z
-  .string()
-  .max(IDENTITY_TICKET_MAX_LENGTH)
-  .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+export { identityTicketSchema, ticketActionSchema };
 
 export type IdentityTicketVerifyCode =
   "malformed" | "signature" | "payload" | "expired" | "scope";

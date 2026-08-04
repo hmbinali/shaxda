@@ -21,10 +21,17 @@ import {
   serverMessageSchema,
 } from "@shaxda/shared";
 import type { ServerMessage } from "@shaxda/shared";
+import {
+  IDENTITY_TICKET_SKEW_MS,
+  IDENTITY_TICKET_TTL_MS,
+  mintIdentityTicket,
+} from "@shaxda/shared/identity";
+import type { TicketAction } from "@shaxda/shared/identity";
 
 const testEnv = env as {
   MATCH_ROOM: DurableObjectNamespace;
   MATCH_COORDINATOR: DurableObjectNamespace;
+  ONLINE_IDENTITY_SECRET: string;
 };
 
 afterEach(async () => {
@@ -171,6 +178,274 @@ describe("match room hibernation spike", () => {
     first.close();
     second.close();
     third.close();
+  });
+
+  it("seats an account by user id and broadcasts only its public snapshot", async () => {
+    const roomCode = await createRoom();
+    const account = await connectRoom(roomCode);
+    const guest = await connectRoom(roomCode);
+    const ticket = await mintTestTicket("join", roomCode, {
+      userId: "private-user-id",
+      usernameSnapshot: "ayaan_7",
+    });
+
+    const joined = await joinAndWait(
+      account,
+      roomCode,
+      "account-device-a",
+      undefined,
+      ticket,
+    );
+    expect(joined.presence.players.A).toMatchObject({
+      kind: "account",
+      displayName: "ayaan_7",
+      username: "ayaan_7",
+      avatar: { mode: "initial", imageUrl: null, initial: "A" },
+    });
+    expect(JSON.stringify(joined.presence)).not.toContain("private-user-id");
+
+    const accountPresence = waitForMessage(account, "presence");
+    const guestJoin = await joinAndWait(
+      guest,
+      roomCode,
+      "guest-id-b",
+      "ayaan_7",
+    );
+    expect(guestJoin.presence.players).toMatchObject({
+      A: { kind: "account", username: "ayaan_7" },
+      B: { kind: "guest", displayName: "ayaan_7" },
+    });
+    expect(JSON.stringify(await accountPresence)).not.toContain(
+      "private-user-id",
+    );
+
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      seatVersion: 2,
+      slots: { A: "account:private-user-id", B: "guest:guest-id-b" },
+      seats: {
+        A: { kind: "account", usernameSnapshot: "ayaan_7" },
+        B: { kind: "guest", displayName: "ayaan_7" },
+      },
+    });
+
+    account.close();
+    guest.close();
+  });
+
+  it("rejects forged, expired, wrong-room, and replayed tickets", async () => {
+    const roomCode = await createRoom();
+    const forged = await connectRoom(roomCode);
+    const valid = await mintTestTicket("join", roomCode);
+    const [payload, signature] = valid.split(".");
+    const forgedClosed = waitForClose(forged);
+    sendJson(
+      forged,
+      joinRoom(
+        roomCode,
+        "account-device-a",
+        undefined,
+        `${payload}.${signature?.slice(0, -1)}A`,
+      ),
+    );
+    await expect(waitForMessage(forged, "error")).resolves.toMatchObject({
+      code: "identityInvalid",
+    });
+    await expect(forgedClosed).resolves.toMatchObject({ code: 4003 });
+
+    const expired = await connectRoom(roomCode);
+    sendJson(
+      expired,
+      joinRoom(
+        roomCode,
+        "account-device-b",
+        undefined,
+        await mintTestTicket(
+          "join",
+          roomCode,
+          {},
+          Date.now() - IDENTITY_TICKET_TTL_MS - IDENTITY_TICKET_SKEW_MS,
+        ),
+      ),
+    );
+    await expect(waitForMessage(expired, "error")).resolves.toMatchObject({
+      code: "identityExpired",
+    });
+
+    const wrongRoom = await connectRoom(roomCode);
+    sendJson(
+      wrongRoom,
+      joinRoom(
+        roomCode,
+        "account-device-c",
+        undefined,
+        await mintTestTicket("join", "BCDEFGHJ"),
+      ),
+    );
+    await expect(waitForMessage(wrongRoom, "error")).resolves.toMatchObject({
+      code: "identityScope",
+    });
+
+    const first = await connectRoom(roomCode);
+    const replayTicket = await mintTestTicket("join", roomCode);
+    await joinAndWait(
+      first,
+      roomCode,
+      "account-device-d",
+      undefined,
+      replayTicket,
+    );
+    const replay = await connectRoom(roomCode);
+    sendJson(
+      replay,
+      joinRoom(roomCode, "account-device-e", undefined, replayTicket),
+    );
+    await expect(waitForMessage(replay, "error")).resolves.toMatchObject({
+      code: "identityReplayed",
+    });
+    expect(await readStoredRoom(roomCode)).toMatchObject({
+      slots: { A: "account:user-id-a" },
+    });
+
+    first.close();
+    expired.close();
+    wrongRoom.close();
+  });
+
+  it("allows one join retry after reconnect has no committed seat", async () => {
+    const roomCode = await createRoom();
+    const socket = await connectRoom(roomCode);
+    sendJson(
+      socket,
+      joinRoom(
+        roomCode,
+        "account-device-a",
+        undefined,
+        await mintTestTicket("reconnect", roomCode),
+      ),
+    );
+    await expect(waitForMessage(socket, "error")).resolves.toMatchObject({
+      code: "identityScope",
+    });
+    expect(socket.readyState).toBe(WebSocket.OPEN);
+
+    await expect(
+      joinAndWait(
+        socket,
+        roomCode,
+        "account-device-a",
+        undefined,
+        await mintTestTicket("join", roomCode),
+      ),
+    ).resolves.toMatchObject({ joined: { slot: "A" } });
+    socket.close();
+  });
+
+  it("serializes simultaneous ticket reuse so exactly one join succeeds", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+    const ticket = await mintTestTicket("join", roomCode);
+    sendJson(first, joinRoom(roomCode, "account-device-a", undefined, ticket));
+    sendJson(second, joinRoom(roomCode, "account-device-b", undefined, ticket));
+
+    const outcomes = await Promise.all([
+      waitForJoinedOrError(first),
+      waitForJoinedOrError(second),
+    ]);
+    expect(
+      outcomes.filter((message) => message.type === "joined"),
+    ).toHaveLength(1);
+    expect(outcomes.filter((message) => message.type === "error")).toEqual([
+      expect.objectContaining({ code: "identityReplayed" }),
+    ]);
+    first.close();
+    second.close();
+  });
+
+  it("takes over duplicate account connections and rejects the stale socket", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    await joinAndWait(
+      first,
+      roomCode,
+      "account-device-a",
+      undefined,
+      await mintTestTicket("join", roomCode),
+    );
+
+    const closed = waitForClose(first);
+    const replacement = await connectRoom(roomCode);
+    await joinAndWait(
+      replacement,
+      roomCode,
+      "account-device-b",
+      undefined,
+      await mintTestTicket("reconnect", roomCode),
+    );
+    await expect(closed).resolves.toMatchObject({ code: 4001 });
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      connections: { A: { connected: true, disconnectedAt: null } },
+      seats: { A: { connectionEpoch: 2 } },
+    });
+    replacement.close();
+  });
+
+  it("migrates legacy room state and legacy socket attachments in memory", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+    await joinAndWait(first, roomCode, "guest-id-a", "Ayaan");
+    await joinAndWait(second, roomCode, "guest-id-b", "Cabdi");
+
+    await patchStoredRoom(roomCode, (room) => {
+      const legacy = { ...room };
+      delete legacy.seatVersion;
+      delete legacy.seats;
+      return {
+        ...legacy,
+        slots: { A: "guest-id-a", B: "guest-id-b" },
+        displayNames: { A: "Ayaan", B: "Cabdi" },
+      };
+    });
+    await runInDurableObject(roomStub(roomCode), async (_instance, state) => {
+      for (const socket of state.getWebSockets()) {
+        const attachment = socket.deserializeAttachment() as {
+          guestId?: string;
+          slot?: "A" | "B";
+        };
+        socket.serializeAttachment({
+          guestId: attachment.guestId,
+          slot: attachment.slot,
+        });
+      }
+    });
+
+    const firstState = waitForMessage(first, "state");
+    const secondState = waitForMessage(second, "state");
+    sendAction(first, roomCode, { type: "place", player: "A", point: "O1" });
+    await expect(firstState).resolves.toMatchObject({
+      state: { board: { O1: "A" } },
+    });
+    await secondState;
+
+    const reconnected = await connectRoom(roomCode);
+    const rejoin = await joinAndWait(reconnected, roomCode, "guest-id-a");
+    expect(rejoin.presence.players.A).toMatchObject({
+      kind: "guest",
+      displayName: "Ayaan",
+    });
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      seatVersion: 2,
+      slots: { A: "guest:guest-id-a", B: "guest:guest-id-b" },
+      seats: {
+        A: { connectionEpoch: 1, usedTickets: [] },
+        B: { connectionEpoch: 0, usedTickets: [] },
+      },
+    });
+
+    first.close();
+    second.close();
+    reconnected.close();
   });
 
   it("reattaches reconnecting guests to the same slot", async () => {
@@ -910,6 +1185,7 @@ function joinRoom(
   roomCode: string,
   guestId: string,
   displayName?: string,
+  identityTicket?: string,
 ): unknown {
   return {
     v: protocolVersion,
@@ -917,6 +1193,7 @@ function joinRoom(
     roomCode,
     guestId,
     ...(displayName ? { displayName } : {}),
+    ...(identityTicket ? { identityTicket } : {}),
   };
 }
 
@@ -925,18 +1202,74 @@ async function joinAndWait(
   roomCode: string,
   guestId: string,
   displayName?: string,
+  identityTicket?: string,
 ): Promise<{
   joined: Extract<ServerMessage, { type: "joined" }>;
   presence: Extract<ServerMessage, { type: "presence" }>;
   state: Extract<ServerMessage, { type: "state" }>;
 }> {
-  sendJson(socket, joinRoom(roomCode, guestId, displayName));
+  sendJson(socket, joinRoom(roomCode, guestId, displayName, identityTicket));
 
   const joined = await waitForMessage(socket, "joined");
   const presence = await waitForMessage(socket, "presence");
   const state = await waitForMessage(socket, "state");
 
   return { joined, presence, state };
+}
+
+async function waitForJoinedOrError(
+  socket: WebSocket,
+): Promise<
+  | Extract<ServerMessage, { type: "joined" }>
+  | Extract<ServerMessage, { type: "error" }>
+> {
+  for (;;) {
+    const message = serverMessageSchema.parse(await nextJson(socket));
+    if (message.type === "joined" || message.type === "error") return message;
+  }
+}
+
+function waitForClose(
+  socket: WebSocket,
+): Promise<{ code: number; reason: string }> {
+  return new Promise((resolve) => {
+    socket.addEventListener(
+      "close",
+      (event) => resolve({ code: event.code, reason: event.reason }),
+      { once: true },
+    );
+  });
+}
+
+let ticketSequence = 0;
+
+async function mintTestTicket(
+  action: TicketAction,
+  roomCode?: string,
+  overrides: Partial<{
+    userId: string;
+    usernameSnapshot: string;
+    avatarMode: "initial" | "google";
+    imageUrl: string | null;
+  }> = {},
+  now = Date.now(),
+): Promise<string> {
+  ticketSequence += 1;
+  return mintIdentityTicket(
+    {
+      iss: "shaxda-web",
+      aud: "shaxda-rooms",
+      action,
+      ...(roomCode === undefined ? {} : { roomCode }),
+      userId: overrides.userId ?? "user-id-a",
+      usernameSnapshot: overrides.usernameSnapshot ?? "ayaan_7",
+      avatarMode: overrides.avatarMode ?? "initial",
+      imageUrl: overrides.imageUrl ?? null,
+      jti: `testticket${ticketSequence.toString().padStart(10, "0")}`,
+    },
+    testEnv.ONLINE_IDENTITY_SECRET,
+    now,
+  );
 }
 
 async function waitForMessage<Type extends ServerMessage["type"]>(

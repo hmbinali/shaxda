@@ -1,10 +1,12 @@
 import {
   appMetadata,
   healthResponseSchema,
+  identityTicketSchema,
   protocolVersion,
   roomCodeSchema,
   serverMessageSchema,
 } from "@shaxda/shared";
+import { verifyIdentityTicket } from "@shaxda/shared/identity";
 import { MatchRoom } from "./match-room";
 import { RoomCoordinator } from "./room-coordinator";
 import { generateRoomCode } from "./room-code";
@@ -16,6 +18,7 @@ const COORDINATOR_NAME = "global";
 
 const createRoomRequestSchema = z.object({
   turnstileToken: z.string().min(1).max(4096).optional(),
+  identityTicket: identityTicketSchema.optional(),
 });
 
 const coordinatorReserveResponseSchema = z.discriminatedUnion("ok", [
@@ -36,6 +39,10 @@ type PublicCreateRoomErrorCode =
   | "tooManyRooms"
   | "capacityFull"
   | "turnstileFailed"
+  | "identityInvalid"
+  | "identityExpired"
+  | "identityScope"
+  | "identityUnavailable"
   | "createFailed";
 
 interface Env {
@@ -43,6 +50,8 @@ interface Env {
   MATCH_COORDINATOR: DurableObjectNamespace;
   ALLOWED_ORIGIN?: string;
   TURNSTILE_SECRET?: string;
+  ONLINE_IDENTITY_SECRET?: string;
+  ONLINE_IDENTITY_SECRET_PREVIOUS?: string;
 }
 
 const worker = {
@@ -65,6 +74,37 @@ const worker = {
       );
       if (!createRequest.success) {
         return withCors(createErrorResponse("createFailed", 400), env);
+      }
+
+      if (createRequest.data.identityTicket !== undefined) {
+        const secrets = [
+          env.ONLINE_IDENTITY_SECRET,
+          env.ONLINE_IDENTITY_SECRET_PREVIOUS,
+        ].filter((secret): secret is string => Boolean(secret?.trim()));
+        if (secrets.length === 0) {
+          return withCors(createErrorResponse("identityUnavailable", 401), env);
+        }
+
+        let verification: Awaited<ReturnType<typeof verifyIdentityTicket>>;
+        try {
+          verification = await verifyIdentityTicket(
+            createRequest.data.identityTicket,
+            secrets,
+            { allowedActions: ["create"] },
+            Date.now(),
+          );
+        } catch {
+          verification = { ok: false, code: "signature" };
+        }
+        if (!verification.ok) {
+          const code =
+            verification.code === "expired"
+              ? "identityExpired"
+              : verification.code === "scope"
+                ? "identityScope"
+                : "identityInvalid";
+          return withCors(createErrorResponse(code, 401), env);
+        }
       }
 
       const ip = clientIp(request);

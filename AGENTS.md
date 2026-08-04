@@ -39,10 +39,11 @@ V1.0 does **not** include:
 - spectating;
 - app-store wrapper.
 
-V1.0 has launched. **V1.1-A — Accounts and Identity is now active** and may add
-Better Auth, Google login, account-owned usernames, and public profiles. Logged-in
-game identity, match history, replay, leaderboard, and full English/i18n remain
-out of scope until their later V1.1 milestones are deliberately activated.
+V1.0 and **V1.1-A — Accounts and Identity have launched**. **V1.1-A2 —
+Authenticated Online Identity Integration is active** and may connect complete
+accounts to online-room seats through short-lived signed tickets. Match
+persistence, history, replay, leaderboard, and full English/i18n remain out of
+scope until their later V1.1 milestones are deliberately activated.
 
 ## Source-of-Truth Documents
 
@@ -80,10 +81,12 @@ Read these before relevant work:
 - Workers Vitest pool / Miniflare
 - Playwright
 
-Better Auth and Google OAuth are permitted only for the active V1.1-A account
-milestone and must live in the SvelteKit web Worker. Do not introduce
-Paraglide/Inlang, English routes/content, logged-in game identity, history,
-replays, or leaderboard work until the corresponding PRD milestone is active.
+Better Auth and Google OAuth belong to the shipped V1.1-A account milestone and
+must live in the SvelteKit web Worker. V1.1-A2 permits the game Worker to verify
+short-lived HMAC identity tickets only; it must not gain Better Auth, D1, or
+session-cookie access. Do not introduce Paraglide/Inlang, English routes/content,
+match persistence, history, replays, or leaderboard work until the corresponding
+PRD milestone is active.
 
 ## Build Principles
 
@@ -199,17 +202,22 @@ Monetization is post-V1 only after the game is finished and has users.
   `/local` and `/online` must remain prerendered, client-only gameplay routes.
 - Gameplay should be client-rendered and not invoke Workers on every local interaction.
 
-### Accounts / Identity (V1.1-A)
+### Accounts / Identity (V1.1-A / V1.1-A2)
 
-- Auth lives in the SvelteKit web Worker at `/api/auth/*`; do not add auth to the
-  game Worker or change Turnstile.
+- Auth lives in the SvelteKit web Worker at `/api/auth/*`; do not add Better Auth,
+  D1, cookies, or session validation to the game Worker or change Turnstile.
+- The game Worker may verify V1.1-A2 HMAC identity tickets at room create, join,
+  and reconnect only. It must fail closed when a supplied ticket cannot be
+  verified and must never silently downgrade that connection to a guest.
 - Google is the only provider. Do not add email/password authentication.
 - Every mutation derives ownership from the server session and validates all
   input. Never accept a user id from the browser.
 - Email and provider identity are private. Public profiles expose only the
   confirmed username and the explicitly selected avatar.
 - Guest local and online play continue to work without an account.
-- Account deletion, logged-in games, history, replay, leaderboard, and English
+- Active account-owned room seats are allowed in V1.1-A2. The permanent user id
+  is private ownership data; only the username/avatar snapshot may be broadcast.
+- Account deletion, match persistence, history, replay, leaderboard, and English
   remain later work.
 
 ## Repository Layout
@@ -241,7 +249,7 @@ Phase 1: A2/A3 engine, B1 board UI, C1 content, D1 DO spike, E1 assets
 Phase 2: L1 local game, then L2/L3/L4 polish/sound/PWA
 Phase 3: O1/O2/O3 guest online play/resilience/hardening
 Phase 4: Q1 QA, BETA1 community beta, P1 launch
-V1.1: A accounts (active) -> B history/replay -> C leaderboard -> D English
+V1.1: A accounts (shipped) -> A2 online identity (active) -> B history/replay -> C leaderboard -> D English
 ```
 
 F1 contracts are the parallelism gate for A2, A3, B1, and O1. C1, D1, and E1 may run earlier only if they do not define or consume game state/action contracts.

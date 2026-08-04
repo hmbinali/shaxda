@@ -2,8 +2,9 @@
 
 ## 1. Purpose
 
-This document is the technical and product source of truth for Shaxda. V1.0 has
-launched; **V1.1-A — Accounts and Identity is the active fast-follow milestone**.
+This document is the technical and product source of truth for Shaxda. V1.0 and
+V1.1-A have launched; **V1.1-A2 — Authenticated Online Identity Integration is
+the active fast-follow milestone**.
 
 It combines the product scope, final tech stack, infrastructure rules, build workflow, and milestone roadmap into one concise file for Codex, Claude, and future developers.
 
@@ -102,14 +103,18 @@ docs/shaxda_brd.md
 V1.0 has launched. V1.1 is split into ordered milestones so identity can ship
 without coupling it to game persistence:
 
-1. V1.1-A accounts and identity — active;
-2. V1.1-B logged-in matches, history, and replay;
-3. V1.1-C leaderboard and profile statistics;
-4. V1.1-D English and full i18n.
+1. V1.1-A accounts and identity — shipped;
+2. V1.1-A2 authenticated online identity integration — active;
+3. V1.1-B logged-in matches, history, and replay;
+4. V1.1-C leaderboard and profile statistics;
+5. V1.1-D English and full i18n.
 
-V1.1-A does not change guest play or the game Worker. It establishes permanent
-Google-backed identity, a required public username, privacy-first avatars, public
-profiles, account settings, and session-aware navigation only.
+V1.1-A established permanent Google-backed identity, a required public username,
+privacy-first avatars, public profiles, account settings, and session-aware
+navigation. V1.1-A2 preserves guest play while allowing complete accounts to
+claim online-room seats through short-lived signed tickets. Better Auth, D1, and
+session validation remain exclusively in the web Worker; the game Worker gains
+HMAC ticket verification only.
 
 ---
 
@@ -713,8 +718,12 @@ their owner may reclaim them after cooldown. Public loaders never expose interna
 ids, email, provider records, session data, timestamps used for cooldown, or
 tokens. Google avatars are opt-in and fall back to a generated initial avatar.
 
-Match history, replay, leaderboard data, and use of the account id inside online
-rooms belong to V1.1-B/C and are not introduced by V1.1-A.
+V1.1-A2 may use the permanent account id as the private ownership key for an
+active Durable Object seat. The public username and selected avatar are captured
+as a display snapshot when the seat is claimed. Account ids never enter the room
+protocol, and active identity state is not persisted to D1. Match history,
+replay, ratings, leaderboard data, and completed-match persistence remain in
+V1.1-B/C.
 
 ### 17.4 V1.1 Matches
 
@@ -1282,7 +1291,7 @@ A1/A2 + B1 ──► L1 ──► L2 ║ L3 ║ L4
 A2 + D1 ─────► O1 ──► O2 ──► O3
 C1 + E1 + L* + O* ──► Q1 ──► BETA1 ──► P1
 
-V1.1 after launch: accounts → history/replay → leaderboard → English
+V1.1 after launch: accounts → online identity → history/replay → leaderboard → English
 ```
 
 `║` means the work can happen in parallel after the dependency is stable.
@@ -1332,7 +1341,7 @@ After V1.0 is launched and feedback is collected, build:
 
 ### V1.1-A — Accounts and Identity
 
-Status: **active**.
+Status: **shipped**.
 
 Includes:
 
@@ -1351,7 +1360,7 @@ Includes:
 Architecture and privacy constraints:
 
 - `/local` and `/online` remain client-only and prerendered;
-- guest play, Turnstile, and the game Worker are untouched;
+- guest play and Turnstile are untouched;
 - every mutation is server-authoritative and session-owned;
 - no email/password, public full name, avatar upload, or deletion backend;
 - the disabled deletion notice may explain that deletion support comes later;
@@ -1360,6 +1369,41 @@ Architecture and privacy constraints:
 - no site-wide CSP is added in this milestone; HTTPS image allowlisting,
   no-referrer policy, opt-in disclosure, and fallback are required, with CSP and
   an image proxy tracked as follow-up work.
+
+### V1.1-A2 — Authenticated Online Identity Integration
+
+Status: **active**. Depends on V1.1-A.
+
+Includes:
+
+- a same-origin web endpoint that validates the Better Auth session and mints a
+  90-second HMAC-SHA-256 identity ticket for create, join, or reconnect;
+- game Worker verification using the current and optional previous shared secret,
+  without Better Auth, D1, cookies, or a cross-Worker callback;
+- Durable Object seats owned by a private permanent account id while broadcasting
+  only a username and selected-avatar snapshot;
+- single-use join/reconnect tickets, bounded per-seat replay protection, and
+  account-scoped socket takeover epochs;
+- additive protocol fields that keep protocol version 1 clients compatible;
+- legacy stored-room and hibernated-socket attachment migration;
+- account-aware online lobby states while signed-out and incomplete users retain
+  explicit guest play;
+- player-card usernames, public-profile links outside the board hit area, and
+  privacy-preserving avatar rendering;
+- unit, Workers integration, compatibility, and authenticated online e2e tests;
+- shared-secret setup, deployment, and rotation documentation.
+
+Constraints:
+
+- `/online` remains client-only and prerendered;
+- the web Worker is the only session-validation boundary and never sends email,
+  Google full name, provider identifiers, cookies, or tokens to the game Worker;
+- the game Worker verifies tickets only and gains no D1 or Better Auth dependency;
+- usernames are display snapshots for the lifetime of a claimed seat; ownership
+  always uses the permanent user id;
+- guest room creation and play continue without an account or identity secret;
+- no logged-in match persistence, history, replay, ratings, leaderboard, or
+  account deletion is introduced.
 
 ### V1.1-B — Persistence, History, Replay
 

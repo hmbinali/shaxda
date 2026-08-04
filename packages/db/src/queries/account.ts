@@ -7,6 +7,7 @@ import {
   USERNAME_CHANGE_COOLDOWN_MS,
   type AvatarMode,
 } from "@shaxda/shared";
+import type { AnyD1Database } from "drizzle-orm/d1";
 
 export type ClaimUsernameOutcome =
   | { kind: "claimed" }
@@ -75,7 +76,7 @@ function requireAvatarMode(value: string): AvatarMode {
 }
 
 export async function claimUsername(
-  db: D1Database,
+  db: AnyD1Database,
   userId: string,
   value: string,
   avatarMode: AvatarMode,
@@ -86,7 +87,7 @@ export async function claimUsername(
   const timestamp = now.getTime();
   const bindings = [userId, username, timestamp] as const;
 
-  let results: D1Result[];
+  let results: { results: unknown[] }[];
   try {
     results = await db.batch([
       db
@@ -137,7 +138,7 @@ export async function claimUsername(
 }
 
 export async function changeUsername(
-  db: D1Database,
+  db: AnyD1Database,
   userId: string,
   value: string,
   now = new Date(),
@@ -200,7 +201,7 @@ export async function changeUsername(
 }
 
 export async function setAvatarMode(
-  db: D1Database,
+  db: AnyD1Database,
   userId: string,
   value: AvatarMode,
   now = new Date(),
@@ -217,7 +218,7 @@ export async function setAvatarMode(
 }
 
 export async function isUsernameAvailable(
-  db: D1Database,
+  db: AnyD1Database,
   value: string,
 ): Promise<boolean> {
   const validation = validateUsername(value);
@@ -230,7 +231,7 @@ export async function isUsernameAvailable(
 }
 
 export async function resolveProfile(
-  db: D1Database,
+  db: AnyD1Database,
   value: string,
 ): Promise<ResolveProfileOutcome> {
   const username = normalizeUsername(value);
@@ -273,7 +274,7 @@ export async function resolveProfile(
 }
 
 async function readUserAndClaim(
-  db: D1Database,
+  db: AnyD1Database,
   userId: string,
   username: string,
 ): Promise<{
@@ -297,7 +298,7 @@ async function readUserAndClaim(
 }
 
 async function classifyChange(
-  db: D1Database,
+  db: AnyD1Database,
   userId: string,
   username: string,
   now: Date,

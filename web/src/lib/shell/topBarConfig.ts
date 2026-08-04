@@ -1,4 +1,3 @@
-import { resolve } from "$app/paths";
 import {
   BookOpen,
   CircleHelp,
@@ -14,8 +13,17 @@ import type { NavPanelGroup, TopBarConfig } from "$lib/shell/appShell.svelte";
 const nav = siteContent.so.nav;
 const topBar = siteContent.so.topBar;
 
-// V1.1 will replace this flag with real authentication state.
-export const SIGNED_IN = false as boolean;
+export type AccountNavigationState =
+  | null
+  | { status: "incomplete" }
+  | {
+      status: "complete";
+      username: string;
+      avatarMode: "initial" | "google";
+      imageUrl: string | null;
+      avatarColor: string;
+      initial: string;
+    };
 
 export function pagesGroup(): NavPanelGroup {
   return {
@@ -33,42 +41,65 @@ export function pagesGroup(): NavPanelGroup {
   };
 }
 
-export function accountGroup(): NavPanelGroup {
+export function accountGroup(account: AccountNavigationState): NavPanelGroup {
   return {
     id: "account",
     label: topBar.groupAccount,
-    items: SIGNED_IN
-      ? [
-          {
-            id: "profile",
-            label: nav.profile,
-            icon: CircleUserRound,
-            href: "/profile",
-          },
-          {
-            id: "logout",
-            label: nav.logout,
-            icon: LogOut,
-            onSelect: () => {},
-          },
-        ]
-      : [
-          { id: "login", label: nav.login, icon: LogIn, href: "/login" },
-          {
-            id: "register",
-            label: nav.register,
-            icon: UserPlus,
-            href: "/register",
-          },
-        ],
+    items:
+      account?.status === "complete"
+        ? [
+            {
+              id: "profile",
+              label: `@${account.username}`,
+              icon: CircleUserRound,
+              href: `/u/${account.username}`,
+            },
+            {
+              id: "account-settings",
+              label: nav.account,
+              icon: CircleUserRound,
+              href: "/account",
+            },
+            {
+              id: "logout",
+              label: nav.logout,
+              icon: LogOut,
+              formAction: "/logout",
+              danger: true,
+            },
+          ]
+        : account?.status === "incomplete"
+          ? [
+              {
+                id: "complete-registration",
+                label: nav.completeRegistration,
+                icon: UserPlus,
+                href: "/register",
+              },
+              {
+                id: "logout",
+                label: nav.logout,
+                icon: LogOut,
+                formAction: "/logout",
+                danger: true,
+              },
+            ]
+          : [
+              { id: "login", label: nav.login, icon: LogIn, href: "/login" },
+              {
+                id: "register",
+                label: nav.register,
+                icon: UserPlus,
+                href: "/register",
+              },
+            ],
   };
 }
 
-export function defaultTopBar(pathname: string): TopBarConfig {
-  if (pathname !== resolve("/")) {
-    return { actions: [], panels: [], brandGuard: null };
-  }
-
+export function defaultTopBar(
+  _pathname: string,
+  account: AccountNavigationState,
+): TopBarConfig {
   const pageLinks = pagesGroup();
   pageLinks.items.push({
     id: "legal",
@@ -81,13 +112,19 @@ export function defaultTopBar(pathname: string): TopBarConfig {
     actions: [
       {
         id: "account",
-        label: topBar.accountLabel,
-        shortLabel: topBar.accountShort,
+        label:
+          account?.status === "complete"
+            ? `@${account.username}`
+            : topBar.accountLabel,
+        shortLabel:
+          account?.status === "complete"
+            ? `@${account.username}`
+            : topBar.accountShort,
         icon: CircleUserRound,
         panel: "account",
       },
     ],
-    panels: [accountGroup(), pageLinks],
+    panels: [accountGroup(account), pageLinks],
     brandGuard: null,
   };
 }

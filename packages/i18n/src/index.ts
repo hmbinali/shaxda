@@ -204,6 +204,7 @@ export const messages = {
         reconnecting: "Dib ayuu u xirmayaa",
         connected: "Wuu xiran yahay",
         closed: "Wuu go'ay",
+        replaced: "Meel kale ayaa laga furay",
         error: "Khalad xiriir",
       },
       notices: {

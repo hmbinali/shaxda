@@ -5,15 +5,26 @@ import {
 } from "@shaxda/shared";
 import type { GameAction } from "@shaxda/game-engine";
 import type { ServerMessage } from "@shaxda/shared";
+import type { TicketAction } from "@shaxda/shared/identity";
 import { httpOrigin, wsOrigin } from "./workerOrigin";
 
 export type OnlineConnectionStatus =
-  "idle" | "connecting" | "reconnecting" | "connected" | "closed" | "error";
+  | "idle"
+  | "connecting"
+  | "reconnecting"
+  | "connected"
+  | "closed"
+  | "replaced"
+  | "error";
 
 export interface JoinRoomOptions {
   roomCode: string;
   guestId: string;
   displayName?: string;
+  requestTicket?: (
+    action: TicketAction,
+    roomCode: string,
+  ) => Promise<string | null>;
 }
 
 export interface OnlineGameClientCallbacks {
@@ -45,6 +56,9 @@ export class OnlineGameClient {
   #intentionalClose = false;
   #reconnectAttempt = 0;
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  #hasOpened = false;
+  #scopeFallbackUsed = false;
+  #lastJoinAction: TicketAction | null = null;
   #httpBase: string;
   #wsBase: string;
   #fetch: typeof fetch;
@@ -63,11 +77,18 @@ export class OnlineGameClient {
     };
   }
 
-  async createRoom(turnstileToken?: string): Promise<string> {
+  async createRoom(
+    turnstileToken?: string,
+    identityTicket?: string,
+  ): Promise<string> {
+    const body = {
+      ...(turnstileToken ? { turnstileToken } : {}),
+      ...(identityTicket ? { identityTicket } : {}),
+    };
     const response = await this.#fetch(`${this.#httpBase}/rooms`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(turnstileToken ? { turnstileToken } : {}),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -89,6 +110,9 @@ export class OnlineGameClient {
     this.#joinOptions = { ...options };
     this.#intentionalClose = false;
     this.#reconnectAttempt = 0;
+    this.#hasOpened = false;
+    this.#scopeFallbackUsed = false;
+    this.#lastJoinAction = null;
     this.emitStatus("connecting");
     this.openSocket(options);
   }
@@ -105,7 +129,9 @@ export class OnlineGameClient {
       }
       this.#reconnectAttempt = 0;
       this.emitStatus("connected");
-      socket.send(JSON.stringify(buildJoinMessage(options)));
+      const action: TicketAction = this.#hasOpened ? "reconnect" : "join";
+      this.#hasOpened = true;
+      void this.sendJoin(socket, options, action);
     });
 
     socket.addEventListener("message", (event) => {
@@ -116,17 +142,29 @@ export class OnlineGameClient {
         const message = serverMessageSchema.parse(
           JSON.parse(String(event.data)),
         );
-        this.#callbacks.onMessage?.(message);
+        void this.handleInboundMessage(socket, options, message);
       } catch (error) {
         this.emitError(toError(error));
       }
     });
 
-    socket.addEventListener("close", () => {
+    socket.addEventListener("close", (event) => {
       if (this.#socket !== socket) {
         return;
       }
       this.#socket = null;
+      if (event instanceof CloseEvent && event.code === 4001) {
+        this.#intentionalClose = true;
+        this.cancelReconnect();
+        this.emitStatus("replaced");
+        return;
+      }
+      if (event instanceof CloseEvent && event.code === 4003) {
+        this.#intentionalClose = true;
+        this.cancelReconnect();
+        this.emitStatus("closed");
+        return;
+      }
       if (!this.#intentionalClose) {
         this.scheduleReconnect();
         return;
@@ -147,6 +185,60 @@ export class OnlineGameClient {
       }
       this.emitStatus("error");
     });
+  }
+
+  private async sendJoin(
+    socket: WebSocket,
+    options: JoinRoomOptions,
+    action: TicketAction,
+  ): Promise<void> {
+    try {
+      const identityTicket = options.requestTicket
+        ? await options.requestTicket(action, options.roomCode)
+        : null;
+      if (
+        this.#socket !== socket ||
+        socket.readyState !== this.#WebSocketCtor.OPEN
+      ) {
+        return;
+      }
+      this.#lastJoinAction = action;
+      socket.send(
+        JSON.stringify(buildJoinMessage(options, identityTicket ?? undefined)),
+      );
+    } catch (error) {
+      if (this.#socket !== socket) return;
+      this.#intentionalClose = true;
+      this.emitError(toError(error));
+      socket.close();
+    }
+  }
+
+  private async handleInboundMessage(
+    socket: WebSocket,
+    options: JoinRoomOptions,
+    message: ServerMessage,
+  ): Promise<void> {
+    if (
+      message.type === "error" &&
+      message.code === "identityScope" &&
+      this.#lastJoinAction === "reconnect" &&
+      !this.#scopeFallbackUsed
+    ) {
+      this.#scopeFallbackUsed = true;
+      await this.sendJoin(socket, options, "join");
+      return;
+    }
+
+    this.#callbacks.onMessage?.(message);
+    if (
+      message.type === "error" &&
+      terminalIdentityErrorCodes.has(message.code)
+    ) {
+      this.#intentionalClose = true;
+      this.cancelReconnect();
+      socket.close();
+    }
   }
 
   sendGameAction(action: GameAction): boolean {
@@ -258,7 +350,18 @@ async function createRoomErrorCode(response: Response): Promise<string> {
   return "createFailed";
 }
 
-function buildJoinMessage(options: JoinRoomOptions): unknown {
+const terminalIdentityErrorCodes = new Set([
+  "identityInvalid",
+  "identityExpired",
+  "identityScope",
+  "identityReplayed",
+  "identityUnavailable",
+]);
+
+function buildJoinMessage(
+  options: JoinRoomOptions,
+  identityTicket?: string,
+): unknown {
   const displayName = options.displayName?.trim();
 
   return clientMessageSchema.parse({
@@ -267,6 +370,7 @@ function buildJoinMessage(options: JoinRoomOptions): unknown {
     roomCode: options.roomCode,
     guestId: options.guestId,
     ...(displayName && displayName.length > 0 ? { displayName } : {}),
+    ...(identityTicket ? { identityTicket } : {}),
   });
 }
 

@@ -56,6 +56,167 @@ describe("OnlineGameClient", () => {
     });
   });
 
+  it("sends an identity ticket when creating a room", async () => {
+    const fetchFn = vi.fn(async () =>
+      Response.json({
+        v: protocolVersion,
+        type: "roomCreated",
+        roomCode: "ABCDEFGH",
+      }),
+    ) as unknown as typeof fetch;
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      fetchFn,
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+    });
+
+    await client.createRoom(undefined, "payload.signature");
+    expect(fetchFn).toHaveBeenCalledWith("http://worker.test/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identityTicket: "payload.signature" }),
+    });
+  });
+
+  it("mints join and reconnect tickets per socket", async () => {
+    vi.useFakeTimers();
+    const requestTicket = vi
+      .fn()
+      .mockResolvedValueOnce(`${"a".repeat(24)}.${"b".repeat(43)}`)
+      .mockResolvedValueOnce(`${"c".repeat(24)}.${"d".repeat(43)}`);
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+    });
+    client.connect({
+      roomCode: "ABCDEFGH",
+      guestId: "guest-id-a",
+      requestTicket,
+    });
+    const first = FakeWebSocket.latest();
+    first.open();
+    await vi.runAllTicks();
+    expect(requestTicket).toHaveBeenNthCalledWith(1, "join", "ABCDEFGH");
+    expect(JSON.parse(first.sent[0] ?? "")).toMatchObject({
+      identityTicket: `${"a".repeat(24)}.${"b".repeat(43)}`,
+    });
+
+    first.close();
+    vi.advanceTimersByTime(1_000);
+    const second = FakeWebSocket.latest();
+    second.open();
+    await vi.runAllTicks();
+    expect(requestTicket).toHaveBeenNthCalledWith(2, "reconnect", "ABCDEFGH");
+    expect(JSON.parse(second.sent[0] ?? "")).toMatchObject({
+      identityTicket: `${"c".repeat(24)}.${"d".repeat(43)}`,
+    });
+  });
+
+  it("does not join or reconnect after ticket minting fails", async () => {
+    vi.useFakeTimers();
+    const errors: string[] = [];
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onError: (error) => errors.push(error.message),
+    });
+    client.connect({
+      roomCode: "ABCDEFGH",
+      guestId: "guest-id-a",
+      requestTicket: async () => {
+        throw new Error("mint failed");
+      },
+    });
+    const socket = FakeWebSocket.latest();
+    socket.open();
+    await vi.runAllTicks();
+    vi.advanceTimersByTime(30_000);
+    expect(socket.sent).toEqual([]);
+    expect(FakeWebSocket.sockets).toHaveLength(1);
+    expect(errors).toEqual(["mint failed"]);
+  });
+
+  it("sends nothing when closed while ticket minting is pending", async () => {
+    let resolveTicket: ((ticket: string) => void) | undefined;
+    const pending = new Promise<string>((resolve) => {
+      resolveTicket = resolve;
+    });
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+    });
+    client.connect({
+      roomCode: "ABCDEFGH",
+      guestId: "guest-id-a",
+      requestTicket: async () => pending,
+    });
+    const socket = FakeWebSocket.latest();
+    socket.open();
+    client.close();
+    resolveTicket?.(`${"a".repeat(24)}.${"b".repeat(43)}`);
+    await Promise.resolve();
+    expect(socket.sent).toEqual([]);
+  });
+
+  it("treats account replacement as intentional", () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onStatus: (status) => statuses.push(status),
+    });
+    client.connect({ roomCode: "ABCDEFGH", guestId: "guest-id-a" });
+    const socket = FakeWebSocket.latest();
+    socket.open();
+    socket.close(4001, "replaced");
+    vi.advanceTimersByTime(30_000);
+    expect(statuses.at(-1)).toBe("replaced");
+    expect(FakeWebSocket.sockets).toHaveLength(1);
+  });
+
+  it("retries a missing reconnect seat once with a join ticket", async () => {
+    vi.useFakeTimers();
+    const requestTicket = vi
+      .fn()
+      .mockResolvedValue(`${"a".repeat(24)}.${"b".repeat(43)}`);
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+    });
+    client.connect({
+      roomCode: "ABCDEFGH",
+      guestId: "guest-id-a",
+      requestTicket,
+    });
+    const first = FakeWebSocket.latest();
+    first.open();
+    await vi.runAllTicks();
+    first.close();
+    vi.advanceTimersByTime(1_000);
+    const reconnect = FakeWebSocket.latest();
+    reconnect.open();
+    await vi.runAllTicks();
+    reconnect.message({
+      v: protocolVersion,
+      type: "error",
+      code: "identityScope",
+      message: "No seat",
+    });
+    await vi.runAllTicks();
+    expect(requestTicket.mock.calls.map((call) => call[0])).toEqual([
+      "join",
+      "reconnect",
+      "join",
+    ]);
+    expect(reconnect.sent).toHaveLength(2);
+  });
+
   it("maps create-room failure codes", async () => {
     const fetchFn = vi.fn(async () =>
       Response.json(
@@ -321,9 +482,9 @@ class FakeWebSocket extends EventTarget {
     this.sent.push(data);
   }
 
-  close(): void {
+  close(code = 1000, reason = ""): void {
     this.readyState = FakeWebSocket.CLOSED;
-    this.dispatchEvent(new Event("close"));
+    this.dispatchEvent(new CloseEvent("close", { code, reason }));
   }
 
   open(): void {

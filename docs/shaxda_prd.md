@@ -48,7 +48,7 @@ The product should feel like a modern Somali wooden board game: warm wood, carve
 | Logged-in games           | No, V1.1                                                                 |
 | Accounts                  | No, V1.1                                                                 |
 | Google login              | No, V1.1                                                                 |
-| Username system           | Guest display name only in V1.0; permanent usernames in V1.1             |
+| Username system           | Guest display name only in V1.0; account-owned usernames in V1.1         |
 | Match history             | No, V1.1                                                                 |
 | Leaderboard               | No, V1.1                                                                 |
 | Replay viewer             | No, V1.1                                                                 |

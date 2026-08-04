@@ -40,7 +40,7 @@ V1.0 does **not** include:
 - app-store wrapper.
 
 V1.0 has launched. **V1.1-A — Accounts and Identity is now active** and may add
-Better Auth, Google login, permanent usernames, and public profiles. Logged-in
+Better Auth, Google login, account-owned usernames, and public profiles. Logged-in
 game identity, match history, replay, leaderboard, and full English/i18n remain
 out of scope until their later V1.1 milestones are deliberately activated.
 

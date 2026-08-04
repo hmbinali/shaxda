@@ -103,7 +103,7 @@ test.describe("C1 public content", () => {
     ).toHaveAttribute("href", "/online");
   });
 
-  test("the global top bar persists while account navigation changes routes", async ({
+  test("the global top bar persists while panel navigation changes routes", async ({
     page,
   }) => {
     await page.goto("/");
@@ -112,10 +112,10 @@ test.describe("C1 public content", () => {
       element.setAttribute("data-persistence-check", "present");
     });
 
-    await page.getByRole("button", { name: "Fur liiska akoonka" }).click();
+    await page.getByRole("button", { name: "Fur ficillo kale" }).click();
     await page
-      .getByRole("menu", { name: "Liiska akoonka" })
-      .getByRole("menuitem", { name: "Baro xeerarka" })
+      .getByRole("dialog", { name: "Ficillo kale" })
+      .getByRole("link", { name: "Baro xeerarka" })
       .click();
 
     await expect(page).toHaveURL(/\/learn$/);
@@ -124,11 +124,11 @@ test.describe("C1 public content", () => {
     ).toBeVisible();
     await expect(topBar).toHaveAttribute("data-persistence-check", "present");
     await expect(
-      topBar.getByRole("button", { name: "Fur liiska akoonka" }),
+      topBar.getByRole("button", { name: "Fur ficillo kale" }),
     ).toHaveCount(0);
   });
 
-  test("desktop uses the compact account panel without taking layout width", async ({
+  test("desktop uses the compact navigation panel without taking layout width", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -143,11 +143,11 @@ test.describe("C1 public content", () => {
     await expect(page.getByRole("button", { name: "Fur hagaha" })).toHaveCount(
       0,
     );
-    const accountButton = page.getByRole("button", {
-      name: "Fur liiska akoonka",
+    const menuButton = page.getByRole("button", {
+      name: "Fur ficillo kale",
     });
-    await accountButton.click();
-    const panel = page.getByRole("menu", { name: "Liiska akoonka" });
+    await menuButton.click();
+    const panel = page.getByRole("dialog", { name: "Ficillo kale" });
     await expect(panel).toBeVisible();
     await expect(main).toHaveCSS("overflow-y", "auto");
     const mainWidthWithPanel = await main.evaluate(
@@ -155,22 +155,16 @@ test.describe("C1 public content", () => {
     );
     expect(mainWidthWithPanel).toBe(mainWidthBefore);
 
-    for (const name of [
-      "Gal",
-      "Isdiiwaangeli",
-      "Baro xeerarka",
-      "Caawin",
-      "Sharciga",
-    ]) {
+    for (const name of ["Baro xeerarka", "Sharciga"]) {
       await expect(
-        panel.getByRole("menuitem", { name, exact: true }),
+        panel.getByRole("link", { name, exact: true }),
       ).toBeVisible();
     }
 
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
     await expect(main).toHaveCSS("overflow-y", "auto");
-    await expect(accountButton).toBeFocused();
+    await expect(menuButton).toBeFocused();
   });
 
   test("offers a keyboard skip link to the main content", async ({ page }) => {

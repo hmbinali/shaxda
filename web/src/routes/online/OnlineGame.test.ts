@@ -161,7 +161,7 @@ describe("/online", () => {
       }),
     );
     await fireEvent.click(
-      screen.getByRole("menuitem", {
+      screen.getByRole("button", {
         name: messages.so.localGame.controls.leaveRoom,
       }),
     );
@@ -209,7 +209,7 @@ describe("/online", () => {
       }),
     );
     await fireEvent.click(
-      screen.getByRole("menuitem", {
+      screen.getByRole("button", {
         name: messages.so.localGame.controls.leaveRoom,
       }),
     );
@@ -474,12 +474,12 @@ describe("/online", () => {
       }),
     );
     expect(
-      screen.getByRole("menuitem", {
+      screen.getByRole("button", {
         name: messages.so.localGame.controls.resign,
       }),
     ).toBeVisible();
     expect(
-      screen.getByRole("menuitem", {
+      screen.getByRole("button", {
         name: messages.so.localGame.controls.leaveRoom,
       }),
     ).toBeVisible();

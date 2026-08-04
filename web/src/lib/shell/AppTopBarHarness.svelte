@@ -2,19 +2,20 @@
   import AppTopBar from "$lib/components/AppTopBar.svelte";
   import {
     createAppShell,
-    registerTopBarActions,
+    registerTopBar,
     setAppShell,
-    type TopBarAction,
+    type TopBarConfig,
   } from "./appShell.svelte";
 
   interface Props {
-    actions: TopBarAction[];
+    config: TopBarConfig;
+    pathname?: string;
   }
 
-  let { actions }: Props = $props();
+  let { config, pathname = "/test" }: Props = $props();
 
   setAppShell(createAppShell());
-  registerTopBarActions(() => actions);
+  registerTopBar(() => config);
 </script>
 
-<AppTopBar />
+<AppTopBar {pathname} />

@@ -3,13 +3,15 @@
     Clipboard,
     Flag,
     LogOut,
+    Menu,
     Plus,
+    RotateCcw,
     Volume2,
     VolumeX,
   } from "@lucide/svelte";
   import { goto, replaceState } from "$app/navigation";
   import { resolve } from "$app/paths";
-  import { messages } from "@shaxda/i18n";
+  import { messages, siteContent } from "@shaxda/i18n";
   import { onMount } from "svelte";
   import {
     getSoundPlayer,
@@ -32,7 +34,8 @@
   import { OnlineCreateRoomError } from "$lib/online/onlineGameClient";
   import { createOnlineGameController } from "$lib/online/onlineGame.svelte";
   import { createTransientToast } from "$lib/notices/toast.svelte";
-  import { registerTopBarActions } from "$lib/shell/appShell.svelte";
+  import { registerTopBar } from "$lib/shell/appShell.svelte";
+  import { pagesGroup } from "$lib/shell/topBarConfig";
 
   type TurnstileApi = {
     render: (
@@ -53,6 +56,7 @@
   const controller = createOnlineGameController();
   const soundPlayer = getSoundPlayer();
   const toast = createTransientToast();
+  const topBarCopy = siteContent.so.topBar;
 
   let guestId = $state("");
   let displayName = $state("");
@@ -61,7 +65,7 @@
   let busy = $state(false);
   let copied = $state(false);
   let soundEnabled = $state(true);
-  let pendingConfirm = $state<"resign" | "leave" | null>(null);
+  let pendingConfirm = $state<"resign" | "leave" | "home" | null>(null);
   let pageBackground = $state<HTMLElement | null>(null);
   let nameInput = $state<HTMLInputElement | null>(null);
   let lastFeedbackNonce = 0;
@@ -85,38 +89,80 @@
   const hasInviteCode = $derived(roomCodeInput.trim().length > 0);
   const lobbyNotice = $derived(resolveLobbyNotice());
 
-  registerTopBarActions(() => {
+  registerTopBar(() => {
     const liveGame =
       controller.started &&
       controller.mySlot !== null &&
       status.phase !== "gameOver";
+    const gameVisible = controller.started && controller.mySlot !== null;
+    const inRoom = controller.roomCode !== null;
 
-    return [
-      {
-        id: "sound",
-        label: soundEnabled
-          ? gameCopy.controls.soundOff
-          : gameCopy.controls.soundOn,
-        icon: soundEnabled ? Volume2 : VolumeX,
-        onSelect: toggleSound,
-        pressed: soundEnabled,
-      },
-      {
-        id: "resign-or-exit",
-        label: liveGame ? gameCopy.controls.resign : gameCopy.controls.exit,
-        icon: liveGame ? Flag : LogOut,
-        onSelect: () => {
-          if (liveGame) {
-            pendingConfirm = "resign";
-          } else if (controller.roomCode === null) {
-            void goto(resolve("/"));
-          } else {
-            pendingConfirm = "leave";
-          }
-        },
-        tone: liveGame ? "danger" : "default",
-      },
-    ];
+    return {
+      actions: !inRoom
+        ? []
+        : [
+            ...(gameVisible
+              ? [
+                  {
+                    id: "sound",
+                    label: soundEnabled
+                      ? gameCopy.controls.soundOff
+                      : gameCopy.controls.soundOn,
+                    shortLabel: gameCopy.controls.soundShort,
+                    icon: soundEnabled ? Volume2 : VolumeX,
+                    onSelect: toggleSound,
+                    pressed: soundEnabled,
+                  },
+                  {
+                    id: "new-game",
+                    label: gameCopy.controls.newGame,
+                    shortLabel: gameCopy.controls.newGame,
+                    icon: RotateCcw,
+                    disabled: true,
+                  },
+                ]
+              : []),
+            {
+              id: "menu",
+              label: topBarCopy.menuLabel,
+              shortLabel: topBarCopy.menuShort,
+              icon: Menu,
+              panel: "menu" as const,
+            },
+          ],
+      panels: inRoom
+        ? [
+            pagesGroup(),
+            {
+              id: "game",
+              label: topBarCopy.groupGame,
+              items: [
+                ...(liveGame
+                  ? [
+                      {
+                        id: "resign",
+                        label: gameCopy.controls.resign,
+                        icon: Flag,
+                        onSelect: () => (pendingConfirm = "resign"),
+                        danger: true,
+                      },
+                    ]
+                  : []),
+                {
+                  id: "leave",
+                  label: gameCopy.controls.leaveRoom,
+                  icon: LogOut,
+                  onSelect: () => (pendingConfirm = "leave"),
+                },
+              ],
+            },
+          ]
+        : [],
+      brandGuard:
+        inRoom && status.phase !== "gameOver"
+          ? () => (pendingConfirm = "home")
+          : null,
+    };
   });
 
   onMount(() => {
@@ -310,6 +356,9 @@
       controller.resign();
     } else if (action === "leave") {
       leaveRoom();
+    } else if (action === "home") {
+      leaveRoom();
+      void goto(resolve("/"));
     }
   }
 
@@ -621,10 +670,14 @@
   open={pendingConfirm !== null}
   title={pendingConfirm === "resign"
     ? gameCopy.controls.resign
-    : gameCopy.controls.exit}
+    : pendingConfirm === "leave"
+      ? gameCopy.controls.leaveRoom
+      : gameCopy.controls.exitGame}
   body={pendingConfirm === "resign"
     ? gameCopy.prompts.resign
-    : gameCopy.prompts.leave}
+    : pendingConfirm === "home"
+      ? gameCopy.prompts.home
+      : gameCopy.prompts.leave}
   cancelLabel={gameCopy.tabletop.cancel}
   confirmLabel={gameCopy.tabletop.confirm}
   background={pageBackground}

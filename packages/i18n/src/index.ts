@@ -101,8 +101,11 @@ export const messages = {
         newGame: "Ciyaar cusub",
         resign: "Is dhiib",
         exit: "Ka bax",
+        exitGame: "Ka bax ciyaarta",
+        leaveRoom: "Ka bax qolka",
         soundOn: "Codka shid",
         soundOff: "Codka dami",
+        soundShort: "Cod",
       },
       tabletop: {
         states: {
@@ -132,6 +135,7 @@ export const messages = {
         newGame: "Ciyaar cusub ma bilaabaysaa?",
         resign: "Ma hubtaa inaad is dhiibayso?",
         leave: "Ma hubtaa inaad ciyaarta ka baxayso?",
+        home: "Ma hubtaa inaad ciyaarta ka baxayso oo aad hoyga aadayso?",
       },
       invalid: {
         gameOver: "Ciyaartu way dhammaatay.",
@@ -300,16 +304,29 @@ export const siteContent = {
     nav: {
       home: "Hoy",
       learn: "Baro",
+      learnRules: "Baro xeerarka",
+      help: "Caawin",
       legal: "Sharciga",
+      login: "Gal",
+      register: "Isdiiwaangeli",
+      profile: "Boggaaga",
+      logout: "Ka bax akoonka",
       localPlay: "Ciyaar qalabkan",
       onlinePlay: "Ciyaar marti ah",
     },
-    sidebar: {
-      // TODO(translation-review): Confirm this navigation landmark label before release.
-      navigationLabel: "Hagaha bogga",
+    topBar: {
+      brandLabel: "Tag hoyga Shaxda",
+      actionsLabel: "Ficillada bogga",
+      menuLabel: "Fur ficillo kale",
+      menuShort: "Kale",
+      accountLabel: "Fur liiska akoonka",
+      accountShort: "Akoon",
+      accountPanelLabel: "Liiska akoonka",
+      menuPanelLabel: "Ficillo kale",
+      groupPages: "Bogagga",
+      groupGame: "Ciyaarta",
+      groupAccount: "Akoonka",
       skipToContent: "U bood nuxurka",
-      openMenu: "Fur hagaha",
-      closeMenu: "Xir hagaha",
     },
     footer: {
       tagline: "Shaxda Soomaali keliya, si fudud loogu barto loona ciyaaro.",

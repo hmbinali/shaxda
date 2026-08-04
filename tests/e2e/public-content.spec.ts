@@ -103,43 +103,36 @@ test.describe("C1 public content", () => {
     ).toHaveAttribute("href", "/online");
   });
 
-  test("the global top bar persists while drawer navigation changes routes", async ({
+  test("the global top bar persists while account navigation changes routes", async ({
     page,
   }) => {
-    await page.goto("/learn");
+    await page.goto("/");
     const topBar = page.getByTestId("app-top-bar");
     await topBar.evaluate((element) => {
       element.setAttribute("data-persistence-check", "present");
     });
 
-    await page.getByRole("button", { name: "Fur hagaha" }).click();
-    const navigation = page.getByRole("navigation", { name: "Hagaha bogga" });
+    await page.getByRole("button", { name: "Fur liiska akoonka" }).click();
+    await page
+      .getByRole("menu", { name: "Liiska akoonka" })
+      .getByRole("menuitem", { name: "Baro xeerarka" })
+      .click();
 
+    await expect(page).toHaveURL(/\/learn$/);
     await expect(
-      navigation.getByRole("link", { name: "Baro" }),
-    ).toHaveAttribute("aria-current", "page");
-
-    await navigation.getByRole("link", { name: "Ciyaar qalabkan" }).click();
-
-    await expect(page).toHaveURL(/\/local$/);
-    await expect(
-      page.getByRole("heading", { name: "Ciyaar qalabkan", exact: true }),
+      page.getByRole("heading", { name: "Baro shaxda", exact: true }),
     ).toBeVisible();
     await expect(topBar).toHaveAttribute("data-persistence-check", "present");
-
-    await page.getByRole("button", { name: "Fur hagaha" }).click();
     await expect(
-      page
-        .getByRole("navigation", { name: "Hagaha bogga" })
-        .getByRole("link", { name: "Ciyaar qalabkan" }),
-    ).toHaveAttribute("aria-current", "page");
+      topBar.getByRole("button", { name: "Fur liiska akoonka" }),
+    ).toHaveCount(0);
   });
 
-  test("desktop uses the same overlay drawer without taking layout width", async ({
+  test("desktop uses the compact account panel without taking layout width", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/learn");
+    await page.goto("/");
 
     const main = page.locator("#main-content");
     const mainWidthBefore = await main.evaluate(
@@ -147,33 +140,37 @@ test.describe("C1 public content", () => {
     );
 
     expect(await page.getByTestId("desktop-sidebar").count()).toBe(0);
-    await page.getByRole("button", { name: "Fur hagaha" }).click();
-    const drawer = page.getByRole("dialog", { name: "Hagaha bogga" });
-    await expect(drawer).toBeVisible();
-    await expect(main).toHaveCSS("overflow-y", "hidden");
-    const mainWidthWithDrawer = await main.evaluate(
+    await expect(page.getByRole("button", { name: "Fur hagaha" })).toHaveCount(
+      0,
+    );
+    const accountButton = page.getByRole("button", {
+      name: "Fur liiska akoonka",
+    });
+    await accountButton.click();
+    const panel = page.getByRole("menu", { name: "Liiska akoonka" });
+    await expect(panel).toBeVisible();
+    await expect(main).toHaveCSS("overflow-y", "auto");
+    const mainWidthWithPanel = await main.evaluate(
       (element) => element.getBoundingClientRect().width,
     );
-    expect(mainWidthWithDrawer).toBe(mainWidthBefore);
+    expect(mainWidthWithPanel).toBe(mainWidthBefore);
 
     for (const name of [
-      "Hoy",
-      "Ciyaar qalabkan",
-      "Ciyaar marti ah",
-      "Baro",
+      "Gal",
+      "Isdiiwaangeli",
+      "Baro xeerarka",
+      "Caawin",
       "Sharciga",
     ]) {
       await expect(
-        drawer.getByRole("link", { name, exact: true }),
+        panel.getByRole("menuitem", { name, exact: true }),
       ).toBeVisible();
     }
 
     await page.keyboard.press("Escape");
-    await expect(drawer).toBeHidden();
+    await expect(panel).toBeHidden();
     await expect(main).toHaveCSS("overflow-y", "auto");
-    await expect(
-      page.getByRole("button", { name: "Fur hagaha" }),
-    ).toBeFocused();
+    await expect(accountButton).toBeFocused();
   });
 
   test("offers a keyboard skip link to the main content", async ({ page }) => {

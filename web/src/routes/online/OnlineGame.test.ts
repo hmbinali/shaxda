@@ -1,4 +1,4 @@
-import { messages } from "@shaxda/i18n";
+import { messages, siteContent } from "@shaxda/i18n";
 import { gameFixtures, protocolVersion } from "@shaxda/shared";
 import {
   fireEvent,
@@ -23,6 +23,7 @@ vi.mock("$app/navigation", () => ({
 import OnlineGamePage from "./+page.svelte";
 
 const copy = messages.so.onlineGame;
+const topBarCopy = siteContent.so.topBar;
 
 describe("/online", () => {
   beforeEach(() => {
@@ -65,8 +66,8 @@ describe("/online", () => {
       screen.queryByText(messages.so.localGame.phaseLabel),
     ).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("app-top-bar")).getAllByRole("button"),
-    ).toHaveLength(3);
+      within(screen.getByTestId("app-top-bar")).queryAllByRole("button"),
+    ).toHaveLength(0);
   });
 
   it("joins on Enter when an invite code is present", async () => {
@@ -154,15 +155,14 @@ describe("/online", () => {
       (screen.getByTestId("share-link") as HTMLInputElement).value,
     ).toContain("/online?room=ABCDEFGH");
     expect(FakeWebSocket.latest().url).toContain("/rooms/ABCDEFGH/ws");
-    expect(
-      within(screen.getByTestId("app-top-bar")).getByRole("button", {
-        name: messages.so.localGame.controls.exit,
-      }),
-    ).toBeVisible();
-
     await fireEvent.click(
       within(screen.getByTestId("app-top-bar")).getByRole("button", {
-        name: messages.so.localGame.controls.exit,
+        name: topBarCopy.menuLabel,
+      }),
+    );
+    await fireEvent.click(
+      screen.getByRole("menuitem", {
+        name: messages.so.localGame.controls.leaveRoom,
       }),
     );
     await fireEvent.click(
@@ -205,7 +205,12 @@ describe("/online", () => {
 
     await fireEvent.click(
       within(screen.getByTestId("app-top-bar")).getByRole("button", {
-        name: messages.so.localGame.controls.exit,
+        name: topBarCopy.menuLabel,
+      }),
+    );
+    await fireEvent.click(
+      screen.getByRole("menuitem", {
+        name: messages.so.localGame.controls.leaveRoom,
       }),
     );
     await fireEvent.click(
@@ -397,7 +402,7 @@ describe("/online", () => {
     );
     expect(
       within(screen.getByTestId("app-top-bar")).getByRole("button", {
-        name: messages.so.localGame.controls.exit,
+        name: topBarCopy.menuLabel,
       }),
     ).toBeVisible();
     expect(screen.getByTestId("app-top-bar")).toHaveProperty("inert", true);
@@ -463,16 +468,21 @@ describe("/online", () => {
     expect(await screen.findByTestId("online-feedback")).toHaveTextContent(
       copy.invalid.notYourTurn,
     );
-    expect(
+    await fireEvent.click(
       within(screen.getByTestId("app-top-bar")).getByRole("button", {
+        name: topBarCopy.menuLabel,
+      }),
+    );
+    expect(
+      screen.getByRole("menuitem", {
         name: messages.so.localGame.controls.resign,
       }),
     ).toBeVisible();
     expect(
-      within(screen.getByTestId("app-top-bar")).queryByRole("button", {
-        name: messages.so.localGame.controls.exit,
+      screen.getByRole("menuitem", {
+        name: messages.so.localGame.controls.leaveRoom,
       }),
-    ).not.toBeInTheDocument();
+    ).toBeVisible();
   });
 
   it("places connection notices with their owner and keeps claim-win actionable at centre", async () => {
@@ -555,7 +565,10 @@ describe("/online", () => {
 });
 
 function renderOnlineGame() {
-  return render(AppShellHarness, { component: OnlineGamePage });
+  return render(AppShellHarness, {
+    component: OnlineGamePage,
+    pathname: "/online",
+  });
 }
 
 class FakeWebSocket extends EventTarget {

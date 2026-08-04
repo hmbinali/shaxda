@@ -151,7 +151,7 @@
       class="drawer-panel relative z-10 flex h-full w-[19rem] max-w-[86vw] flex-col overflow-y-auto overscroll-contain rounded-r-2xl border-r border-board-700/15 bg-board-50 shadow-2xl outline-none"
       role="dialog"
       aria-modal="true"
-      aria-label="Hagaha bogga"
+      aria-label={sidebar.navigationLabel}
       tabindex="-1"
       onkeydown={handleKeydown}
       in:slidePanel={{
@@ -169,7 +169,7 @@
         <a
           href={resolve("/")}
           aria-label={messages.so.appName}
-          class="inline-flex min-w-0 items-center gap-2.5 rounded outline-none focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2"
+          class="inline-flex min-w-0 items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
           onclick={() => shell.close()}
         >
           <span
@@ -178,14 +178,14 @@
           >
             S
           </span>
-          <span class="truncate text-2xl font-semibold tracking-normal">
+          <span class="truncate text-2xl font-semibold">
             {messages.so.appName}
           </span>
         </a>
 
         <button
           type="button"
-          class="ml-auto inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-board-700 outline-none transition-colors hover:bg-board-100/65 hover:text-board-900 focus-visible:ring-2 focus-visible:ring-red-800 motion-reduce:transition-none"
+          class="ml-auto inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-board-700 outline-none transition-colors hover:bg-board-100/65 hover:text-board-900 focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none"
           aria-label={sidebar.closeMenu}
           onclick={() => shell.close()}
         >
@@ -193,18 +193,19 @@
         </button>
       </div>
 
-      <nav class="px-3 py-5" aria-label="Hagaha bogga">
+      <nav class="px-3 py-5" aria-label={sidebar.navigationLabel}>
         <ul class="grid gap-1">
           {#each navItems as item (item.href)}
             <li>
               <a
                 href={resolve(item.href)}
                 aria-label={item.label}
-                aria-current={page.url.pathname === item.href
+                aria-current={page.url.pathname === resolve(item.href)
                   ? "page"
                   : undefined}
-                class:active-navigation={page.url.pathname === item.href}
-                class="flex min-h-12 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-board-700 outline-none transition-colors hover:bg-board-100/65 hover:text-board-900 focus-visible:ring-2 focus-visible:ring-red-800"
+                class:active-navigation={page.url.pathname ===
+                  resolve(item.href)}
+                class="flex min-h-12 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-board-700 outline-none transition-colors hover:bg-board-100/65 hover:text-board-900 focus-visible:ring-2 focus-visible:ring-focus"
                 onclick={() => shell.close()}
               >
                 <item.icon class="shrink-0" size={19} aria-hidden="true" />
@@ -220,11 +221,11 @@
           {#each footerItems as item (item.href)}
             <a
               aria-label={item.label}
-              aria-current={page.url.pathname === item.href
+              aria-current={page.url.pathname === resolve(item.href)
                 ? "page"
                 : undefined}
-              class:active-navigation={page.url.pathname === item.href}
-              class="inline-flex min-h-11 items-center gap-2 rounded text-board-700 outline-none hover:text-board-900 focus-visible:ring-2 focus-visible:ring-red-800"
+              class:active-navigation={page.url.pathname === resolve(item.href)}
+              class="inline-flex min-h-11 items-center gap-2 rounded-lg text-board-700 outline-none hover:text-board-900 focus-visible:ring-2 focus-visible:ring-focus"
               href={resolve(item.href)}
               onclick={() => shell.close()}
             >

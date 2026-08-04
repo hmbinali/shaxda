@@ -2,6 +2,7 @@
   import { resolve } from "$app/paths";
   import { siteContent } from "@shaxda/i18n";
   import PageMeta from "$components/PageMeta.svelte";
+  import ButtonLink from "$components/ui/ButtonLink.svelte";
 
   const page = siteContent.so.pages.home;
 </script>
@@ -10,10 +11,10 @@
 
 <section class="grid min-h-full place-items-center px-4 py-12 sm:px-6 lg:px-8">
   <div class="w-full max-w-2xl text-center">
-    <p class="text-sm font-semibold uppercase tracking-normal text-red-800">
+    <p class="text-sm font-semibold uppercase text-red-800">
       {page.heroEyebrow}
     </p>
-    <h1 class="text-5xl font-semibold tracking-normal sm:text-7xl">
+    <h1 class="text-5xl font-semibold sm:text-7xl">
       {page.heroTitle}
     </h1>
     <p class="mx-auto mt-5 max-w-xl text-lg leading-8 text-board-700">
@@ -21,18 +22,12 @@
     </p>
 
     <div class="mx-auto mt-9 grid max-w-md gap-3 sm:grid-cols-2">
-      <a
-        class="rounded-lg bg-board-900 px-5 py-3.5 text-sm font-semibold text-board-50 outline-none hover:bg-board-700 focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2"
-        href={resolve("/local")}
-      >
+      <ButtonLink variant="primary" class="py-3.5" href={resolve("/local")}>
         {page.primaryCta}
-      </a>
-      <a
-        class="rounded-lg border border-board-700/35 bg-white/45 px-5 py-3.5 text-sm font-semibold text-board-900 outline-none hover:bg-board-100/50 focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2"
-        href={resolve("/online")}
-      >
+      </ButtonLink>
+      <ButtonLink class="py-3.5" href={resolve("/online")}>
         {page.secondaryCta}
-      </a>
+      </ButtonLink>
     </div>
   </div>
 </section>

@@ -1,4 +1,6 @@
+import { render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import PwaNoticesHarness from "./PwaNoticesHarness.svelte";
 import { PWA_INSTALL_DISMISSED_STORAGE_KEY } from "./preferences";
 import { createPwaController } from "./pwa.svelte";
 
@@ -21,6 +23,7 @@ describe("PwaController", () => {
       Object.defineProperty(window, "matchMedia", originalMatchMedia);
     }
     window.localStorage.clear();
+    vi.useRealTimers();
   });
 
   it("does not touch browser globals before browser start", () => {
@@ -61,6 +64,23 @@ describe("PwaController", () => {
     expect(controller.status.needRefresh).toBe(true);
     await expect(controller.update()).resolves.toBeUndefined();
     expect(updateServiceWorker).toHaveBeenCalledTimes(1);
+
+    controller.setNeedRefresh(false);
+    controller.setOfflineReady(false);
+    expect(controller.status.needRefresh).toBe(false);
+    expect(controller.status.offlineReady).toBe(false);
+  });
+
+  it("automatically dismisses the one-time offline-ready notice", async () => {
+    vi.useFakeTimers();
+    render(PwaNoticesHarness);
+    expect(screen.getByTestId("pwa-offline-ready-notice")).toBeVisible();
+
+    await vi.advanceTimersByTimeAsync(8_000);
+
+    expect(
+      screen.queryByTestId("pwa-offline-ready-notice"),
+    ).not.toBeInTheDocument();
   });
 
   it("tracks install prompt availability and dismissal", async () => {

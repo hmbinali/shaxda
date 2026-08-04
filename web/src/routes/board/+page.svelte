@@ -37,10 +37,10 @@
       class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
     >
       <div>
-        <p class="text-sm font-medium uppercase tracking-normal text-board-700">
+        <p class="text-sm font-medium uppercase text-board-700">
           {messages.so.appName}
         </p>
-        <h1 class="mt-1 text-3xl font-semibold tracking-normal sm:text-5xl">
+        <h1 class="mt-1 text-3xl font-semibold sm:text-5xl">
           {copy.title}
         </h1>
       </div>
@@ -48,7 +48,7 @@
     </div>
 
     <div
-      class="mb-6 flex flex-wrap gap-3 rounded border border-board-700/20 bg-white/40 p-3 text-sm text-board-700"
+      class="mb-6 flex flex-wrap gap-3 rounded-lg border border-board-700/20 bg-white/60 p-3 text-sm text-board-700"
       aria-label="Astaamaha looxa"
     >
       <span class="inline-flex items-center gap-2">
@@ -72,11 +72,11 @@
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each fixtureEntries as [key, state] (key)}
         <article
-          class="rounded border border-board-700/20 bg-white/55 p-4 shadow-sm"
+          class="rounded-lg border border-board-700/20 bg-white/60 p-4 shadow-sm"
           data-fixture={key}
         >
           <div class="mb-3 min-h-20">
-            <h2 class="text-xl font-semibold tracking-normal">
+            <h2 class="text-xl font-semibold">
               {copy.fixtureLabels[key]}
             </h2>
             <p class="mt-1 text-sm leading-6 text-board-700">

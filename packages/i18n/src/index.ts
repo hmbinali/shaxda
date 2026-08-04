@@ -223,6 +223,8 @@ export const messages = {
         },
       },
       invalid: {
+        // TODO(translation-review): Confirm this turn-feedback wording before release.
+        notYourTurn: "Wareeggaaga ma aha.",
         gameOver: "Ciyaartu way dhammaatay.",
         illegalPoint: "Bartaas hadda lama ciyaari karo.",
         selectMovablePiece: "Dooro dhagax dhaqaaqi kara.",
@@ -230,6 +232,8 @@ export const messages = {
         actionRejected: "Tallaabada lama aqbalin.",
       },
       errors: {
+        // TODO(translation-review): Confirm this guest-name validation copy before release.
+        nameRequired: "Fadlan geli magaca martida.",
         invalidMessage: "Fariinta qolka lama fahmin.",
         roomNotFound: "Qolka lama helin.",
         roomMismatch: "Koodhka qolka lama jaanqaadayo.",
@@ -259,6 +263,8 @@ export const messages = {
       form: {
         namePlaceholder: "Magacaaga",
         codePlaceholder: "ABCD1234",
+        // TODO(translation-review): Confirm this short busy label before release.
+        busy: "Fadlan sug...",
       },
     },
     pwa: {
@@ -299,6 +305,8 @@ export const siteContent = {
       onlinePlay: "Ciyaar marti ah",
     },
     sidebar: {
+      // TODO(translation-review): Confirm this navigation landmark label before release.
+      navigationLabel: "Hagaha bogga",
       skipToContent: "U bood nuxurka",
       openMenu: "Fur hagaha",
       closeMenu: "Xir hagaha",

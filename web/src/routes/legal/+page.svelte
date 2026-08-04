@@ -12,7 +12,7 @@
     <p class="text-sm font-bold uppercase tracking-wider text-red-800">
       {page.hero.eyebrow}
     </p>
-    <h1 class="mt-3 text-3xl font-semibold tracking-normal sm:text-4xl">
+    <h1 class="mt-3 text-3xl font-semibold sm:text-4xl">
       {page.hero.heading}
     </h1>
     <p class="mt-4 text-base leading-8 text-board-700">
@@ -33,7 +33,7 @@
         data-legal-section={section.id}
         class="doc-section border-b border-board-700/15 py-8 last:border-b-0 sm:py-10"
       >
-        <h2 class="text-xl font-semibold tracking-normal text-board-900">
+        <h2 class="text-xl font-semibold text-board-900">
           {section.heading}
         </h2>
 

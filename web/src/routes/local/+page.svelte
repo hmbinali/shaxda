@@ -10,7 +10,7 @@
   import { messages } from "@shaxda/i18n";
   import { onMount } from "svelte";
   import {
-    SoundPlayer,
+    getSoundPlayer,
     loadSoundPreference,
     saveSoundPreference,
   } from "$lib/audio/sound";
@@ -34,12 +34,15 @@
   const orientation = { orientation: "shared" } as const;
   const seating = resolveSeating(orientation);
   const controller = createLocalGameController();
-  const soundPlayer = new SoundPlayer();
+  const soundPlayer = getSoundPlayer();
 
   let soundEnabled = $state(true);
   let lastFeedbackNonce = 0;
   let pendingConfirm = $state<"newGame" | "resign" | "exit" | null>(null);
   let tabletopBackground = $state<HTMLElement | null>(null);
+  let topRailElement = $state<HTMLElement | null>(null);
+  let bottomRailElement = $state<HTMLElement | null>(null);
+  let topBar = $state<HTMLElement | null>(null);
   const status = $derived(controller.status);
   const resignOwner = $derived(findResignOwner(controller.state));
   const invalidMessage = $derived(
@@ -79,6 +82,8 @@
 
   onMount(() => {
     soundEnabled = loadSoundPreference();
+    void soundPlayer.preload();
+    topBar = document.querySelector<HTMLElement>('[data-testid="app-top-bar"]');
   });
 
   $effect(() => {
@@ -154,6 +159,7 @@
   >
     {#snippet topRail()}
       <PlayerRail
+        bind:element={topRailElement}
         player={seating.top}
         {status}
         name={playerName(seating.top)}
@@ -193,6 +199,7 @@
             testId="game-result"
             onNewGame={() => controller.startNewGame()}
             onExit={() => void goto(resolve("/"))}
+            inertTargets={[topBar, topRailElement, bottomRailElement]}
           />
         {/if}
       </div>
@@ -200,6 +207,7 @@
 
     {#snippet bottomRail()}
       <PlayerRail
+        bind:element={bottomRailElement}
         player={seating.bottom}
         {status}
         name={playerName(seating.bottom)}

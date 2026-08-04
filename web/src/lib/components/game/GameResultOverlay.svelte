@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
-  import { onMount, tick } from "svelte";
+  import { modal } from "$lib/a11y/modal";
   import type { GameStatus } from "$lib/game/status";
   import Button from "$components/ui/Button.svelte";
 
@@ -13,6 +13,7 @@
     onNewGame?: () => void;
     onExit?: () => void;
     onLeave?: () => void;
+    inertTargets?: readonly (HTMLElement | null | undefined)[];
   }
 
   let {
@@ -23,30 +24,25 @@
     onNewGame,
     onExit,
     onLeave,
+    inertTargets = [],
   }: Props = $props();
 
   const copy = messages.so.localGame;
   const onlineCopy = messages.so.onlineGame;
   const titleId = $derived(`${testId}-title`);
   const reasonId = $derived(`${testId}-reason`);
-  let overlay: HTMLElement | null = null;
-
-  onMount(() => {
-    void tick().then(() => {
-      overlay
-        ?.querySelector<HTMLButtonElement>("[data-result-primary]")
-        ?.focus();
-    });
-  });
+  let primaryAction = $state<HTMLButtonElement | null>(null);
 </script>
 
 <div
-  bind:this={overlay}
   class="overlay"
   data-testid={testId}
   role="dialog"
+  tabindex="-1"
+  aria-modal="true"
   aria-labelledby={titleId}
   aria-describedby={reason === null ? undefined : reasonId}
+  use:modal={{ inertTargets, initialFocus: primaryAction, onEscape: null }}
 >
   <div class="result-panel" data-testid="game-result-panel">
     <div
@@ -73,7 +69,12 @@
 
     <div class="actions" class:single={!onNewGame || !onExit}>
       {#if onNewGame}
-        <Button variant="primary" onclick={onNewGame} data-result-primary>
+        <Button
+          bind:element={primaryAction}
+          variant="primary"
+          onclick={onNewGame}
+          data-result-primary
+        >
           {copy.controls.newGame}
         </Button>
         {#if onExit}
@@ -82,7 +83,12 @@
           </Button>
         {/if}
       {:else if onLeave}
-        <Button variant="primary" onclick={onLeave} data-result-primary>
+        <Button
+          bind:element={primaryAction}
+          variant="primary"
+          onclick={onLeave}
+          data-result-primary
+        >
           {onlineCopy.leave}
         </Button>
       {/if}

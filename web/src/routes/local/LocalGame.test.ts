@@ -169,7 +169,10 @@ describe("/local", () => {
     );
     expect(screen.getAllByTestId("game-result-panel")).toHaveLength(1);
     expect(screen.getByTestId("game-result")).toHaveAttribute("role", "dialog");
-    expect(screen.getByTestId("game-result")).not.toHaveAttribute("aria-modal");
+    expect(screen.getByTestId("game-result")).toHaveAttribute(
+      "aria-modal",
+      "true",
+    );
     expect(
       within(screen.getByTestId("game-result")).getByRole("button", {
         name: copy.controls.newGame,

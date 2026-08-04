@@ -69,6 +69,10 @@ describe("AppNavDrawer", () => {
     expect(
       drawerQueries.getByRole("link", { name: nav.localPlay }),
     ).toHaveAttribute("aria-current", "page");
+    expect(
+      drawerQueries.getByRole("link", { name: nav.legal }),
+    ).toHaveAttribute("href", "/legal");
+    expect(drawer).toHaveTextContent(siteContent.so.footer.tagline);
 
     const focusable = Array.from(
       drawer.querySelectorAll<HTMLElement>(

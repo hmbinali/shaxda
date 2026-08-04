@@ -26,6 +26,7 @@ const copy = messages.so.onlineGame;
 
 describe("/online", () => {
   beforeEach(() => {
+    window.history.replaceState({}, "", "/online");
     window.localStorage.clear();
     vi.stubGlobal(
       "fetch",
@@ -45,6 +46,9 @@ describe("/online", () => {
     vi.restoreAllMocks();
     window.localStorage.clear();
     FakeWebSocket.sockets = [];
+    vi.unstubAllEnvs();
+    Reflect.deleteProperty(window, "turnstile");
+    window.history.replaceState({}, "", "/");
   });
 
   it("renders create and join controls", () => {
@@ -58,8 +62,76 @@ describe("/online", () => {
     );
     expect(screen.getByTestId("join-room")).toHaveTextContent(copy.joinRoom);
     expect(
+      screen.queryByText(messages.so.localGame.phaseLabel),
+    ).not.toBeInTheDocument();
+    expect(
       within(screen.getByTestId("app-top-bar")).getAllByRole("button"),
     ).toHaveLength(3);
+  });
+
+  it("joins on Enter when an invite code is present", async () => {
+    window.history.replaceState({}, "", "/online?room=ROOM1234");
+    renderOnlineGame();
+
+    const name = screen.getByLabelText(copy.nameLabel);
+    await fireEvent.input(name, { target: { value: "Ayaan" } });
+    await fireEvent.submit(name.closest("form")!);
+
+    await waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+    expect(FakeWebSocket.latest().url).toContain("/rooms/ROOM1234/ws");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("creates on Enter when the code is empty", async () => {
+    renderOnlineGame();
+    const name = screen.getByLabelText(copy.nameLabel);
+    await fireEvent.input(name, { target: { value: "Ayaan" } });
+    await fireEvent.submit(name.closest("form")!);
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(FakeWebSocket.latest().url).toContain("/rooms/ABCDEFGH/ws");
+  });
+
+  it("keeps Create and Join tied to their labels", async () => {
+    const first = renderOnlineGame();
+    await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
+      target: { value: "Ayaan" },
+    });
+    await fireEvent.input(screen.getByLabelText(copy.roomCodeLabel), {
+      target: { value: "ROOM1234" },
+    });
+    await fireEvent.click(screen.getByTestId("create-room"));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(FakeWebSocket.latest().url).toContain("/rooms/ABCDEFGH/ws");
+
+    first.unmount();
+    FakeWebSocket.sockets = [];
+    vi.mocked(fetch).mockClear();
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/online");
+    renderOnlineGame();
+    await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
+      target: { value: "Bilan" },
+    });
+    await fireEvent.input(screen.getByLabelText(copy.roomCodeLabel), {
+      target: { value: "ROOM5678" },
+    });
+    await fireEvent.click(screen.getByTestId("join-room"));
+
+    expect(FakeWebSocket.latest().url).toContain("/rooms/ROOM5678/ws");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("shows a useful empty-name error and focuses the field", async () => {
+    renderOnlineGame();
+
+    await fireEvent.click(screen.getByTestId("create-room"));
+
+    expect(screen.getByTestId("online-feedback")).toHaveTextContent(
+      copy.errors.nameRequired,
+    );
+    expect(screen.getByLabelText(copy.nameLabel)).toHaveFocus();
   });
 
   it("creates a room and shows the lobby", async () => {
@@ -75,7 +147,7 @@ describe("/online", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("online-lobby")).toHaveTextContent(
-        copy.waiting,
+        copy.connection.connecting,
       ),
     );
     expect(
@@ -105,6 +177,47 @@ describe("/online", () => {
     );
   });
 
+  it("removes and recreates Turnstile when the room form returns", async () => {
+    vi.stubEnv("PUBLIC_TURNSTILE_SITE_KEY", "test-site-key");
+    const renderWidget = vi.fn(
+      (_container: HTMLElement, options: { callback(token: string): void }) => {
+        options.callback(`token-${renderWidget.mock.calls.length}`);
+        return `widget-${renderWidget.mock.calls.length}`;
+      },
+    );
+    const removeWidget = vi.fn();
+    window.turnstile = {
+      render: renderWidget,
+      reset: vi.fn(),
+      remove: removeWidget,
+    };
+    renderOnlineGame();
+
+    await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
+      target: { value: "Ayaan" },
+    });
+    await waitFor(() => expect(renderWidget).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId("create-room")).toBeEnabled(),
+    );
+    await fireEvent.click(screen.getByTestId("create-room"));
+    await waitFor(() => expect(removeWidget).toHaveBeenCalledWith("widget-1"));
+
+    await fireEvent.click(
+      within(screen.getByTestId("app-top-bar")).getByRole("button", {
+        name: messages.so.localGame.controls.exit,
+      }),
+    );
+    await fireEvent.click(
+      screen.getByRole("button", {
+        name: messages.so.localGame.tabletop.confirm,
+      }),
+    );
+
+    await waitFor(() => expect(renderWidget).toHaveBeenCalledTimes(2));
+    expect(removeWidget).toHaveBeenCalledTimes(1);
+  });
+
   it("shows specific create-room errors", async () => {
     vi.stubGlobal(
       "fetch",
@@ -126,6 +239,82 @@ describe("/online", () => {
       expect(screen.getByTestId("online-feedback")).toHaveTextContent(
         copy.errors.rateLimited,
       ),
+    );
+
+    const firstNotice = screen.getByTestId("online-feedback");
+    await waitFor(() =>
+      expect(screen.getByTestId("create-room")).toBeEnabled(),
+    );
+    await fireEvent.click(screen.getByTestId("create-room"));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByTestId("online-feedback")).not.toBe(firstNotice),
+    );
+    expect(screen.getByTestId("online-feedback")).toHaveTextContent(
+      copy.errors.rateLimited,
+    );
+  });
+
+  it("re-announces identical in-game server errors and clears lobby errors when play starts", async () => {
+    renderOnlineGame();
+    await fireEvent.click(screen.getByTestId("create-room"));
+    expect(screen.getByTestId("online-feedback")).toHaveTextContent(
+      copy.errors.nameRequired,
+    );
+    await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
+      target: { value: "Ayaan" },
+    });
+    await fireEvent.click(screen.getByTestId("create-room"));
+    await waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+
+    const socket = FakeWebSocket.latest();
+    socket.open();
+    socket.message({
+      v: protocolVersion,
+      type: "joined",
+      roomCode: "ABCDEFGH",
+      guestId: "guest-id-a",
+      slot: "A",
+    });
+    socket.message({
+      v: protocolVersion,
+      type: "presence",
+      roomCode: "ABCDEFGH",
+      players: {
+        A: { displayName: "Ayaan" },
+        B: { displayName: "Bilan" },
+      },
+      started: true,
+    });
+    socket.message({
+      v: protocolVersion,
+      type: "state",
+      roomCode: "ABCDEFGH",
+      state: gameFixtures.midPlacement,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("online-board")).toBeVisible(),
+    );
+    expect(screen.queryByTestId("online-feedback")).not.toBeInTheDocument();
+
+    const error = {
+      v: protocolVersion,
+      type: "error" as const,
+      code: "notYourTurn",
+      message: "It is not your turn.",
+    };
+    socket.message(error);
+    const firstToast = await screen.findByTestId("online-feedback");
+    const firstNonce = firstToast.dataset.feedbackNonce;
+    socket.message(error);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("online-feedback").dataset.feedbackNonce,
+      ).not.toBe(firstNonce),
+    );
+    expect(screen.getByTestId("online-feedback")).toHaveTextContent(
+      copy.errors.notYourTurn,
     );
   });
 
@@ -194,8 +383,9 @@ describe("/online", () => {
       "role",
       "dialog",
     );
-    expect(screen.getByTestId("online-game-result")).not.toHaveAttribute(
+    expect(screen.getByTestId("online-game-result")).toHaveAttribute(
       "aria-modal",
+      "true",
     );
     expect(
       within(screen.getByTestId("online-game-result")).getByRole("button", {
@@ -210,16 +400,7 @@ describe("/online", () => {
         name: messages.so.localGame.controls.exit,
       }),
     ).toBeVisible();
-    within(screen.getByTestId("app-top-bar"))
-      .getByRole("button", {
-        name: messages.so.localGame.controls.exit,
-      })
-      .focus();
-    expect(
-      within(screen.getByTestId("app-top-bar")).getByRole("button", {
-        name: messages.so.localGame.controls.exit,
-      }),
-    ).toHaveFocus();
+    expect(screen.getByTestId("app-top-bar")).toHaveProperty("inert", true);
   });
 
   it("seats a player B viewer at the bottom without rotating or remapping colour", async () => {
@@ -278,6 +459,10 @@ describe("/online", () => {
       messages.so.localGame.tabletop.states.acting,
     );
     expect(document.querySelector('[data-occupant="B"]')).toBeInTheDocument();
+    await fireEvent.click(document.querySelector('[data-point-id="M2"]')!);
+    expect(await screen.findByTestId("online-feedback")).toHaveTextContent(
+      copy.invalid.notYourTurn,
+    );
     expect(
       within(screen.getByTestId("app-top-bar")).getByRole("button", {
         name: messages.so.localGame.controls.resign,
@@ -348,6 +533,14 @@ describe("/online", () => {
       ),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: copy.claimWin })).toBeVisible();
+    const centralPoint = document.querySelector<HTMLElement>(
+      '[data-point-id="M2"]',
+    );
+    expect(centralPoint).toHaveAttribute("role", "button");
+    await fireEvent.click(centralPoint!);
+    expect(
+      socket.sent.some((message) => message.includes('"point":"M2"')),
+    ).toBe(true);
 
     socket.close();
 

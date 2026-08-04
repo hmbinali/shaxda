@@ -82,6 +82,7 @@
     );
     max-width: 48rem;
     padding: 0.5rem;
+    transition: grid-template-rows 180ms ease;
   }
 
   .rail-slot {
@@ -120,6 +121,12 @@
         4.5rem,
         max(3.5rem, calc((100cqh - 17.5rem - 2 * var(--stack-gap) - 1rem) / 2))
       );
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tabletop {
+      transition: none;
     }
   }
 </style>

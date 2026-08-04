@@ -773,6 +773,12 @@
             controller.presence[player] === null
               ? copy.emptySlot
               : playerSeatLabel(player)}
+          playerIdentity={(player) => {
+            const presence = controller.presence[player];
+            return presence?.username && presence.avatar
+              ? { username: presence.username, avatar: presence.avatar }
+              : null;
+          }}
         />
       </aside>
     </section>

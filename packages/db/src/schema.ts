@@ -10,6 +10,26 @@ import { user } from "./schema.generated";
 
 export * from "./schema.generated";
 
+// `schema.generated.ts` must stay byte-identical to the Better Auth CLI output
+// (`schema:check` enforces this), so the hardening applied to its tables cannot
+// be declared here. `migrations/0000_accounts.sql` is hand-written and adds, on
+// top of what this model describes:
+//
+//   - UNIQUE INDEX `user_username_unique` on `user (username)`;
+//   - UNIQUE INDEX `account_provider_account_unique` on
+//     `account (provider_id, account_id)`;
+//   - CHECK `user_username_normalized_check`;
+//   - CHECK `user_avatar_mode_check`;
+//   - NOT NULL on `user.avatar_mode`.
+//
+// `migrations/meta/` therefore does not describe them either, and it is left
+// that way on purpose: syncing the snapshot by hand would make the next
+// `drizzle-kit generate` emit DROP statements for constraints this model does
+// not declare. Migrations here are hand-written; no script runs `drizzle-kit
+// generate`. If you ever do generate one, review the SQL and re-apply the list
+// above whenever `user` or `account` is rebuilt. The migration test in
+// `queries/account.worker.test.ts` fails if any of them stops being applied.
+
 export const usernameClaim = sqliteTable(
   "username_claim",
   {

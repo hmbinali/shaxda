@@ -40,17 +40,54 @@ describe("account migration", () => {
       .all<{ name: string; sql: string | null }>();
     const byName = new Map(schema.results.map((row) => [row.name, row.sql]));
 
-    expect(byName.has("account_provider_account_unique")).toBe(true);
     expect(byName.has("account_userId_idx")).toBe(true);
     expect(byName.has("session_token_unique")).toBe(true);
     expect(byName.has("session_userId_idx")).toBe(true);
-    expect(byName.has("user_username_unique")).toBe(true);
     expect(byName.has("username_claim_user_released_idx")).toBe(true);
-    expect(byName.get("user")).toContain("user_username_normalized_check");
-    expect(byName.get("user")).toContain("user_avatar_mode_check");
     expect(byName.get("username_claim")).toContain(
       "username_claim_normalized_check",
     );
+  });
+
+  // These live only in the hand-written migration SQL, never in the Drizzle
+  // model or its snapshot. See the note in `src/schema.ts`: without this test a
+  // regenerated migration that rebuilds `user` or `account` would drop them
+  // silently.
+  it("keeps the constraints that exist only in hand-written migration SQL", async () => {
+    const indexes = await db
+      .prepare(
+        `SELECT name, "unique", origin FROM pragma_index_list('user')
+         UNION ALL
+         SELECT name, "unique", origin FROM pragma_index_list('account')`,
+      )
+      .all<{ name: string; unique: number }>();
+    const uniqueByName = new Map(
+      indexes.results.map((row) => [row.name, row.unique]),
+    );
+
+    expect(uniqueByName.get("user_username_unique")).toBe(1);
+    expect(uniqueByName.get("account_provider_account_unique")).toBe(1);
+    await expect(indexColumns("user_username_unique")).resolves.toEqual([
+      "username",
+    ]);
+    await expect(
+      indexColumns("account_provider_account_unique"),
+    ).resolves.toEqual(["provider_id", "account_id"]);
+
+    const userTable = await db
+      .prepare(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user'",
+      )
+      .first<{ sql: string }>();
+    expect(userTable?.sql).toContain("user_username_normalized_check");
+    expect(userTable?.sql).toContain("user_avatar_mode_check");
+
+    const avatarMode = await db
+      .prepare(
+        "SELECT \"notnull\" FROM pragma_table_info('user') WHERE name = 'avatar_mode'",
+      )
+      .first<{ notnull: number }>();
+    expect(avatarMode?.notnull).toBe(1);
   });
 
   it("rejects denormalized usernames and invalid avatar modes", async () => {
@@ -258,6 +295,14 @@ async function insertUser(
       start.getTime(),
     )
     .run();
+}
+
+async function indexColumns(index: string): Promise<string[]> {
+  const result = await db
+    .prepare("SELECT name FROM pragma_index_info(?1) ORDER BY seqno")
+    .bind(index)
+    .all<{ name: string }>();
+  return result.results.map((row) => row.name);
 }
 
 async function tableRows(

@@ -27,11 +27,10 @@ describe("i18n scaffold", () => {
     expect(legal.path).toBe("/legal");
     expect(sectionIds.length).toBeGreaterThan(0);
     expect(new Set(sectionIds).size).toBe(sectionIds.length);
-    expect(
-      legal.sections.every(
-        (section) => section.navLabel.length > 0 && section.heading.length > 0,
-      ),
-    ).toBe(true);
+    expect(legal.sections.every((section) => section.heading.length > 0)).toBe(
+      true,
+    );
+    expect(sectionIds.every((id) => /^[a-z-]+$/.test(id))).toBe(true);
     expect(siteContent.so.nav).not.toHaveProperty("privacy");
     expect(siteContent.so.nav).not.toHaveProperty("terms");
   });

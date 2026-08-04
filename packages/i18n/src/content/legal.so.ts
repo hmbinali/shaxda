@@ -1,5 +1,3 @@
-import type { ContentCallout } from "./types";
-
 export const legalSectionIds = [
   "guudmar",
   "xogta",
@@ -27,12 +25,11 @@ interface LegalDetail {
 
 interface LegalSection {
   id: LegalSectionId;
-  navLabel: string;
   heading: string;
   paragraphs: readonly string[];
   bullets: readonly string[];
-  callouts: readonly ContentCallout[];
   details: readonly LegalDetail[];
+  notes: readonly string[];
 }
 
 export interface LegalPageContent {
@@ -47,7 +44,6 @@ export interface LegalPageContent {
   lastUpdatedLabel: string;
   lastUpdated: string;
   draftNotice: string;
-  navigationLabel: string;
   sections: readonly LegalSection[];
 }
 
@@ -66,11 +62,9 @@ export const legalContentSo = {
   lastUpdated: "[TAARIIKHDA CUSBOONAYSIINTA]",
   draftNotice:
     "Qoraalkani weli waa qabyo. Waa in mulkiiluhu buuxiyo meelaha calaamadeysan, qof Soomaali si hufan u yaqaanna hubiyo luqadda, khabiir sharci ahna ansixiyo ka hor daahfurka.",
-  navigationLabel: "Qaybaha sharciga",
   sections: [
     {
       id: "guudmar",
-      navLabel: "Guudmar",
       heading: "Waxa boggani daboolayo",
       paragraphs: [
         "Shaxda waa adeeg bilaash ah oo lagu barto laguna ciyaaro ciyaarta dhaqameed ee shaxda. [MAGACA MULKIILAHA] ayaa maamula bogga iyo adeegga ciyaarta martida.",
@@ -78,16 +72,12 @@ export const legalContentSo = {
       ],
       bullets: [],
       details: [],
-      callouts: [
-        {
-          variant: "digniin",
-          body: "Ha u qaadan qoraalkan talo sharci. Xuquuqda aad sharciga ku leedahay waxay ku xirnaan kartaa meesha aad joogto.",
-        },
+      notes: [
+        "Ha u qaadan qoraalkan talo sharci. Xuquuqda aad sharciga ku leedahay waxay ku xirnaan kartaa meesha aad joogto.",
       ],
     },
     {
       id: "xogta",
-      navLabel: "Xogta jirta",
       heading: "Xogta Shaxda isticmaasho",
       paragraphs: [
         "Shaxda ma laha akoon, galitaan Google, magac joogto ah, taariikh ciyaareed joogto ah, ama miis darajo. Martidu waxay doorataa magac bandhig, qalabkuna wuxuu samaystaa aqoonsi marti oo aan kala sooc lahayn.",
@@ -100,11 +90,10 @@ export const legalContentSo = {
         "Xogta cabbirka: jidka bogga, halka booqashadu ka timid, waddanka, biraawsarka, nidaamka qalabka, iyo nooca qalabka.",
       ],
       details: [],
-      callouts: [],
+      notes: [],
     },
     {
       id: "kaydka-qalabka",
-      navLabel: "Kaydka qalabka",
       heading: "Waxa ku kaydsan qalabkaaga",
       paragraphs: [
         "Shaxda waxay isticmaashaa localStorage si ay qalabkaaga ugu xafiddo ciyaarta maxalliga ah iyo dookhyo kooban. Nuqulladan qalabka ku jira si toos ah looguma raro kayd xogeed dhexe.",
@@ -137,11 +126,10 @@ export const legalContentSo = {
           detail: "Xusuusta ah inaad hadda diidday soo-jeedinta rakibidda.",
         },
       ],
-      callouts: [],
+      notes: [],
     },
     {
       id: "ciyaarta-martida",
-      navLabel: "Ciyaarta martida",
       heading: "Xogta qolka ciyaarta martida",
       paragraphs: [
         "Marka aad samayso ama gasho qol marti ah, aqoonsiga martida iyo magaca bandhigga waxaa loo diraa Worker-ka Shaxda. Waxaa lagu hayaa Durable Object-ka qolka si labada ciyaaryahan loo kala garto, xaaladda ciyaartana loo waafajiyo.",
@@ -160,16 +148,12 @@ export const legalContentSo = {
             "Durable Object-ku wuxuu tirtiraa dhammaan xaaladda qolka 60 daqiiqo oo firfircoonaan la'aan ah kadib.",
         },
       ],
-      callouts: [
-        {
-          variant: "talo",
-          body: "La wadaag xiriiriyaha qolka qofka aad rabto inaad la ciyaarto oo keliya, hana u adeegsan magaca bandhigga xog gaar ah oo xasaasi ah.",
-        },
+      notes: [
+        "La wadaag xiriiriyaha qolka qofka aad rabto inaad la ciyaarto oo keliya, hana u adeegsan magaca bandhigga xog gaar ah oo xasaasi ah.",
       ],
     },
     {
       id: "cabbiraadda",
-      navLabel: "Cabbiraadda",
       heading: "Cloudflare Web Analytics",
       paragraphs: [
         "Haddii calaamadda PUBLIC_CF_BEACON_TOKEN la dejiyo, boggu wuxuu shidaa Cloudflare Web Analytics. Beacon-kan ma isticmaalo cookie ama localStorage, laakiin wuxuu diraa cabbirro la isku geeyey oo ku saabsan booqashada.",
@@ -177,16 +161,12 @@ export const legalContentSo = {
       ],
       bullets: [],
       details: [],
-      callouts: [
-        {
-          variant: "xeer",
-          body: "Web Analytics wuxuu shaqeeyaa oo keliya marka calaamaddiisa dadweynaha lagu daro dhismaha bogga.",
-        },
+      notes: [
+        "Web Analytics wuxuu shaqeeyaa oo keliya marka calaamaddiisa dadweynaha lagu daro dhismaha bogga.",
       ],
     },
     {
       id: "ilaalinta",
-      navLabel: "Ilaalinta",
       heading: "Xaddidaadda codsiyada iyo Turnstile",
       paragraphs: [
         "Si loo yareeyo samaynta qolal badan iyo isticmaalka otomaatiga ah, isku-duwaha qolalku wuxuu kaydiyaa cinwaanka IP-ga oo aan la qarin iyo waqtiyada isku dayga. Hal IP wuxuu samayn karaa ugu badnaan 10 isku day 60 ilbiriqsi gudahood.",
@@ -210,16 +190,12 @@ export const legalContentSo = {
             "Tani waa muddo kale: qolka waxaa la tirtiraa 60 daqiiqo oo firfircoonaan la'aan ah kadib, ee ma aha 60 daqiiqo laga bilaabo samaynta.",
         },
       ],
-      callouts: [
-        {
-          variant: "digniin",
-          body: "Turnstile caadi ahaan wuxuu soo saaraa calaamad hal mar la isticmaalo. Haddii pre-clearance laga shido Cloudflare, wuxuu sidoo kale dhigi karaa cookie la yiraahdo cf_clearance; dejintaas weli waa in laga xaqiijiyaa dashboard-ka Cloudflare.",
-        },
+      notes: [
+        "Turnstile caadi ahaan wuxuu soo saaraa calaamad hal mar la isticmaalo. Haddii pre-clearance laga shido Cloudflare, wuxuu sidoo kale dhigi karaa cookie la yiraahdo cf_clearance; dejintaas weli waa in laga xaqiijiyaa dashboard-ka Cloudflare.",
       ],
     },
     {
       id: "adeegyada",
-      navLabel: "Adeeg bixiyaha",
       heading: "Cloudflare iyo diiwaannada hawlgalka",
       paragraphs: [
         "Cloudflare waa adeeg bixiye martigeliya bogga oo socodsiiya Workers-ka, Durable Objects-ka, Turnstile, iyo Web Analytics marka la shido. Sidaas darteed xogta codsiyada iyo qolalka waxay dhex martaa nidaamyada Cloudflare.",
@@ -231,11 +207,10 @@ export const legalContentSo = {
         "Adeegga hadda kuma xirna kayd D1 ah oo ciyaaraha ama xogta martida lagu sii hayo.",
       ],
       details: [],
-      callouts: [],
+      notes: [],
     },
     {
       id: "carruurta",
-      navLabel: "Carruurta",
       heading: "Carruurta iyo xogta gaarka ah",
       paragraphs: [
         "Shaxda waa ciyaar dhaqameed ay qoysasku wada ciyaari karaan, laakiin adeeggu si gaar ah uguma talagelin ururinta xogta carruurta. Ha gelin magaca bandhigga magaca buuxa, cinwaan, dugsi, ama xog kale oo lagu garan karo ilmo.",
@@ -243,11 +218,10 @@ export const legalContentSo = {
       ],
       bullets: [],
       details: [],
-      callouts: [],
+      notes: [],
     },
     {
       id: "xuquuqda",
-      navLabel: "Xuquuqdaada",
       heading: "Doorashooyinkaaga iyo codsiyada xogta",
       paragraphs: [
         "Waxaad localStorage-ka iyo kaydka service worker-ka ka tirtiri kartaa dejimaha biraawsarka, ama waxaad ka saari kartaa barnaamijka la rakibay. Tani waxay tirtiri kartaa ciyaarta maxalliga ah, aqoonsiga martida, magaca bandhigga, iyo dookhyada ku jira qalabkaas.",
@@ -255,11 +229,10 @@ export const legalContentSo = {
       ],
       bullets: [],
       details: [],
-      callouts: [],
+      notes: [],
     },
     {
       id: "shuruudaha",
-      navLabel: "Shuruudaha",
       heading: "Adeegga aad isticmaalayso",
       paragraphs: [
         "Markaad isticmaasho Shaxda, waxaad oggolaanaysaa shuruudahan inta sharcigu oggol yahay. Haddii aadan oggolayn, ha isticmaalin ciyaarta martida ama qaybaha kale ee adeegga.",
@@ -267,11 +240,10 @@ export const legalContentSo = {
       ],
       bullets: [],
       details: [],
-      callouts: [],
+      notes: [],
     },
     {
       id: "isticmaal-fiican",
-      navLabel: "Isticmaal fiican",
       heading: "Ciyaar caddaalad ah iyo ilaalinta adeegga",
       paragraphs: [
         "Isticmaal Shaxda si sharci ah, si caddaalad ah, oo ixtiraam leh. Adiga ayaa masuul ka ah magaca bandhigga aad doorato iyo cidda aad la wadaagto xiriiriyaha qolka.",
@@ -283,16 +255,12 @@ export const legalContentSo = {
         "Ha u isticmaalin adeegga fal sharci-darro ah ama waxyeello u geysanaya qof kale.",
       ],
       details: [],
-      callouts: [
-        {
-          variant: "digniin",
-          body: "Helitaanka adeegga waa la xaddidi karaa ama waa laga joojin karaa codsi ama qalab si xun u isticmaala ama khatar geliya adeegga.",
-        },
+      notes: [
+        "Helitaanka adeegga waa la xaddidi karaa ama waa laga joojin karaa codsi ama qalab si xun u isticmaala ama khatar geliya adeegga.",
       ],
     },
     {
       id: "milkiyadda",
-      navLabel: "Milkiyadda",
       heading: "Dhaqanka, koodhka, iyo astaamaha",
       paragraphs: [
         "Shaxda iyo xeerarkeeda dhaqameed waa dhaxal dhaqameed Soomaaliyeed; boggani ma sheeganayo inuu leeyahay ciyaarta dhaqanka lafteeda. Sharaxaadda, koodhka, naqshadda, sawirrada, codadka, iyo astaamaha mashruuca waxaa laga yaabaa inay leeyihiin xuquuq gaar ah.",
@@ -300,11 +268,10 @@ export const legalContentSo = {
       ],
       bullets: [],
       details: [],
-      callouts: [],
+      notes: [],
     },
     {
       id: "dammaanad",
-      navLabel: "Dammaanad",
       heading: "Helitaanka iyo xaddidaadda masuuliyadda",
       paragraphs: [
         "Shaxda waxaa lagu bixiyaa sida ay hadda tahay iyo inta la heli karo. Lama ballanqaadayo in adeeggu mar walba shaqaynayo, khalad la'aan yahay, amnigiisu dhammaystiran yahay, ama xogta qolka dib loo soo celin karo.",
@@ -312,11 +279,10 @@ export const legalContentSo = {
       ],
       bullets: [],
       details: [],
-      callouts: [],
+      notes: [],
     },
     {
       id: "isbeddel",
-      navLabel: "Isbeddel",
       heading: "Isbeddellada boggan iyo adeegga",
       paragraphs: [
         "Boggan waa la cusboonaysiin karaa marka adeeggu is beddelo, adeeg bixiye cusub la isticmaalo, ama sharci khuseeya is beddelo. Taariikhda kore ayaa la beddeli doonaa marka nuqul cusub la daabaco.",
@@ -324,11 +290,10 @@ export const legalContentSo = {
       ],
       bullets: [],
       details: [],
-      callouts: [],
+      notes: [],
     },
     {
       id: "xiriirka",
-      navLabel: "Xiriirka",
       heading: "Cidda lala xiriirayo iyo sharciga khuseeya",
       paragraphs: [
         "Mulkiilaha ama maamulaha adeegga: [MAGACA MULKIILAHA]. Su'aalaha asturnaanta, codsiyada xogta, ama arrimaha shuruudahan u dir [EMAIL XIRIIRKA].",
@@ -336,11 +301,8 @@ export const legalContentSo = {
       ],
       bullets: [],
       details: [],
-      callouts: [
-        {
-          variant: "digniin",
-          body: "Magaca mulkiilaha, email-ka xiriirka, waddanka sharciga, taariikhda cusboonaysiinta, iyo ruqsadda astaamaha waa in la buuxiyaa ka hor daahfurka.",
-        },
+      notes: [
+        "Magaca mulkiilaha, email-ka xiriirka, waddanka sharciga, taariikhda cusboonaysiinta, iyo ruqsadda astaamaha waa in la buuxiyaa ka hor daahfurka.",
       ],
     },
   ],

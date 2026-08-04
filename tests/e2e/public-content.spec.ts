@@ -125,7 +125,7 @@ test.describe("C1 public content", () => {
     await expect(topBar).toHaveAttribute("data-persistence-check", "present");
     await expect(
       topBar.getByRole("button", { name: "Fur liiska akoonka" }),
-    ).toHaveCount(0);
+    ).toBeVisible();
   });
 
   test("desktop uses the compact account panel without taking layout width", async ({

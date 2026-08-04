@@ -16,8 +16,30 @@ declare global {
   }
 
   namespace App {
+    interface Locals {
+      session: {
+        id: string;
+        userId: string;
+        expiresAt: Date;
+        token: string;
+        createdAt: Date;
+        updatedAt: Date;
+      } | null;
+      user: {
+        id: string;
+        name: string;
+        email: string;
+        emailVerified: boolean;
+        image?: string | null;
+        username?: string | null;
+        avatarMode?: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      } | null;
+    }
+
     interface Platform {
-      env?: Record<string, unknown>;
+      env: import("$lib/server/auth/options").AuthEnvironment;
       context?: {
         waitUntil(promise: Promise<unknown>): void;
       };

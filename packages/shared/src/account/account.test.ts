@@ -7,6 +7,7 @@ import {
   avatarInitial,
   avatarModeSchema,
   canChangeUsername,
+  isNormalizedUsername,
   nextUsernameChangeAt,
   normalizeUsername,
   suggestUsernames,
@@ -59,6 +60,20 @@ describe("account username rules", () => {
     expect(normalizeUsername(" User_Name ")).toBe("user_name");
     expect(usernameSchema.safeParse("user_name").success).toBe(true);
     expect(usernameSchema.safeParse("User-Name").success).toBe(false);
+  });
+
+  it.each([
+    ["mahamed_7", true],
+    ["", false],
+    ["ab", false],
+    // validateUsername normalizes first and accepts these; a form control that
+    // mirrors the input's `pattern` must not.
+    ["Mahamed", false],
+    [" mahamed ", false],
+    ["magac-qof", false],
+    ["admin", false],
+  ] as const)("treats %j as already-normalized: %s", (value, expected) => {
+    expect(isNormalizedUsername(value)).toBe(expected);
   });
 });
 

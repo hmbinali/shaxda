@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { validateUsername } from "@shaxda/shared";
+  import { isNormalizedUsername } from "@shaxda/shared";
 
   interface Props {
     value: string;
@@ -14,7 +14,7 @@
     suggestions = [],
     suggestionsLabel = "Talooyin",
   }: Props = $props();
-  const validation = $derived(validateUsername(value));
+  const valid = $derived(isNormalizedUsername(value));
 </script>
 
 <label class="grid gap-2 text-sm font-semibold text-board-900">
@@ -33,7 +33,7 @@
       autocomplete="username"
       autocapitalize="none"
       spellcheck="false"
-      aria-invalid={value.length > 0 && !validation.ok}
+      aria-invalid={value.length > 0 && !valid}
       class="min-h-12 min-w-0 flex-1 rounded-xl bg-transparent px-1.5 py-2 outline-none"
     />
   </span>

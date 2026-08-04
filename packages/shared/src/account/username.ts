@@ -43,3 +43,11 @@ export function validateUsername(value: string): UsernameValidationResult {
 
   return { ok: true, username };
 }
+
+// `validateUsername` normalizes before validating, so it accepts input the
+// username input's own `pattern` rejects (`Mahamed`, ` mahamed `). Use this
+// where a control must agree with what the browser will let the user submit.
+export function isNormalizedUsername(value: string): boolean {
+  const result = validateUsername(value);
+  return result.ok && result.username === value;
+}

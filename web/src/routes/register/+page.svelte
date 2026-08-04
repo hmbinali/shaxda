@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import { siteContent } from "@shaxda/i18n";
-  import { avatarInitial } from "@shaxda/shared";
+  import { avatarInitial, isNormalizedUsername } from "@shaxda/shared";
   import { untrack } from "svelte";
   import Avatar from "$components/account/Avatar.svelte";
   import UsernameField from "$components/account/UsernameField.svelte";
@@ -13,15 +13,17 @@
   let { data, form }: { data: PageData; form: ActionData } = $props();
   const copy = siteContent.so.pages.register;
   const errors = siteContent.so.accountErrors;
-  let username = $state(
-    untrack(() => form?.values?.username ?? data.suggestions[0] ?? "player1"),
-  );
+  // Suggestions are derived from the private Google email, so the field starts
+  // empty and only a click on a suggestion may fill it. Rejected submissions
+  // replay what the visitor typed, never a suggestion.
+  let username = $state(untrack(() => form?.values?.username ?? ""));
   let avatarMode = $state<"initial" | "google">(
     untrack(() =>
       form?.values?.avatarMode === "google" ? "google" : "initial",
     ),
   );
   let loading = $state(false);
+  const confirmDisabled = $derived(!isNormalizedUsername(username));
   const errorCopy = $derived(
     form?.error ? errors[form.error as keyof typeof errors] : "",
   );
@@ -116,7 +118,9 @@
           </p>
         </fieldset>
 
-        <Button type="submit" variant="primary">{copy.confirm}</Button>
+        <Button type="submit" variant="primary" disabled={confirmDisabled}
+          >{copy.confirm}</Button
+        >
       </form>
     {/if}
   </div>

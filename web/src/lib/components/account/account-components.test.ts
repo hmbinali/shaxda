@@ -63,4 +63,56 @@ describe("username field", () => {
     await fireEvent.click(view.getByRole("button", { name: "@mahamed42" }));
     expect(input.value).toBe("mahamed42");
   });
+
+  it("renders an empty field and leaves suggestions unapplied", () => {
+    const view = render(UsernameField, {
+      value: "",
+      label: "Magaca dadweynaha",
+      suggestions: ["mahamed42", "mahamed7"],
+    });
+    const input = view.getByRole("textbox") as HTMLInputElement;
+
+    expect(input.value).toBe("");
+    expect(input).toBeRequired();
+    // An untouched empty field is not an error state yet.
+    expect(input).not.toHaveAttribute("aria-invalid", "true");
+    expect(
+      view.getByRole("button", { name: "@mahamed42" }),
+    ).toBeInTheDocument();
+    expect(view.getByRole("button", { name: "@mahamed7" })).toBeInTheDocument();
+  });
+
+  it("keeps a typed value when the suggestion list changes", async () => {
+    const view = render(UsernameField, {
+      value: "",
+      label: "Magaca dadweynaha",
+      suggestions: ["mahamed42"],
+    });
+    const input = view.getByRole("textbox") as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: "cabdi_shaxda" } });
+
+    await view.rerender({
+      value: "cabdi_shaxda",
+      label: "Magaca dadweynaha",
+      suggestions: ["another_one9"],
+    });
+
+    expect(input.value).toBe("cabdi_shaxda");
+  });
+
+  it.each([
+    ["ab", "true"],
+    ["Mahamed", "true"],
+    ["magac-qof", "true"],
+    ["mahamed_7", "false"],
+  ])("marks %j with aria-invalid=%s", async (value, expected) => {
+    const view = render(UsernameField, {
+      value: "",
+      label: "Magaca dadweynaha",
+    });
+    const input = view.getByRole("textbox") as HTMLInputElement;
+    await fireEvent.input(input, { target: { value } });
+
+    expect(input).toHaveAttribute("aria-invalid", expected);
+  });
 });

@@ -15,6 +15,22 @@ export const AVATAR_PALETTE = [
 export const avatarModeSchema = z.enum(["initial", "google"]);
 export type AvatarMode = z.infer<typeof avatarModeSchema>;
 
+const GOOGLE_AVATAR_HOST = /^lh[3-6]\.googleusercontent\.com$/;
+
+export function allowedGoogleAvatarUrl(
+  value: string | null | undefined,
+): string | null {
+  if (!value || value.length > 512) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && GOOGLE_AVATAR_HOST.test(url.hostname)
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function avatarColorForUserId(userId: string): string {
   let hash = 0x811c9dc5;
 

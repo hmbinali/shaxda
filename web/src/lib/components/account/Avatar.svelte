@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { allowedGoogleAvatarUrl } from "./avatar";
+  import { allowedGoogleAvatarUrl } from "@shaxda/shared";
 
   interface Props {
     username: string;

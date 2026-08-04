@@ -28,6 +28,34 @@ function mutatePart(ticket: string, part: 0 | 1): string {
   return pieces.join(".");
 }
 
+async function signPayload(payload: unknown): Promise<string> {
+  const encodedPayload = btoa(JSON.stringify(payload))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const rawSignature = new Uint8Array(
+    await crypto.subtle.sign(
+      "HMAC",
+      key,
+      new TextEncoder().encode(encodedPayload),
+    ),
+  );
+  let signature = "";
+  for (const byte of rawSignature) signature += String.fromCharCode(byte);
+  const encodedSignature = btoa(signature)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  return `${encodedPayload}.${encodedSignature}`;
+}
+
 describe("online identity tickets", () => {
   it("round-trips a scoped ticket", async () => {
     const ticket = await mintIdentityTicket(BASE_PAYLOAD, SECRET, NOW);
@@ -118,12 +146,7 @@ describe("online identity tickets", () => {
       iat: NOW,
       exp: NOW + IDENTITY_TICKET_TTL_MS + 1,
     });
-    const long = await mintIdentityTicket(
-      { ...longPayload, exp: undefined, iat: undefined },
-      SECRET,
-      NOW,
-      IDENTITY_TICKET_TTL_MS + 1,
-    );
+    const long = await signPayload(longPayload);
     await expect(
       verifyIdentityTicket(
         long,

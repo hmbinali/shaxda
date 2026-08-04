@@ -42,6 +42,12 @@ For local development, copy `web/.dev.vars.example` to `web/.dev.vars`, generate
 a random secret of at least 32 characters, and add the real Google client id and
 secret. `.dev.vars` is ignored by Git.
 
+Keep `AUTH_BASE_URL` in `.dev.vars`. Without it, `platform.env` falls back to the
+production `AUTH_BASE_URL` in `web/wrangler.jsonc`, Better Auth's origin check
+stops matching the dev server, and every `/api/auth/*` request returns a
+SvelteKit 404 instead of an error. The value must equal the origin the browser
+uses, so update it if the dev server is not on `http://localhost:5173`.
+
 ## Worker secrets
 
 Set all three secrets for preview and production. Use the corresponding Wrangler
@@ -62,6 +68,14 @@ control. The production bundle check rejects any supplied auth secret and the
 committed e2e secret if one appears in `.svelte-kit/cloudflare/`.
 
 ## Migrations
+
+`pnpm dev:web` reads `web/wrangler.jsonc` and persists D1 to
+`web/.wrangler/state/v3`. Apply migrations there once before the first local
+sign-in, otherwise Better Auth starts against a database with no tables:
+
+```bash
+pnpm --filter @shaxda/web exec wrangler d1 migrations apply shaxda-db --local
+```
 
 Local authenticated application e2e uses an isolated persisted database:
 
@@ -89,6 +103,15 @@ runtime config and fails when its output differs from the committed schema.
 ```bash
 pnpm --filter @shaxda/db run schema:check
 ```
+
+Migration SQL is hand-written. `0000_accounts.sql` adds a unique username index,
+a unique provider/account index, the username and avatar-mode CHECK constraints,
+and `NOT NULL` on `avatar_mode` — none of which the Better Auth-generated Drizzle
+model or `migrations/meta/` can describe. Do not hand-sync the snapshot to match:
+the next `drizzle-kit generate` would then emit DROP statements for them. The
+reasoning and the full list are in `packages/db/src/schema.ts`, and
+`pnpm --filter @shaxda/db run test:worker` fails if any of them stops being
+applied.
 
 ## Release order
 

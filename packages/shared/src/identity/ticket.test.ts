@@ -24,7 +24,7 @@ const BASE_PAYLOAD = {
 function mutatePart(ticket: string, part: 0 | 1): string {
   const pieces = ticket.split(".");
   const value = pieces[part] ?? "";
-  pieces[part] = `${value.slice(0, -1)}${value.endsWith("A") ? "B" : "A"}`;
+  pieces[part] = `${value.startsWith("A") ? "B" : "A"}${value.slice(1)}`;
   return pieces.join(".");
 }
 

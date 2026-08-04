@@ -74,7 +74,8 @@ describe("worker", () => {
       action,
     );
     if (_name === "invalid") {
-      ticket = `${ticket.slice(0, -1)}${ticket.endsWith("A") ? "B" : "A"}`;
+      const [payload, signature = ""] = ticket.split(".");
+      ticket = `${payload}.${signature.startsWith("A") ? "B" : "A"}${signature.slice(1)}`;
     }
     const response = await worker.fetch(roomRequest(ticket), testEnv);
     expect(response.status).toBe(401);

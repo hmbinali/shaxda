@@ -25,7 +25,7 @@ export type TopBarAction = {
   shortLabel: string;
   icon: Component;
   onSelect?: () => void;
-  panel?: "menu";
+  panel?: "menu" | "account";
   pressed?: boolean;
   tone?: "default" | "danger";
   disabled?: boolean;
@@ -39,11 +39,11 @@ export type TopBarConfig = {
 
 export class AppShellState {
   config = $state<TopBarConfig | null>(null);
-  panel = $state<"menu" | null>(null);
+  panel = $state<"menu" | "account" | null>(null);
 
   #owner: symbol | null = null;
 
-  openPanel(panel: "menu"): void {
+  openPanel(panel: "menu" | "account"): void {
     this.panel = panel;
   }
 
@@ -51,7 +51,7 @@ export class AppShellState {
     this.panel = null;
   }
 
-  togglePanel(panel: "menu"): void {
+  togglePanel(panel: "menu" | "account"): void {
     this.panel = this.panel === panel ? null : panel;
   }
 

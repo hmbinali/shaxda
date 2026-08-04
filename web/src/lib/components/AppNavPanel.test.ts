@@ -66,31 +66,29 @@ describe("AppNavPanel", () => {
     const { trigger, onResign } = renderPanel();
     await fireEvent.click(trigger);
 
-    const panel = screen.getByRole("dialog", {
-      name: topBarCopy.menuPanelLabel,
-    });
-    expect(within(panel).getByText(topBarCopy.groupPages)).toBeVisible();
-    expect(within(panel).getByText(topBarCopy.groupGame)).toBeVisible();
+    const menu = screen.getByRole("menu", { name: topBarCopy.menuPanelLabel });
+    expect(within(menu).getByText(topBarCopy.groupPages)).toBeVisible();
+    expect(within(menu).getByText(topBarCopy.groupGame)).toBeVisible();
     expect(
-      within(panel).getByRole("link", { name: "Baro xeerarka" }),
+      within(menu).getByRole("menuitem", { name: "Baro xeerarka" }),
     ).toHaveAttribute("href", "/learn");
-    const resign = within(panel).getByRole("button", { name: "Is dhiib" });
+    const resign = within(menu).getByRole("menuitem", { name: "Is dhiib" });
     expect(resign).toHaveClass("text-danger");
 
     await fireEvent.click(resign);
     expect(onResign).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
   it("closes on Escape and restores focus to its trigger", async () => {
     const { trigger } = renderPanel();
     trigger.focus();
     await fireEvent.click(trigger);
-    const panel = screen.getByRole("dialog");
-    expect(panel).toHaveFocus();
+    const menu = screen.getByRole("menu");
+    expect(menu).toHaveFocus();
 
-    await fireEvent.keyDown(panel, { key: "Escape" });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await fireEvent.keyDown(menu, { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     await Promise.resolve();
     expect(trigger).toHaveFocus();
   });
@@ -98,18 +96,15 @@ describe("AppNavPanel", () => {
   it("traps Tab in both directions", async () => {
     const { trigger } = renderPanel();
     await fireEvent.click(trigger);
-    const panel = screen.getByRole("dialog");
-    const first = within(panel).getByRole("link", { name: "Baro xeerarka" });
-    const last = within(panel).getByRole("button", {
-      name: "Ka bax ciyaarta",
-    });
+    const menu = screen.getByRole("menu");
+    const items = within(menu).getAllByRole("menuitem");
 
-    last.focus();
-    await fireEvent.keyDown(panel, { key: "Tab" });
-    expect(first).toHaveFocus();
+    items.at(-1)?.focus();
+    await fireEvent.keyDown(menu, { key: "Tab" });
+    expect(items[0]).toHaveFocus();
 
-    first.focus();
-    await fireEvent.keyDown(panel, { key: "Tab", shiftKey: true });
-    expect(last).toHaveFocus();
+    items[0].focus();
+    await fireEvent.keyDown(menu, { key: "Tab", shiftKey: true });
+    expect(items.at(-1)).toHaveFocus();
   });
 });

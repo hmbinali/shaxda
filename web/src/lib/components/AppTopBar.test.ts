@@ -8,14 +8,14 @@ import AppTopBarHarness from "$lib/shell/AppTopBarHarness.svelte";
 const topBarCopy = siteContent.so.topBar;
 
 describe("AppTopBar", () => {
-  it("renders the default Home brand link and menu action", () => {
+  it("renders the default Home brand link and account action", () => {
     render(AppShellHarness, { pathname: "/" });
 
     expect(
       screen.getByRole("link", { name: topBarCopy.brandLabel }),
     ).toHaveAttribute("href", "/");
     expect(
-      screen.getByRole("button", { name: topBarCopy.menuLabel }),
+      screen.getByRole("button", { name: topBarCopy.accountLabel }),
     ).toBeVisible();
   });
 
@@ -101,10 +101,10 @@ describe("AppTopBar", () => {
 
     await fireEvent.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("dialog")).toHaveAttribute("id", "app-nav-panel");
+    expect(screen.getByRole("menu")).toHaveAttribute("id", "app-nav-panel");
 
     await fireEvent.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });

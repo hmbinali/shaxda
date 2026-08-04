@@ -5,6 +5,7 @@
     LogOut,
     Menu,
     Plus,
+    RotateCcw,
     Volume2,
     VolumeX,
   } from "@lucide/svelte";
@@ -111,6 +112,13 @@
                     icon: soundEnabled ? Volume2 : VolumeX,
                     onSelect: toggleSound,
                     pressed: soundEnabled,
+                  },
+                  {
+                    id: "new-game",
+                    label: gameCopy.controls.newGame,
+                    shortLabel: gameCopy.controls.newGame,
+                    icon: RotateCcw,
+                    disabled: true,
                   },
                 ]
               : []),

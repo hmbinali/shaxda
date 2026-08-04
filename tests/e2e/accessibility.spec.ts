@@ -29,13 +29,13 @@ test.describe("Q1 accessibility audit", () => {
     });
   }
 
-  test("the open navigation panel has no serious or critical axe violations", async ({
+  test("the open account panel has no serious or critical axe violations", async ({
     page,
   }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Fur ficillo kale" }).click();
+    await page.getByRole("button", { name: "Fur liiska akoonka" }).click();
     await expect(
-      page.getByRole("dialog", { name: "Ficillo kale" }),
+      page.getByRole("menu", { name: "Liiska akoonka" }),
     ).toBeVisible();
 
     const results = await new AxeBuilder({ page })

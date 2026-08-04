@@ -154,7 +154,7 @@ describe("/local", () => {
       topBar.getByRole("button", { name: topBarCopy.menuLabel }),
     );
     await fireEvent.click(
-      screen.getByRole("button", { name: copy.controls.resign }),
+      screen.getByRole("menuitem", { name: copy.controls.resign }),
     );
     const dialog = screen.getByRole("dialog", {
       name: copy.controls.resign,
@@ -187,10 +187,10 @@ describe("/local", () => {
       topBar.getByRole("button", { name: topBarCopy.menuLabel }),
     );
     expect(
-      screen.getByRole("button", { name: copy.controls.exitGame }),
+      screen.getByRole("menuitem", { name: copy.controls.exitGame }),
     ).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: copy.controls.resign }),
+      screen.queryByRole("menuitem", { name: copy.controls.resign }),
     ).not.toBeInTheDocument();
   });
 

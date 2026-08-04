@@ -6,14 +6,17 @@
   import { getAppShell, type NavPanelGroup } from "$lib/shell/appShell.svelte";
 
   interface Props {
+    kind: "menu" | "account";
     groups: NavPanelGroup[];
   }
 
-  let { groups }: Props = $props();
+  let { kind, groups }: Props = $props();
 
   const shell = getAppShell();
   const topBar = siteContent.so.topBar;
-  const panelLabel = topBar.menuPanelLabel;
+  const panelLabel = $derived(
+    kind === "account" ? topBar.accountPanelLabel : topBar.menuPanelLabel,
+  );
 
   onMount(() => {
     const dismissOutside = (event: PointerEvent) => {
@@ -44,7 +47,7 @@
 
 <div
   id="app-nav-panel"
-  role="dialog"
+  role="menu"
   aria-label={panelLabel}
   tabindex="-1"
   class="nav-panel absolute right-2 top-full z-40 w-[min(17.5rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-board-700/30 bg-board-50 shadow-2xl outline-none md:right-4"
@@ -68,6 +71,7 @@
         {#each group.items as item (item.id)}
           {#if "href" in item}
             <a
+              role="menuitem"
               href={resolve(item.href as "/")}
               class="menu-item flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-board-900 outline-none transition-colors hover:bg-board-100/75 focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none"
               onclick={() => shell.closePanel()}
@@ -77,6 +81,7 @@
             </a>
           {:else}
             <button
+              role="menuitem"
               type="button"
               class="menu-item flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-board-900 outline-none transition-colors hover:bg-board-100/75 focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none"
               class:text-danger={item.danger}

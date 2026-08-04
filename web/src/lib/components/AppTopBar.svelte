@@ -83,7 +83,7 @@
   </nav>
 
   {#if shell.panel !== null}
-    <AppNavPanel groups={config.panels} />
+    <AppNavPanel kind={shell.panel} groups={config.panels} />
   {/if}
 </header>
 

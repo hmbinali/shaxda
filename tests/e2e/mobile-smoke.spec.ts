@@ -62,17 +62,15 @@ test.describe("Q1 mobile responsive smoke", () => {
       }),
     ).toBeVisible();
 
-    const menuButton = page.getByRole("button", {
-      name: "Fur ficillo kale",
+    const accountButton = page.getByRole("button", {
+      name: "Fur liiska akoonka",
     });
-    await menuButton.click();
-    const navigationPanel = page.getByRole("dialog", {
-      name: "Ficillo kale",
-    });
-    await expect(navigationPanel).toBeFocused();
+    await accountButton.click();
+    const accountPanel = page.getByRole("menu", { name: "Liiska akoonka" });
+    await expect(accountPanel).toBeFocused();
     await page.keyboard.press("Escape");
-    await expect(navigationPanel).toBeHidden();
-    await expect(menuButton).toBeFocused();
+    await expect(accountPanel).toBeHidden();
+    await expect(accountButton).toBeFocused();
 
     await page.goto("/local");
     await expect(

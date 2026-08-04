@@ -1,7 +1,7 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const routes = ["/", "/learn", "/privacy", "/terms", "/local", "/online"];
+const routes = ["/", "/learn", "/legal", "/local", "/online"];
 
 const activeBoardFixtures = [
   "movement",

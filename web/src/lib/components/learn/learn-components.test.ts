@@ -1,6 +1,6 @@
 import { fireEvent, render } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
-import LearnSectionNav from "./LearnSectionNav.svelte";
+import SectionNav from "../content/SectionNav.svelte";
 import RuleDiagram from "./RuleDiagram.svelte";
 
 describe("learn components", () => {
@@ -31,7 +31,7 @@ describe("learn components", () => {
       { id: "bilowga", label: "Bilowga" },
       { id: "jare", label: "Jare" },
     ] as const;
-    const { container } = render(LearnSectionNav, {
+    const { container } = render(SectionNav, {
       props: { sections, label: "Qaybaha hagaha" },
     });
 

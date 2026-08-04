@@ -1,6 +1,9 @@
 import { learnContentSo } from "./content/learn.so";
+import { legalContentSo } from "./content/legal.so";
 
 export * from "./content/learn.so";
+export * from "./content/legal.so";
+export * from "./content/types";
 
 export const defaultLocale = "so";
 export const locales = ["so"] as const;
@@ -297,8 +300,7 @@ export const siteContent = {
     nav: {
       home: "Hoy",
       learn: "Baro",
-      privacy: "Asturnaanta",
-      terms: "Shuruudaha",
+      legal: "Sharciga",
       localPlay: "Ciyaar qalabkan",
       onlinePlay: "Ciyaar marti ah",
     },
@@ -311,8 +313,6 @@ export const siteContent = {
     },
     footer: {
       tagline: "Shaxda Soomaali keliya, si fudud loogu barto loona ciyaaro.",
-      reviewNote:
-        "Qoraalka asturnaanta iyo shuruudaha wuxuu u baahan yahay dib u eegis mulkiile iyo sharci ka hor daahfurka.",
     },
     errorPage: {
       notFound: {
@@ -359,68 +359,7 @@ export const siteContent = {
         ],
       },
       learn: learnContentSo,
-      privacy: {
-        path: "/privacy",
-        title: "Asturnaanta",
-        description:
-          "Qoraal asturnaan oo qabyo ah oo sharxaya habka V1.0: akoon la'aan, marti, kayd qalab, iyo martigelin Cloudflare.",
-        heading: "Asturnaanta",
-        intro:
-          "Boggan waa qoraal qabyo ah oo ku saabsan sida V1.0 loo qorsheeyay. Waa inuu maro dib u eegis mulkiile iyo sharci ka hor daahfurka.",
-        sections: [
-          {
-            title: "Akoon la'aan",
-            body: "V1.0 looma qorsheyn akoon, galitaan Google, magac joogto ah, taariikh ciyaareed joogto ah, ama miis darajo. Ciyaarta martida waxay isticmaashaa magac bandhig marti ah oo fudud.",
-          },
-          {
-            title: "Kaydka qalabka",
-            body: "Ciyaarta hal qalab, dookhyada yaryar, iyo aqoonsiga martida ee fudud waxaa loo qorsheeyay in lagu hayo localStorage ee qalabka isticmaalaha.",
-          },
-          {
-            title: "Ciyaarta martida",
-            body: "Ciyaarta martida ee V1.0 waxaa loo qorsheeyay inay noqoto mid aan darajo lahayn oo inta badan aan joogto loo kaydin. Xaaladda ciyaarta firfircoon waxay ku jirtaa qolka ciyaarta inta ciyaartu socoto.",
-          },
-          {
-            title: "Martigelin",
-            body: "Adeegga waxaa loo qorsheeyay in lagu martigeliyo Cloudflare Workers iyo faylal taagan. Diiwaanada iyo cabbirka hawlgalka waa in lagu koobaa waxa adeegga u baahan yahay.",
-          },
-          {
-            title: "Lacag iyo xayeysiis",
-            body: "V1.0 kuma jiro xayeysiis, lacag bixin, taageero ganacsi, xiriir iib, ama iib. Haddii siyaasaddan is beddesho mustaqbalka, qoraalkan waa in la cusboonaysiiyaa.",
-          },
-        ],
-      },
-      terms: {
-        path: "/terms",
-        title: "Shuruudaha",
-        description:
-          "Shuruudaha isticmaalka oo qabyo ah oo loogu talagalay Shaxda V1.0 iyo ciyaarta martida.",
-        heading: "Shuruudaha",
-        intro:
-          "Boggan waa qoraal qabyo ah oo u baahan dib u eegis mulkiile iyo sharci ka hor daahfurka. Wuxuu sharxayaa isticmaalka guud ee Shaxda V1.0.",
-        sections: [
-          {
-            title: "Isticmaalka adeegga",
-            body: "Shaxda waxaa loogu talagalay barasho iyo ciyaar laba qof ah. Isticmaaluhu waa inuu si cadaalad ah u ciyaaro oo uusan isku dayin inuu dhaawaco adeegga ama ciyaaryahannada kale.",
-          },
-          {
-            title: "Ciyaarta martida",
-            body: "Magacyada bandhigga ee martida waa inay ahaadaan kuwo edeb leh. Qolalka martida waxaa loogu talagalay ciyaar fudud oo aan darajo lahayn.",
-          },
-          {
-            title: "Xeerarka ciyaarta",
-            body: "Xeerarka ciyaarta waxay raacayaan dukumentiga ciyaarta ee mashruuca. Haddii ciyaaryahanno dhaqameed ama tijaabooyin bulshada ahi caddeeyaan sixid, xeerarka iyo adeegga waa in si wadajir ah loo cusboonaysiiyaa.",
-          },
-          {
-            title: "Helitaanka adeegga",
-            body: "Adeeggu wuxuu ku jiraa dhisme V1.0 ah. Mararka qaar wuu istaagi karaa, wuu is beddeli karaa, ama qaybo ka mid ah lama heli karo inta horumarintu socoto.",
-          },
-          {
-            title: "Waxyaabaha aan ku jirin V1.0",
-            body: "V1.0 kuma jiro akoon, galitaanka Google, taariikh ciyaareed joogto ah, miis darajo, sheeko fariin ah, caqli macmal, tartan rasmi ah, xayeysiis, taageero ganacsi, ama lacag bixin.",
-          },
-        ],
-      },
+      legal: legalContentSo,
     },
   },
 } as const;

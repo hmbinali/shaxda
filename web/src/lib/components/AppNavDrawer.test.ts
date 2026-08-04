@@ -9,17 +9,20 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AppShellHarness from "$lib/shell/AppShellHarness.svelte";
 
-vi.mock("$app/state", () => ({
+const appState = vi.hoisted(() => ({
   page: {
     url: new URL("https://shaxda.example/local"),
   },
 }));
+
+vi.mock("$app/state", () => appState);
 
 const sidebar = siteContent.so.sidebar;
 const nav = siteContent.so.nav;
 
 describe("AppNavDrawer", () => {
   beforeEach(() => {
+    appState.page.url = new URL("https://shaxda.example/local");
     Object.defineProperty(Element.prototype, "animate", {
       configurable: true,
       value: vi.fn(() => {
@@ -67,11 +70,8 @@ describe("AppNavDrawer", () => {
       drawerQueries.getByRole("link", { name: nav.localPlay }),
     ).toHaveAttribute("aria-current", "page");
     expect(
-      drawerQueries.getByRole("link", { name: nav.privacy }),
-    ).toHaveAttribute("href", "/privacy");
-    expect(
-      drawerQueries.getByRole("link", { name: nav.terms }),
-    ).toHaveAttribute("href", "/terms");
+      drawerQueries.getByRole("link", { name: nav.legal }),
+    ).toHaveAttribute("href", "/legal");
     expect(drawer).toHaveTextContent(siteContent.so.footer.tagline);
 
     const focusable = Array.from(
@@ -149,6 +149,22 @@ describe("AppNavDrawer", () => {
     );
 
     await fireEvent.click(currentRouteLink);
+
+    await waitForDrawerToClose();
+    expect(menuButton).toHaveFocus();
+  });
+
+  it("marks the legal footer link current and closes after selection", async () => {
+    appState.page.url = new URL("https://shaxda.example/legal");
+    render(AppShellHarness, { withDrawer: true });
+    const menuButton = await openDrawer();
+    const legalLink = within(
+      screen.getByRole("dialog", { name: "Hagaha bogga" }),
+    ).getByRole("link", { name: nav.legal });
+    legalLink.addEventListener("click", (event) => event.preventDefault());
+
+    expect(legalLink).toHaveAttribute("aria-current", "page");
+    await fireEvent.click(legalLink);
 
     await waitForDrawerToClose();
     expect(menuButton).toHaveFocus();

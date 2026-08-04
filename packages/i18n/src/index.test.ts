@@ -11,18 +11,28 @@ describe("i18n scaffold", () => {
   it("provides metadata for every C1 public page", () => {
     const pages = siteContent.so.pages;
 
-    expect(Object.keys(pages).sort()).toEqual([
-      "home",
-      "learn",
-      "privacy",
-      "terms",
-    ]);
+    expect(Object.keys(pages).sort()).toEqual(["home", "learn", "legal"]);
 
     for (const page of Object.values(pages)) {
       expect(page.title.length).toBeGreaterThan(0);
       expect(page.description.length).toBeGreaterThan(0);
       expect(page.path).toMatch(/^\//);
     }
+  });
+
+  it("provides one complete combined legal destination", () => {
+    const { legal } = siteContent.so.pages;
+    const sectionIds = legal.sections.map((section) => section.id);
+
+    expect(legal.path).toBe("/legal");
+    expect(sectionIds.length).toBeGreaterThan(0);
+    expect(new Set(sectionIds).size).toBe(sectionIds.length);
+    expect(legal.sections.every((section) => section.heading.length > 0)).toBe(
+      true,
+    );
+    expect(sectionIds.every((id) => /^[a-z-]+$/.test(id))).toBe(true);
+    expect(siteContent.so.nav).not.toHaveProperty("privacy");
+    expect(siteContent.so.nav).not.toHaveProperty("terms");
   });
 
   it("preserves required Somali game terms in public content", () => {

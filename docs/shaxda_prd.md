@@ -464,12 +464,12 @@ Required routes:
 
 - `/`;
 - `/learn`;
-- `/privacy`;
-- `/terms`.
+- `/legal`.
 
 `/learn` is the single public learning and rules route. `/rules` is retired and
-must return 404 rather than redirecting. `/help` and `/legal` are separate
-follow-ups and are not part of the finalized V1.0 public route set. `/board`
+must return 404 rather than redirecting. `/legal` is the single combined legal
+route added after V1.0; `/privacy` and `/terms` are retired and return 404 in the
+same way as `/rules`. `/help` remains a separate follow-up. `/board`
 remains an unlinked internal fixture gallery pending a separate pre-launch
 decision to remove, gate, or retain it.
 
@@ -1025,8 +1025,7 @@ Includes:
 - beginner guide and full rules in the same progressive page;
 - jare/irmaan/movement explanations;
 - quick start;
-- privacy;
-- terms;
+- one combined legal page;
 - Somali-only content;
 - SEO;
 - Open Graph;

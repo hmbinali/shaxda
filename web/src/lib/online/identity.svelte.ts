@@ -59,12 +59,12 @@ export class OnlineIdentity {
           ...(roomCode === undefined ? {} : { roomCode }),
         }),
       });
-      if (!response.ok) throw new Error("Online identity ticket failed.");
+      if (!response.ok) throw new Error("identityUnavailable");
       const result = onlineIdentityTicketResponseSchema.parse(
         await response.json(),
       );
       if (result.expiresAt <= this.#now()) {
-        throw new Error("Online identity ticket expired before use.");
+        throw new Error("identityExpired");
       }
       return result.ticket;
     } catch (error) {

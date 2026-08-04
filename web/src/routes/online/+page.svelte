@@ -19,6 +19,7 @@
     saveSoundPreference,
   } from "$lib/audio/sound";
   import ConfirmDialog from "$components/game/ConfirmDialog.svelte";
+  import Avatar from "$components/account/Avatar.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
   import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
   import OnlineTabletop from "$components/game/OnlineTabletop.svelte";
@@ -32,6 +33,7 @@
     saveGuestDisplayName,
   } from "$lib/online/guestIdentity";
   import { OnlineCreateRoomError } from "$lib/online/onlineGameClient";
+  import { createOnlineIdentity } from "$lib/online/identity.svelte";
   import { createOnlineGameController } from "$lib/online/onlineGame.svelte";
   import { createTransientToast } from "$lib/notices/toast.svelte";
   import { registerTopBar } from "$lib/shell/appShell.svelte";
@@ -54,6 +56,7 @@
   const copy = messages.so.onlineGame;
   const gameCopy = messages.so.localGame;
   const controller = createOnlineGameController();
+  const identity = createOnlineIdentity();
   const soundPlayer = getSoundPlayer();
   const toast = createTransientToast();
   const topBarCopy = siteContent.so.topBar;
@@ -76,6 +79,8 @@
   let turnstileWidgetId: string | undefined;
   let turnstileLoading: Promise<TurnstileApi | undefined> | null = null;
   let copyTimeout: number | undefined;
+  let guestFallbackAllowed = $state(false);
+  let returnTo = $state("/online");
 
   const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "";
   const turnstileRequired = $derived(turnstileSiteKey.length > 0);
@@ -87,6 +92,16 @@
       : `${pageOrigin}/online?room=${controller.roomCode}`,
   );
   const hasInviteCode = $derived(roomCodeInput.trim().length > 0);
+  const identityUsesAccount = $derived(identity.status === "complete");
+  const guestFormAvailable = $derived(
+    identity.status === "signedOut" ||
+      identity.status === "incomplete" ||
+      (identity.status === "unavailable" && guestFallbackAllowed),
+  );
+  const identityFormBlocked = $derived(
+    identity.status === "loading" ||
+      (identity.status === "unavailable" && !guestFallbackAllowed),
+  );
   const lobbyNotice = $derived(resolveLobbyNotice());
 
   registerTopBar(() => {
@@ -172,13 +187,13 @@
     void soundPlayer.preload();
     pageOrigin = window.location.origin;
 
-    const linkedRoom = new URL(window.location.href).searchParams.get("room");
+    const currentUrl = new URL(window.location.href);
+    returnTo = `${currentUrl.pathname}${currentUrl.search}`;
+    const linkedRoom = currentUrl.searchParams.get("room");
     if (linkedRoom !== null) {
       roomCodeInput = linkedRoom.trim().toUpperCase();
-      if (roomCodeInput.length > 0 && displayName.trim().length > 0) {
-        controller.joinRoom(roomCodeInput, guestId, displayName);
-      }
     }
+    void refreshIdentity(true);
 
     return () => {
       if (copyTimeout !== undefined) {
@@ -271,7 +286,7 @@
   });
 
   async function createRoom(): Promise<void> {
-    if (!hasName()) {
+    if (!hasSeatIdentity()) {
       return;
     }
 
@@ -282,13 +297,19 @@
 
     busy = true;
     toast.clear();
-    saveGuestDisplayName(displayName);
+    if (!identityUsesAccount) saveGuestDisplayName(displayName);
 
     try {
+      const identityTicket = identityUsesAccount
+        ? await identity.requestTicket("create")
+        : null;
+      const seatName = identity.account?.username ?? displayName;
       const roomCode = await controller.createRoom(
         guestId,
-        displayName,
+        seatName,
         turnstileToken,
+        identityTicket ?? undefined,
+        identityUsesAccount ? requestIdentityTicket : undefined,
       );
       roomCodeInput = roomCode;
       replaceState(resolve(`/online?room=${roomCode}`), {});
@@ -296,7 +317,9 @@
       toast.show(
         error instanceof OnlineCreateRoomError
           ? errorMessage(error.code)
-          : copy.errors.createFailed,
+          : error instanceof Error
+            ? errorMessage(error.message)
+            : copy.errors.createFailed,
       );
       resetTurnstile();
     } finally {
@@ -305,7 +328,7 @@
   }
 
   function joinRoom(): void {
-    if (!hasName()) {
+    if (!hasSeatIdentity()) {
       return;
     }
 
@@ -316,8 +339,13 @@
     }
 
     toast.clear();
-    saveGuestDisplayName(displayName);
-    controller.joinRoom(roomCode, guestId, displayName);
+    if (!identityUsesAccount) saveGuestDisplayName(displayName);
+    controller.joinRoom(
+      roomCode,
+      guestId,
+      identity.account?.username ?? displayName,
+      identityUsesAccount ? requestIdentityTicket : undefined,
+    );
     replaceState(resolve(`/online?room=${roomCode}`), {});
   }
 
@@ -371,14 +399,37 @@
     }
   }
 
-  function hasName(): boolean {
-    if (guestId.length === 0 || displayName.trim().length === 0) {
+  function hasSeatIdentity(): boolean {
+    if (identityFormBlocked || guestId.length === 0) return false;
+    if (!identityUsesAccount && displayName.trim().length === 0) {
       toast.show(copy.errors.nameRequired);
       nameInput?.focus();
       return false;
     }
 
     return true;
+  }
+
+  async function refreshIdentity(autoJoin = false): Promise<void> {
+    guestFallbackAllowed = false;
+    await identity.refresh();
+    if (
+      autoJoin &&
+      roomCodeInput.length > 0 &&
+      (identity.status === "complete" ||
+        ((identity.status === "signedOut" ||
+          identity.status === "incomplete") &&
+          displayName.trim().length > 0))
+    ) {
+      joinRoom();
+    }
+  }
+
+  function requestIdentityTicket(
+    action: "join" | "reconnect",
+    roomCode: string,
+  ): Promise<string | null> {
+    return identity.requestTicket(action, roomCode);
   }
 
   function playerName(player: "A" | "B"): string {
@@ -535,16 +586,73 @@
                 }
               }}
             >
-              <label class="grid gap-2 text-sm font-semibold text-board-900">
-                {copy.nameLabel}
-                <input
-                  bind:this={nameInput}
-                  class="rounded border border-board-700/25 bg-white px-3 py-2 font-normal text-board-900"
-                  bind:value={displayName}
-                  maxlength="40"
-                  placeholder={copy.form.namePlaceholder}
-                />
-              </label>
+              {#if identity.status === "signedOut"}
+                <NoticeBanner tone="info">
+                  {copy.identity.signIn}
+                  <a
+                    class="ml-1 font-semibold underline"
+                    href={resolve(
+                      `/login?returnTo=${encodeURIComponent(returnTo)}` as "/login",
+                    )}>{copy.identity.signInAction}</a
+                  >
+                </NoticeBanner>
+              {:else if identity.status === "incomplete"}
+                <NoticeBanner tone="warning">
+                  {copy.identity.incomplete}
+                  <a
+                    class="ml-1 font-semibold underline"
+                    href={resolve(
+                      `/register?returnTo=${encodeURIComponent(returnTo)}` as "/register",
+                    )}>{copy.identity.completeRegistration}</a
+                  >
+                </NoticeBanner>
+              {:else if identity.status === "unavailable" && !guestFallbackAllowed}
+                <NoticeBanner tone="warning">
+                  {copy.identity.unavailable}
+                </NoticeBanner>
+                <div class="flex flex-wrap gap-2">
+                  <Button onclick={() => void refreshIdentity()}>
+                    {copy.identity.retry}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onclick={() => (guestFallbackAllowed = true)}
+                  >
+                    {copy.identity.continueAsGuest}
+                  </Button>
+                </div>
+              {/if}
+
+              {#if identityUsesAccount && identity.account !== null}
+                <div
+                  class="flex items-center gap-3 rounded border border-board-700/20 bg-board-50 px-3 py-2"
+                  data-testid="online-account-identity"
+                >
+                  <Avatar
+                    username={identity.account.username}
+                    initial={identity.account.avatar.initial}
+                    color={identity.account.avatar.color}
+                    avatarMode={identity.account.avatar.mode}
+                    imageUrl={identity.account.avatar.imageUrl}
+                    size="small"
+                  />
+                  <span class="min-w-0 truncate text-sm font-semibold">
+                    {copy.identity.completePrefix}
+                    @{identity.account.username}
+                  </span>
+                </div>
+              {:else if guestFormAvailable || identity.status === "loading"}
+                <label class="grid gap-2 text-sm font-semibold text-board-900">
+                  {copy.nameLabel}
+                  <input
+                    bind:this={nameInput}
+                    class="rounded border border-board-700/25 bg-white px-3 py-2 font-normal text-board-900"
+                    bind:value={displayName}
+                    maxlength="40"
+                    placeholder={copy.form.namePlaceholder}
+                  />
+                </label>
+              {/if}
 
               <label class="grid gap-2 text-sm font-semibold text-board-900">
                 {copy.roomCodeLabel}
@@ -564,7 +672,9 @@
                 {#if hasInviteCode}
                   <Button
                     variant="primary"
-                    disabled={busy || guestId.length === 0}
+                    disabled={busy ||
+                      identityFormBlocked ||
+                      guestId.length === 0}
                     onclick={joinRoom}
                     testId="join-room"
                   >
@@ -574,6 +684,7 @@
                 <Button
                   variant={hasInviteCode ? "outline" : "primary"}
                   disabled={busy ||
+                    identityFormBlocked ||
                     guestId.length === 0 ||
                     (turnstileRequired && !turnstileToken)}
                   onclick={() => void createRoom()}
@@ -584,7 +695,9 @@
                 </Button>
                 {#if !hasInviteCode}
                   <Button
-                    disabled={busy || guestId.length === 0}
+                    disabled={busy ||
+                      identityFormBlocked ||
+                      guestId.length === 0}
                     onclick={joinRoom}
                     testId="join-room"
                   >

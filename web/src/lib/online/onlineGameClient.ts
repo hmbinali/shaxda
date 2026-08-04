@@ -16,13 +16,14 @@ export type OnlineConnectionStatus =
   | "closed"
   | "replaced"
   | "error";
+export type RoomTicketAction = Exclude<TicketAction, "create">;
 
 export interface JoinRoomOptions {
   roomCode: string;
   guestId: string;
   displayName?: string;
   requestTicket?: (
-    action: TicketAction,
+    action: RoomTicketAction,
     roomCode: string,
   ) => Promise<string | null>;
 }
@@ -58,7 +59,7 @@ export class OnlineGameClient {
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   #hasOpened = false;
   #scopeFallbackUsed = false;
-  #lastJoinAction: TicketAction | null = null;
+  #lastJoinAction: RoomTicketAction | null = null;
   #httpBase: string;
   #wsBase: string;
   #fetch: typeof fetch;
@@ -129,7 +130,7 @@ export class OnlineGameClient {
       }
       this.#reconnectAttempt = 0;
       this.emitStatus("connected");
-      const action: TicketAction = this.#hasOpened ? "reconnect" : "join";
+      const action: RoomTicketAction = this.#hasOpened ? "reconnect" : "join";
       this.#hasOpened = true;
       void this.sendJoin(socket, options, action);
     });
@@ -190,7 +191,7 @@ export class OnlineGameClient {
   private async sendJoin(
     socket: WebSocket,
     options: JoinRoomOptions,
-    action: TicketAction,
+    action: RoomTicketAction,
   ): Promise<void> {
     try {
       const identityTicket = options.requestTicket

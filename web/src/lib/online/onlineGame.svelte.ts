@@ -6,7 +6,6 @@ import type {
   PointId,
 } from "@shaxda/game-engine";
 import type { ServerMessage } from "@shaxda/shared";
-import type { TicketAction } from "@shaxda/shared/identity";
 import {
   mapPointClick,
   type PointInteractionInvalidReason,
@@ -21,6 +20,7 @@ import { inferOpponentAction } from "./inferAction";
 import {
   OnlineGameClient,
   type OnlineConnectionStatus,
+  type RoomTicketAction,
 } from "./onlineGameClient";
 
 export type OnlinePresence = Extract<
@@ -122,7 +122,7 @@ export class OnlineGameController {
     turnstileToken?: string,
     identityTicket?: string,
     requestTicket?: (
-      action: TicketAction,
+      action: RoomTicketAction,
       roomCode: string,
     ) => Promise<string | null>,
   ): Promise<string> {
@@ -139,7 +139,7 @@ export class OnlineGameController {
     guestId: string,
     displayName: string,
     requestTicket?: (
-      action: TicketAction,
+      action: RoomTicketAction,
       roomCode: string,
     ) => Promise<string | null>,
   ): void {

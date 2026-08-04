@@ -5,6 +5,10 @@ compatibility_date = "2026-07-05"
 [observability]
 enabled = true
 
+# Dev/test only. Preview and production use Wrangler secrets instead.
+[vars]
+ONLINE_IDENTITY_SECRET = "shaxda-online-identity-dev-test-secret-000000000001"
+
 [[durable_objects.bindings]]
 name = "MATCH_ROOM"
 class_name = "MatchRoom"

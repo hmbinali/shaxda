@@ -1,2 +1,4 @@
 ALLOWED_ORIGIN=http://localhost:5173
 TURNSTILE_SECRET=
+# Must exactly match web/.dev.vars ONLINE_IDENTITY_SECRET.
+ONLINE_IDENTITY_SECRET=replace-with-the-same-random-online-identity-secret

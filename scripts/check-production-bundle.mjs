@@ -3,6 +3,8 @@ const webRoot = new URL("../web/", import.meta.url);
 const bundleRoot = new URL(".svelte-kit/cloudflare/", webRoot);
 const fallbackOrigins = ["https://shaxda.example", "http://127.0.0.1:8787"];
 const committedTestSecret = "shaxda-e2e-only-secret-48-characters-long-000000";
+const committedOnlineIdentityTestSecret =
+  "shaxda-online-identity-dev-test-secret-000000000001";
 
 function parseEnv(contents) {
   const env = {};
@@ -103,14 +105,19 @@ const presentFallbacks = fallbackOrigins.filter((fallback) =>
 const forbiddenSecrets = [
   env.BETTER_AUTH_SECRET,
   env.GOOGLE_CLIENT_SECRET,
+  env.ONLINE_IDENTITY_SECRET,
+  env.ONLINE_IDENTITY_SECRET_PREVIOUS,
   committedTestSecret,
+  committedOnlineIdentityTestSecret,
 ].filter((value) => typeof value === "string" && value.length > 0);
 const exposedSecrets = forbiddenSecrets.filter((secret) =>
   contents.some((content) => content.includes(secret)),
 );
 
 if (exposedSecrets.length > 0) {
-  console.error("Production bundle contains an authentication secret.");
+  console.error(
+    "Production bundle contains an authentication or identity secret.",
+  );
   process.exit(1);
 }
 

@@ -4,6 +4,7 @@ import {
   avatarColorForUserId,
   avatarInitial,
   avatarModeSchema,
+  canChangeUsername,
   nextUsernameChangeAt,
   validateUsername,
 } from "@shaxda/shared";
@@ -24,17 +25,21 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
   if (stored === null) redirect(303, "/login?returnTo=/account");
 
   const avatarMode = avatarModeSchema.catch("initial").parse(user.avatarMode);
+  const changedAt =
+    stored.username_changed_at === null
+      ? null
+      : new Date(stored.username_changed_at);
   return {
     settings: {
       username: user.username,
       email: user.email,
       joinedAt: dateFormatter.format(user.createdAt),
+      // Only surface the cooldown while it is still running; once the account is
+      // eligible again the row would otherwise show a date in the past.
       nextChangeAt:
-        stored.username_changed_at === null
+        changedAt === null || canChangeUsername(changedAt)
           ? null
-          : dateFormatter.format(
-              nextUsernameChangeAt(new Date(stored.username_changed_at)),
-            ),
+          : dateFormatter.format(nextUsernameChangeAt(changedAt)),
       avatarMode,
       imageUrl: user.image ?? null,
       avatarColor: avatarColorForUserId(user.id),

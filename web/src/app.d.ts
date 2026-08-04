@@ -16,8 +16,46 @@ declare global {
   }
 
   namespace App {
+    interface Locals {
+      session: {
+        id: string;
+        userId: string;
+        expiresAt: Date;
+        token: string;
+        createdAt: Date;
+        updatedAt: Date;
+      } | null;
+      user: {
+        id: string;
+        name: string;
+        email: string;
+        emailVerified: boolean;
+        image?: string | null;
+        username?: string | null;
+        avatarMode?: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      } | null;
+    }
+
+    type AccountPageData =
+      | null
+      | { status: "incomplete" }
+      | {
+          status: "complete";
+          username: string;
+          avatarMode: "initial" | "google";
+          imageUrl: string | null;
+          avatarColor: string;
+          initial: string;
+        };
+
+    interface PageData {
+      account: AccountPageData;
+    }
+
     interface Platform {
-      env?: Record<string, unknown>;
+      env: import("$lib/server/auth/options").AuthEnvironment;
       context?: {
         waitUntil(promise: Promise<unknown>): void;
       };

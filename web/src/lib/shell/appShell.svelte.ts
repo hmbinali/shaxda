@@ -9,6 +9,13 @@ export type NavPanelItem =
       id: string;
       label: string;
       icon: Component;
+      formAction: string;
+      danger?: boolean;
+    }
+  | {
+      id: string;
+      label: string;
+      icon: Component;
       onSelect: () => void;
       danger?: boolean;
     };

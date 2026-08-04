@@ -5,17 +5,21 @@
   import AppNavPanel from "$lib/components/AppNavPanel.svelte";
   import BrandMark from "$lib/components/BrandMark.svelte";
   import { getAppShell } from "$lib/shell/appShell.svelte";
-  import { defaultTopBar } from "$lib/shell/topBarConfig";
+  import {
+    defaultTopBar,
+    type AccountNavigationState,
+  } from "$lib/shell/topBarConfig";
 
   interface Props {
     pathname: string;
+    account?: AccountNavigationState;
   }
 
-  let { pathname }: Props = $props();
+  let { pathname, account = null }: Props = $props();
 
   const shell = getAppShell();
   const topBar = siteContent.so.topBar;
-  const config = $derived(shell.config ?? defaultTopBar(pathname));
+  const config = $derived(shell.config ?? defaultTopBar(pathname, account));
   let previousPathname = untrack(() => pathname);
 
   $effect(() => {

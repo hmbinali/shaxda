@@ -6,16 +6,18 @@
     setAppShell,
     type TopBarConfig,
   } from "./appShell.svelte";
+  import type { AccountNavigationState } from "./topBarConfig";
 
   interface Props {
     config: TopBarConfig;
     pathname?: string;
+    account?: AccountNavigationState;
   }
 
-  let { config, pathname = "/test" }: Props = $props();
+  let { config, pathname = "/test", account = null }: Props = $props();
 
   setAppShell(createAppShell());
   registerTopBar(() => config);
 </script>
 
-<AppTopBar {pathname} />
+<AppTopBar {pathname} {account} />

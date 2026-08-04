@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openAccountPanel } from "./fixtures/panel";
 
 const storageKey = "shaxda:local-game:v1";
 const movementJareState = JSON.stringify({
@@ -65,8 +66,7 @@ test.describe("Q1 mobile responsive smoke", () => {
     const accountButton = page.getByRole("button", {
       name: "Fur liiska akoonka",
     });
-    await accountButton.click();
-    const accountPanel = page.getByRole("menu", { name: "Liiska akoonka" });
+    const accountPanel = await openAccountPanel(page);
     await expect(accountPanel).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(accountPanel).toBeHidden();

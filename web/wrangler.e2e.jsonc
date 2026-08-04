@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "shaxda-web-e2e",
+  "compatibility_date": "2026-07-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": ".svelte-kit/cloudflare/_worker.js",
+  "workers_dev": true,
+  "vars": {
+    "AUTH_BASE_URL": "http://127.0.0.1:4173",
+    "BETTER_AUTH_SECRET": "shaxda-e2e-only-secret-48-characters-long-000000",
+    "GOOGLE_CLIENT_ID": "shaxda-e2e-google-client",
+    "GOOGLE_CLIENT_SECRET": "shaxda-e2e-google-secret",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "shaxda-db-e2e",
+      "database_id": "local-e2e-database",
+      "migrations_dir": "../packages/db/migrations",
+      "migrations_table": "d1_migrations",
+    },
+  ],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".svelte-kit/cloudflare",
+  },
+}

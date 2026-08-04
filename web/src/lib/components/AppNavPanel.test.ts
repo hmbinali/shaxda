@@ -29,6 +29,12 @@ function renderPanel(onResign = vi.fn()) {
               icon: BookOpen,
               href: "/learn",
             },
+            {
+              id: "logout",
+              label: "Ka bax akoonka",
+              icon: LogOut,
+              formAction: "/logout",
+            },
           ],
         },
         {
@@ -73,6 +79,11 @@ describe("AppNavPanel", () => {
       within(menu).getByRole("menuitem", { name: "Baro xeerarka" }),
     ).toHaveAttribute("href", "/learn");
     const resign = within(menu).getByRole("menuitem", { name: "Is dhiib" });
+    const logout = within(menu).getByRole("menuitem", {
+      name: "Ka bax akoonka",
+    });
+    expect(logout.closest("form")).toHaveAttribute("method", "POST");
+    expect(logout.closest("form")).toHaveAttribute("action", "/logout");
     expect(resign).toHaveClass("text-danger");
 
     await fireEvent.click(resign);

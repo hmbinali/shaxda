@@ -11,7 +11,15 @@ describe("i18n scaffold", () => {
   it("provides metadata for every C1 public page", () => {
     const pages = siteContent.so.pages;
 
-    expect(Object.keys(pages).sort()).toEqual(["home", "learn", "legal"]);
+    expect(Object.keys(pages).sort()).toEqual([
+      "account",
+      "home",
+      "learn",
+      "legal",
+      "login",
+      "profile",
+      "register",
+    ]);
 
     for (const page of Object.values(pages)) {
       expect(page.title.length).toBeGreaterThan(0);

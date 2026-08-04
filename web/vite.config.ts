@@ -109,7 +109,12 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/local",
         navigateFallbackAllowlist: [/\/local$/],
-        globPatterns: ["**/*.{js,css,html,svg,png,webp,wav,webmanifest}"],
+        globPatterns: ["**/*.{js,css,html,json,svg,png,webp,wav,webmanifest}"],
+        ignoreURLParametersMatching: [
+          /^utm_/,
+          /^fbclid$/,
+          /^x-sveltekit-invalidated$/,
+        ],
         skipWaiting: false,
         clientsClaim: true,
       },

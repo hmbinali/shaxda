@@ -1,5 +1,6 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { openAccountPanel } from "./fixtures/panel";
 
 const routes = ["/", "/learn", "/legal", "/local", "/online"];
 
@@ -33,10 +34,7 @@ test.describe("Q1 accessibility audit", () => {
     page,
   }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Fur liiska akoonka" }).click();
-    await expect(
-      page.getByRole("menu", { name: "Liiska akoonka" }),
-    ).toBeVisible();
+    await openAccountPanel(page);
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

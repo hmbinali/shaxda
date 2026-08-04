@@ -5,6 +5,18 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": ".svelte-kit/cloudflare/_worker.js",
   "workers_dev": true,
+  "vars": {
+    "AUTH_BASE_URL": "https://REPLACE_WITH_SHAXDA_WEB_SUBDOMAIN.workers.dev",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "shaxda-db-preview",
+      "database_id": "REPLACE_WITH_SHAXDA_DB_PREVIEW_ID",
+      "migrations_dir": "../packages/db/migrations",
+      "migrations_table": "d1_migrations",
+    },
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": ".svelte-kit/cloudflare",

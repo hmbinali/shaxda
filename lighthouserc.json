@@ -7,7 +7,7 @@
         "http://127.0.0.1:4173/local",
         "http://127.0.0.1:4173/online"
       ],
-      "startServerCommand": "pnpm --filter @shaxda/web preview --host 127.0.0.1 --port 4173",
+      "startServerCommand": "node scripts/start-web-e2e.mjs",
       "startServerReadyPattern": "Local:",
       "numberOfRuns": 1
     },

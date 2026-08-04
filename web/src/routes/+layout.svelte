@@ -9,7 +9,7 @@
   import { siteContent } from "@shaxda/i18n";
   import "../app.css";
 
-  let { children } = $props();
+  let { children, data } = $props();
 
   const pwa = createPwaController();
   const shell = createAppShell();
@@ -122,7 +122,7 @@
       {siteContent.so.topBar.skipToContent}
     </a>
     <PwaNotices />
-    <AppTopBar pathname={page.url.pathname} />
+    <AppTopBar pathname={page.url.pathname} account={data.account} />
     <!-- svelte-ignore a11y_no_noninteractive_tabindex (the independently scrolling main region must be keyboard reachable) -->
     <main id="main-content" tabindex="0" class="min-w-0 flex-1 overflow-y-auto">
       {@render children()}

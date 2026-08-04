@@ -18,12 +18,16 @@
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.6.25",
     "@lucide/svelte": "^1.23.0",
+    "@shaxda/db": "workspace:*",
     "@shaxda/game-engine": "workspace:*",
     "@shaxda/i18n": "workspace:*",
     "@shaxda/shared": "workspace:*",
+    "better-auth": "1.6.25",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.2",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

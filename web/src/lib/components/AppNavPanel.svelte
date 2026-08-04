@@ -79,6 +79,18 @@
               <item.icon size={19} aria-hidden="true" />
               <span>{item.label}</span>
             </a>
+          {:else if "formAction" in item}
+            <form method="POST" action={item.formAction}>
+              <button
+                role="menuitem"
+                type="submit"
+                class="menu-item flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-board-900 outline-none transition-colors hover:bg-board-100/75 focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none"
+                class:text-danger={item.danger}
+              >
+                <item.icon size={19} aria-hidden="true" />
+                <span>{item.label}</span>
+              </button>
+            </form>
           {:else}
             <button
               role="menuitem"

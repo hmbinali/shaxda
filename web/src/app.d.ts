@@ -38,6 +38,22 @@ declare global {
       } | null;
     }
 
+    type AccountPageData =
+      | null
+      | { status: "incomplete" }
+      | {
+          status: "complete";
+          username: string;
+          avatarMode: "initial" | "google";
+          imageUrl: string | null;
+          avatarColor: string;
+          initial: string;
+        };
+
+    interface PageData {
+      account: AccountPageData;
+    }
+
     interface Platform {
       env: import("$lib/server/auth/options").AuthEnvironment;
       context?: {

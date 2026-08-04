@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openAccountPanel } from "./fixtures/panel";
 
 const routes = [
   { path: "/", heading: "Shaxda" },
@@ -112,11 +113,8 @@ test.describe("C1 public content", () => {
       element.setAttribute("data-persistence-check", "present");
     });
 
-    await page.getByRole("button", { name: "Fur liiska akoonka" }).click();
-    await page
-      .getByRole("menu", { name: "Liiska akoonka" })
-      .getByRole("menuitem", { name: "Baro xeerarka" })
-      .click();
+    const accountPanel = await openAccountPanel(page);
+    await accountPanel.getByRole("menuitem", { name: "Baro xeerarka" }).click();
 
     await expect(page).toHaveURL(/\/learn$/);
     await expect(
@@ -146,9 +144,7 @@ test.describe("C1 public content", () => {
     const accountButton = page.getByRole("button", {
       name: "Fur liiska akoonka",
     });
-    await accountButton.click();
-    const panel = page.getByRole("menu", { name: "Liiska akoonka" });
-    await expect(panel).toBeVisible();
+    const panel = await openAccountPanel(page);
     await expect(main).toHaveCSS("overflow-y", "auto");
     const mainWidthWithPanel = await main.evaluate(
       (element) => element.getBoundingClientRect().width,

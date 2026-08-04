@@ -13,15 +13,24 @@
     "build": "tsc --noEmit",
     "format": "prettier --write .",
     "lint": "eslint .",
-    "test": "vitest run",
+    "schema:check": "node ./scripts/check-schema.mjs",
+    "schema:generate": "better-auth generate --config ./better-auth.cli.ts --output ./src/schema.generated.ts --yes",
+    "test": "vitest run --exclude 'src/**/*.worker.test.ts'",
+    "test:worker": "vitest run --config vitest.worker.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@shaxda/shared": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
+    "@better-auth/cli": "1.4.22",
+    "@cloudflare/vitest-pool-workers": "^0.18.0",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "better-auth": "1.6.25",
     "drizzle-kit": "^0.31.10",
     "typescript": "^5.8.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "wrangler": "^4.107.0"
   }
 }

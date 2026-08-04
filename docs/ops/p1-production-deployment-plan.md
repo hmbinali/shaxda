@@ -59,7 +59,7 @@ Two independent Workers, deployed separately, sharing `packages/game-engine` and
 - `nodejs_compat`, `compatibility_date = 2026-07-05`, `workers_dev: false`.
 - All six routes are `prerender = true`; `/local` and `/online` additionally set
   `ssr = false`, so gameplay is fully client-rendered and never calls the Worker.
-- PWA (`@vite-pwa/sveltekit`, generateSW): precaches 68 entries, `start_url: "/"`,
+- PWA (`@vite-pwa/sveltekit`, generateSW): precaches 67 entries, `start_url: "/"`,
   `navigateFallback: "/local"` restricted by `navigateFallbackAllowlist: [/\/local$/]`.
 
 **API Worker — `shaxda-worker`** (`worker/src/index.ts`)

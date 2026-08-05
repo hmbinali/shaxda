@@ -165,8 +165,69 @@ Starting production secret state: `shaxda-web` had none; `shaxda-worker` had onl
 `TURNSTILE_SECRET` from the V1.0 launch, which must not be rotated by this
 release.
 
-## Remaining work
+### Production deployment
 
-Set the four `shaxda-web` secrets and the one `shaxda-worker` identity secret,
-swap `web/.env.production` to production values, deploy the game Worker then the
-web Worker, and re-run the smoke test against `shaxda.app`.
+Deployed in dependency order, game Worker first:
+
+| Worker          | New version                            |
+| --------------- | -------------------------------------- |
+| `shaxda-worker` | `8e51f9a4-d3cf-447b-9087-67a1efb5335c` |
+| `shaxda-web`    | `9ad0eade-8837-41cc-b46a-19a89d2e4a09` |
+
+The production build was rebuilt against production `PUBLIC_*` values before the
+web deploy. The served bundle carries the production Turnstile site key and
+`shaxda.app` origins, with zero occurrences of the preview site key or either
+preview host. No rollback was needed.
+
+`BETTER_AUTH_SECRET` does appear as a string in one client chunk. It is the
+identifier inside Better Auth's isomorphic env accessor — a frozen object of
+getters that read `process.env` at runtime and resolve to undefined in a browser
+— not the value. Worker secrets are not available at build time, so no build can
+bake one in. Note also that `check-production-bundle.mjs` can only compare values
+it can see: with the real secrets held only as Worker secrets, its secret scan
+covered the committed dev/e2e literals rather than the live values.
+
+### Production verification
+
+| Check                                                 | Result                                                                                                |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `/`, `/login`, `/register`, `/local`, `/online`       | 200                                                                                                   |
+| `/account` signed out                                 | 303                                                                                                   |
+| `/u/nobody`                                           | 404                                                                                                   |
+| `/api/auth/get-session`                               | `null`, 200                                                                                           |
+| `/api/online/identity`                                | `{"status":"signedOut"}`, 200                                                                         |
+| `POST /api/online/identity` signed out / cross-origin | `401 signed-out` / `403 cross-origin-request`                                                         |
+| `POST /logout` cross-origin                           | `403`                                                                                                 |
+| `/health`                                             | `{"ok":true,"service":"shaxda"}`                                                                      |
+| `POST /rooms` no token / invalid token                | `403 turnstileFailed` (both)                                                                          |
+| `POST /rooms` forged ticket                           | `401 identityInvalid`                                                                                 |
+| Google authorization URL                              | `redirect_uri=https://shaxda.app/api/auth/callback/google`, scope `email profile openid`, PKCE `S256` |
+
+Immediately after the web deploy, `/login` returned 404 once while `/register`
+already returned 200. That was a stale edge-cached response from the V1.0 site,
+which had no `/login`; it cleared on its own and now returns 200 with
+`x-sveltekit-page: true`. Worth expecting on any route that returned 404 under
+V1.0 and was requested during pre-deploy checks.
+
+`wrangler tail` on both Workers during the smoke run captured five requests, all
+`outcome: ok`, with no exceptions and no error or warning logs. A first attempt at
+log capture recorded nothing because macOS has no `timeout` binary; the tails were
+re-run without it.
+
+## Remaining browser-only checks on production
+
+Everything below needs a real Google account and a browser, and none of it can be
+scripted because the production Turnstile secret makes room creation require a
+real widget token:
+
+- Google sign-in, consent, and callback;
+- registration and username confirmation;
+- the account page showing the private email and next eligible change date;
+- public profile hiding email and Google full name;
+- username change and alias redirect;
+- guest create/join;
+- registered create/join;
+- registered reconnect and second-tab takeover;
+- a presence frame carrying no account id, email, Google full name, or token.
+
+The equivalents all passed on preview against the same code.

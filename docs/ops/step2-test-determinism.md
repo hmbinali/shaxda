@@ -152,14 +152,16 @@ pnpm check                      # includes check:e2e-isolation
 pnpm test:e2e
 ```
 
-`scripts/check-e2e-isolation.mjs` (also `pnpm check:e2e-isolation`) covers three
+`scripts/check-e2e-isolation.mjs` (also `pnpm check:e2e-isolation`) covers four
 contamination sources against throwaway fixtures in the system temp directory,
 each paired with a negative control so no assertion can pass vacuously:
 
 1. a conflicting `.dev.vars`, for both Workers — beaten by the env file;
-2. a conflicting `.env` / `.env.local` — beaten by `--mode e2e`;
+2. conflicting `.env`, `.env.local`, and `.env.production` files — beaten by
+   `--mode e2e`;
 3. conflicting process-level `PUBLIC_*` — beaten by the explicit child
-   environment.
+   environment;
+4. Wrangler's process-environment opt-in — forced off in every E2E child.
 
 It never reads, moves, rewrites, or prints a real `.dev.vars`.
 

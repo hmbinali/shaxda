@@ -119,6 +119,8 @@ spawnGroup(
     "exec",
     "vite",
     "preview",
+    "--mode",
+    "e2e",
     "--host",
     "127.0.0.1",
     "--port",

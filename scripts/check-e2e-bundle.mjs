@@ -11,7 +11,6 @@ import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { repoRoot } from "./lib/e2e-state.mjs";
 import { readE2eFixture, webRoot } from "./lib/e2e-env.mjs";
-import { readEnvFile } from "./lib/env-file.mjs";
 
 // `vite preview` serves `output/`; `cloudflare/` is the copy the deploy would
 // upload. Scan what the suite actually runs against.
@@ -108,19 +107,6 @@ for (const origin of await deployedOrigins()) {
   const hits = findAll(origin);
   if (hits.length > 0) {
     failures.push(`Deployed origin ${origin} appears in: ${hits.join(", ")}`);
-  }
-}
-
-// An untracked `web/.env.production` must not be able to reach the E2E bundle.
-// Read without printing: only the variable name is ever reported.
-const productionEnv = await readEnvFile(resolve(webRoot, ".env.production"));
-for (const [key, value] of Object.entries(productionEnv ?? {})) {
-  if (!key.startsWith("PUBLIC_") || value.trim() === "") continue;
-  if (value === fixture[key]) continue;
-  if (findAll(value).length > 0) {
-    failures.push(
-      `${key} from web/.env.production leaked into the E2E bundle.`,
-    );
   }
 }
 

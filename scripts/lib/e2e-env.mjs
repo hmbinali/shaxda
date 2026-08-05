@@ -20,6 +20,20 @@ export const CONTROLLED_KEYS = [
   "SHAXDA_REQUIRE_PUBLIC_ENV",
 ];
 
+/**
+ * Pins Wrangler's two process-environment switches for every E2E child. An
+ * exported `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` would otherwise let shell
+ * bindings override the reviewed fixture file even when `envFiles` is set.
+ */
+export function buildWranglerE2eEnv(parentEnv, overrides = {}) {
+  return {
+    ...parentEnv,
+    ...overrides,
+    CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: "true",
+    CLOUDFLARE_INCLUDE_PROCESS_ENV: "false",
+  };
+}
+
 export async function readE2eFixture() {
   const fixture = await readEnvFile(resolve(webRoot, E2E_ENV_FILE));
   if (!fixture) {
@@ -44,11 +58,5 @@ export function buildE2eEnv(parentEnv, fixture, overrides = {}) {
   // exported `NODE_ENV=development` would otherwise yield a development bundle.
   env.NODE_ENV = "production";
 
-  // Wrangler reads `.env` files only when `envFiles` is set, and merges
-  // `process.env` only when asked. Pin both so a developer's shell cannot flip
-  // them mid-run.
-  env.CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV = "true";
-  env.CLOUDFLARE_INCLUDE_PROCESS_ENV = "false";
-
-  return { ...env, ...overrides };
+  return buildWranglerE2eEnv(env, overrides);
 }

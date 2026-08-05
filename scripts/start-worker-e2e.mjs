@@ -8,7 +8,7 @@
 // spawns Wrangler directly so the flags are actually parsed.
 
 import { mkdirSync, writeFileSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { spawnGroup } from "./lib/spawn-group.mjs";
 import { resolve } from "node:path";
 import {
   cleanE2eStateDirectory,
@@ -37,7 +37,7 @@ writeFileSync(
   `${JSON.stringify({ path: devState, ...fingerprintTree(devState) }, null, 2)}\n`,
 );
 
-const wrangler = spawn(
+spawnGroup(
   "pnpm",
   [
     "exec",
@@ -59,9 +59,3 @@ const wrangler = spawn(
 );
 
 process.stdout.write(`Game Worker E2E state: ${state}\n`);
-
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => wrangler.kill(signal));
-}
-
-wrangler.on("exit", (code) => process.exit(code ?? 0));

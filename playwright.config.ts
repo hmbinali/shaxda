@@ -7,6 +7,15 @@ export default defineConfig({
     timeout: 5_000,
   },
   reporter: "list",
+  // The account fixtures seed D1 through a separate `wrangler d1 execute`
+  // process while the preview Worker holds the same local SQLite file open.
+  // Parallel workers therefore contend for the write lock, and whichever side
+  // loses fails with `SQLITE_BUSY` — the Worker surfaces it as a
+  // `jsgInternalError` on any page load that touches the session, so the test
+  // that fails is arbitrary. Playwright already defaults to one worker under
+  // `CI`, which is why this only ever broke local runs; pinning it makes local
+  // and CI identical. Costs about 18s on a 69-test suite.
+  workers: 1,
   use: {
     baseURL: "http://127.0.0.1:4173",
     trace: "on-first-retry",

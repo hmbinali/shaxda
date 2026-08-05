@@ -31,6 +31,20 @@ failed.
 --env-file` for the game Worker. Values come from the tracked `web/.env.e2e` and
 `worker/.env.e2e`.
 
+The same contamination reaches the unit suites, which have no env-file control
+of their own. Both were pre-existing and both were reproduced here:
+
+- `@cloudflare/vitest-pool-workers` calls `unstable_getMiniflareWorkerOptions`
+  without `envFiles` and exposes no option to change that, so `worker/.dev.vars`
+  is loaded into the test Worker. A real `TURNSTILE_SECRET` there failed 33
+  Worker tests. Pinned through `miniflare.bindings` in
+  `worker/vitest.config.ts`, which is merged over the Wrangler-derived options.
+- Vite loads `.env.local` in every mode, `test` included, so a real
+  `PUBLIC_TURNSTILE_SITE_KEY` made the online lobby render a Turnstile widget
+  that never resolves under jsdom, leaving Create disabled and failing 12 web
+  tests. Pinned through `test.env` in `web/vite.config.ts`; `vi.stubEnv` still
+  overrides per test.
+
 ### 2. Vite `.env` files lose to `process.env` — confirmed
 
 `--mode e2e` alone cannot isolate the build. Vite's `loadEnv` re-applies
@@ -61,6 +75,28 @@ skipped the cleanup command entirely on local reruns.
 separator. `reuseExistingServer` is `false` for both servers, so every run gets
 freshly cleaned state and a second concurrent run fails loudly on the bound port
 instead of silently sharing a persistence path.
+
+Two further sources of run-to-run failure surfaced during the repeated-run
+verification, both pre-existing and both local-only:
+
+- **Shared D1 write lock.** The account fixtures seed through a separate
+  `wrangler d1 execute` process while the preview Worker holds the same local
+  SQLite file open. With parallel Playwright workers, whichever side loses the
+  write lock fails with `SQLITE_BUSY`; the Worker surfaces it as a
+  `jsgInternalError` on any page load that touches the session, so the test that
+  fails is arbitrary. Playwright already defaults to one worker under `CI`,
+  which is why only local runs broke. `workers: 1` is now pinned so local and CI
+  behave identically, and the fixture retries `SQLITE_BUSY` with jittered
+  backoff. Costs about 18s on a 69-test suite.
+- **Leaked `workerd` processes.** Each run left an orphaned `workerd` with
+  `ppid=1`; they accumulated until one held port 4173, at which point `vite
+preview` silently moved to the next free port and Playwright waited out its
+  timeout polling a port nothing was listening on. The preview now runs with
+  `--strictPort` so that fails loudly, and the launchers keep their child in
+  Playwright's own process group so its group kill reaps the whole tree.
+  Detaching the child looks like the fix and is not: it puts the server in a
+  different group, Playwright's kill misses it, and the suite hangs after the
+  last test.
 
 ### 4. Turbo `outputs: []` — premise inaccurate, two real defects found
 

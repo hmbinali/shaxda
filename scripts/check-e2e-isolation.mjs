@@ -1,12 +1,13 @@
 // Proves `pnpm test:e2e` uses only controlled fixtures, whatever a developer
 // happens to have on disk or exported in their shell.
 //
-// Three contamination sources, each with a negative control so no assertion can
+// Four contamination sources, each with a negative control so no assertion can
 // pass vacuously:
 //
 //   1. a conflicting `web/.dev.vars`   -> beaten by `platformProxy.envFiles`
-//   2. a conflicting `.env`/`.env.local` -> beaten by `--mode e2e`
+//   2. conflicting `.env*` files -> beaten by `--mode e2e`
 //   3. conflicting process-level PUBLIC_* -> beaten by the explicit child env
+//   4. Wrangler process-env opt-in -> forced off in every E2E child
 //
 // Everything runs against throwaway fixtures in the system temp directory. The
 // developer's own `web/.dev.vars` is never read, moved, rewritten or printed.
@@ -25,6 +26,7 @@ import { repoRoot } from "./lib/e2e-state.mjs";
 import {
   E2E_ENV_FILE,
   buildE2eEnv,
+  buildWranglerE2eEnv,
   readE2eFixture,
   webRoot,
 } from "./lib/e2e-env.mjs";
@@ -55,7 +57,38 @@ const CONFLICTING_PUBLIC = {
   PUBLIC_WORKER_ORIGIN: "https://contaminated-worker.example",
 };
 
+const CONFLICTING_PRODUCTION_PUBLIC = {
+  PUBLIC_SITE_ORIGIN: "https://production-site.example",
+  PUBLIC_WORKER_ORIGIN: "https://production-worker.example",
+};
+
 const failures = [];
+
+const SAFE_PARENT_ENV_KEYS = [
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "PATH",
+  "SYSTEMROOT",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "USERPROFILE",
+  "WINDIR",
+];
+
+/**
+ * Keeps credentials and unrelated shell settings out of probe processes. This
+ * also makes a failed comparison safe to print: Wrangler can only return the
+ * controlled values supplied by the probe.
+ */
+function probeEnvironment(overrides = {}) {
+  const env = {};
+  for (const key of SAFE_PARENT_ENV_KEYS) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  return buildWranglerE2eEnv(env, overrides);
+}
 
 function check(name, actual, expected) {
   const a = JSON.stringify(actual);
@@ -140,7 +173,10 @@ function writeEnvFile(path, values) {
  * whichever conflicting files this case is testing. The probes never touch the
  * repository copies, so a developer's own `.dev.vars` is left completely alone.
  */
-function makeFixture(root, { envFileFrom, devVars, dotEnv } = {}) {
+function makeFixture(
+  root,
+  { envFileFrom, devVars, dotEnv, productionEnv } = {},
+) {
   mkdirSync(root, { recursive: true });
   if (envFileFrom) {
     copyFileSync(envFileFrom, resolve(root, E2E_ENV_FILE));
@@ -150,6 +186,9 @@ function makeFixture(root, { envFileFrom, devVars, dotEnv } = {}) {
   if (dotEnv) {
     writeEnvFile(resolve(root, ".env"), dotEnv);
     writeEnvFile(resolve(root, ".env.local"), dotEnv);
+  }
+  if (productionEnv) {
+    writeEnvFile(resolve(root, ".env.production"), productionEnv);
   }
 
   return root;
@@ -169,7 +208,7 @@ function checkDevVarsIsolation({
 }) {
   process.stdout.write(`\n▸ ${label}\n`);
 
-  const base = { ...process.env, SHAXDA_PROBE_CONFIG: config };
+  const base = probeEnvironment({ SHAXDA_PROBE_CONFIG: config });
   const pristine = makeFixture(resolve(temp, `${slug}-pristine`), {
     envFileFrom,
   });
@@ -232,6 +271,8 @@ function checkDevVarsIsolation({
     control.vars[firstKey],
     firstValue,
   );
+
+  return { directory: contaminated, expected };
 }
 
 const fixture = await readE2eFixture();
@@ -240,7 +281,7 @@ const temp = mkdtempSync(resolve(tmpdir(), "shaxda-e2e-isolation-"));
 try {
   // ---- 1. a conflicting .dev.vars, on both Workers -----------------------
   checkDevVarsIsolation({
-    label: "1/3a a conflicting web/.dev.vars",
+    label: "1/4a a conflicting web/.dev.vars",
     slug: "web-dev-vars",
     cwd: webRoot,
     config: "wrangler.e2e.jsonc",
@@ -248,8 +289,8 @@ try {
     conflicting: CONFLICTING_DEV_VARS,
   });
 
-  checkDevVarsIsolation({
-    label: "1/3b a conflicting worker/.dev.vars",
+  const workerProbe = checkDevVarsIsolation({
+    label: "1/4b a conflicting worker/.dev.vars",
     slug: "worker-dev-vars",
     cwd: workerRoot,
     config: "wrangler.toml",
@@ -257,14 +298,15 @@ try {
     conflicting: CONFLICTING_WORKER_DEV_VARS,
   });
 
-  // ---- 2. a conflicting .env / .env.local --------------------------------
-  process.stdout.write("\n▸ 2/3 a conflicting .env and .env.local\n");
+  // ---- 2. conflicting .env files -----------------------------------------
+  process.stdout.write("\n▸ 2/4 conflicting local and production .env files\n");
 
   const envFixture = makeFixture(resolve(temp, "dot-env"), {
     envFileFrom: resolve(webRoot, E2E_ENV_FILE),
     dotEnv: CONFLICTING_PUBLIC,
+    productionEnv: CONFLICTING_PRODUCTION_PUBLIC,
   });
-  const clean = { ...process.env };
+  const clean = probeEnvironment();
   for (const key of Object.keys(CONFLICTING_PUBLIC)) delete clean[key];
 
   check(
@@ -286,11 +328,11 @@ try {
       SHAXDA_PROBE_DIR: envFixture,
       SHAXDA_PROBE_MODE: "production",
     }),
-    CONFLICTING_PUBLIC,
+    CONFLICTING_PRODUCTION_PUBLIC,
   );
 
   // ---- 3. conflicting process-level PUBLIC_* ------------------------------
-  process.stdout.write("\n▸ 3/3 conflicting process-level PUBLIC_* values\n");
+  process.stdout.write("\n▸ 3/4 conflicting process-level PUBLIC_* values\n");
 
   const exported = { ...clean, ...CONFLICTING_PUBLIC };
 
@@ -315,6 +357,57 @@ try {
     }),
     CONFLICTING_PUBLIC,
   );
+
+  // ---- 4. Wrangler process-environment opt-in ----------------------------
+  process.stdout.write("\n▸ 4/4 Wrangler process-environment opt-in\n");
+
+  const wranglerExported = {
+    ...clean,
+    ...CONFLICTING_WORKER_DEV_VARS,
+    CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",
+  };
+  const wranglerProbe = {
+    SHAXDA_PROBE_CONFIG: "wrangler.toml",
+    SHAXDA_PROBE_DIR: workerProbe.directory,
+    SHAXDA_PROBE_ENV_FILES: E2E_ENV_FILE,
+  };
+  const processIsolated = probe(
+    BINDINGS_PROBE,
+    {
+      ...buildWranglerE2eEnv(wranglerExported),
+      ...wranglerProbe,
+    },
+    workerRoot,
+  );
+
+  check(
+    "the Worker child environment keeps the reviewed bindings",
+    Object.fromEntries(
+      Object.keys(workerProbe.expected.vars).map((key) => [
+        key,
+        processIsolated.vars[key],
+      ]),
+    ),
+    workerProbe.expected.vars,
+  );
+  check(
+    "no exported Worker value reaches the E2E bindings",
+    Object.entries(CONFLICTING_WORKER_DEV_VARS).filter(([, value]) =>
+      Object.values(processIsolated.vars).includes(value),
+    ),
+    [],
+  );
+
+  const processControl = probe(
+    BINDINGS_PROBE,
+    { ...wranglerExported, ...wranglerProbe },
+    workerRoot,
+  );
+  check(
+    "control: Wrangler's process-env opt-in overrides the fixture",
+    processControl.vars.ALLOWED_ORIGIN,
+    CONFLICTING_WORKER_DEV_VARS.ALLOWED_ORIGIN,
+  );
 } finally {
   rmSync(temp, { recursive: true, force: true });
 }
@@ -325,6 +418,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(
-  "\nE2E isolation verified against all three contamination sources.",
-);
+console.log("\nE2E isolation verified against all four contamination sources.");

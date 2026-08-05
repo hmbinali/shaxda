@@ -16,6 +16,7 @@ import {
   testResultsRoot,
 } from "./lib/e2e-state.mjs";
 import { fingerprintTree } from "./lib/fs-tree.mjs";
+import { buildWranglerE2eEnv } from "./lib/e2e-env.mjs";
 
 export const WORKER_E2E_STATE = "wrangler-e2e";
 export const WORKER_DEV_STATE_BASELINE = "dev-state-baseline.worker.json";
@@ -55,7 +56,11 @@ spawnGroup(
     "--env-file",
     ".env.e2e",
   ],
-  { cwd: worker, stdio: "inherit" },
+  {
+    cwd: worker,
+    stdio: "inherit",
+    env: buildWranglerE2eEnv(process.env),
+  },
 );
 
 process.stdout.write(`Game Worker E2E state: ${state}\n`);

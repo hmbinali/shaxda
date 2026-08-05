@@ -198,12 +198,25 @@ export const messages = {
       connectionLabel: "Xiriirka",
       statusLabel: "Xaaladda",
       roomLabel: "Qolka",
+      identity: {
+        signIn: "Gal koontada si aad ugu ciyaarto magacaaga dadweynaha.",
+        signInAction: "Gal koontada",
+        incomplete:
+          "Diiwaangelinta lama dhammaystirin. Waad sii ciyaari kartaa marti ahaan.",
+        completePrefix: "Waxaad u ciyaaraysaa",
+        completeRegistration: "Dhammaystir diiwaangelinta",
+        unavailable:
+          "Xaaladda koontada lama xaqiijin karo hadda. Dib u tijaabi ama si cad marti ahaan u sii wad.",
+        retry: "Dib u tijaabi",
+        continueAsGuest: "Ku sii wad marti ahaan",
+      },
       connection: {
         idle: "Aan bilaaban",
         connecting: "Wuu xirmayaa",
         reconnecting: "Dib ayuu u xirmayaa",
         connected: "Wuu xiran yahay",
         closed: "Wuu go'ay",
+        replaced: "Meel kale ayaa laga furay",
         error: "Khalad xiriir",
       },
       notices: {
@@ -258,6 +271,13 @@ export const messages = {
         unsupportedAction: "Tallaabadaas lama taageero.",
         notClaimable: "Guusha hadda lama qaadan karo.",
         rateLimited: "Codsiyo badan ayaa yimid; sug wax yar.",
+        identityInvalid: "Aqoonsiga koontada lama xaqiijin.",
+        identityExpired:
+          "Ogolaanshaha koontadu wuu dhacay; fadlan dib u tijaabi.",
+        identityScope: "Ogolaanshahan qolkan looguma talagelin.",
+        identityReplayed: "Ogolaanshahan mar hore ayaa la isticmaalay.",
+        identityUnavailable:
+          "Aqoonsiga koontada lama heli karo hadda; fadlan dib u tijaabi.",
         tooManyRooms: "Qolal badan ayaad furtay; mid isticmaal ama sug.",
         capacityFull: "Adeeggu hadda wuu buuxaa; mar kale isku day.",
         turnstileFailed: "Hubinta amniga lama dhammaystirin.",

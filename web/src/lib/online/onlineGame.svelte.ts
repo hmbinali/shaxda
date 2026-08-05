@@ -20,6 +20,7 @@ import { inferOpponentAction } from "./inferAction";
 import {
   OnlineGameClient,
   type OnlineConnectionStatus,
+  type RoomTicketAction,
 } from "./onlineGameClient";
 
 export type OnlinePresence = Extract<
@@ -119,13 +120,29 @@ export class OnlineGameController {
     guestId: string,
     displayName: string,
     turnstileToken?: string,
+    identityTicket?: string,
+    requestTicket?: (
+      action: RoomTicketAction,
+      roomCode: string,
+    ) => Promise<string | null>,
   ): Promise<string> {
-    const roomCode = await this.#client.createRoom(turnstileToken);
-    this.joinRoom(roomCode, guestId, displayName);
+    const roomCode = await this.#client.createRoom(
+      turnstileToken,
+      identityTicket,
+    );
+    this.joinRoom(roomCode, guestId, displayName, requestTicket);
     return roomCode;
   }
 
-  joinRoom(roomCode: string, guestId: string, displayName: string): void {
+  joinRoom(
+    roomCode: string,
+    guestId: string,
+    displayName: string,
+    requestTicket?: (
+      action: RoomTicketAction,
+      roomCode: string,
+    ) => Promise<string | null>,
+  ): void {
     const normalizedRoomCode = roomCode.trim().toUpperCase();
     this.roomCode = normalizedRoomCode;
     this.resetDisplayedRoomState();
@@ -133,6 +150,7 @@ export class OnlineGameController {
       roomCode: normalizedRoomCode,
       guestId,
       displayName,
+      requestTicket,
     });
   }
 

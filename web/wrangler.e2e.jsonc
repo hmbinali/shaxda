@@ -8,6 +8,7 @@
   "vars": {
     "AUTH_BASE_URL": "http://127.0.0.1:4173",
     "BETTER_AUTH_SECRET": "shaxda-e2e-only-secret-48-characters-long-000000",
+    "ONLINE_IDENTITY_SECRET": "shaxda-online-identity-dev-test-secret-000000000001",
     "GOOGLE_CLIENT_ID": "shaxda-e2e-google-client",
     "GOOGLE_CLIENT_SECRET": "shaxda-e2e-google-secret",
   },

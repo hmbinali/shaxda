@@ -1,8 +1,9 @@
-# V1.1-A Accounts Operations Runbook
+# V1.1-A / V1.1-A2 Accounts Operations Runbook
 
-Use this runbook to provision and release Google-backed Shaxda accounts. Auth is
-served by `shaxda-web` under `/api/auth/*`; the game Worker, guest rooms, and
-Turnstile are unchanged.
+Use this runbook to provision and release Google-backed Shaxda accounts and their
+online-room identity integration. Auth is served by `shaxda-web` under
+`/api/auth/*`; the game Worker verifies signed identity tickets only. Guest rooms
+and Turnstile remain available without an account.
 
 ## Prerequisites and placeholders
 
@@ -38,9 +39,15 @@ The preview URI must exactly match `AUTH_BASE_URL` in
 `web/wrangler.preview.jsonc`. The origin is configuration, never an inbound Host
 header.
 
-For local development, copy `web/.dev.vars.example` to `web/.dev.vars`, generate
-a random secret of at least 32 characters, and add the real Google client id and
-secret. `.dev.vars` is ignored by Git.
+For local development, copy both examples, generate a random online-identity
+secret of at least 32 characters, and paste the exact same value into both
+`ONLINE_IDENTITY_SECRET` entries. Add the real Google client id and secret to the
+web file. `.dev.vars` is ignored by Git.
+
+```bash
+cp web/.dev.vars.example web/.dev.vars
+cp worker/.dev.vars.example worker/.dev.vars
+```
 
 Keep `AUTH_BASE_URL` in `.dev.vars`. Without it, `platform.env` falls back to the
 production `AUTH_BASE_URL` in `web/wrangler.jsonc`, Better Auth's origin check
@@ -50,22 +57,47 @@ uses, so update it if the dev server is not on `http://localhost:5173`.
 
 ## Worker secrets
 
-Set all three secrets for preview and production. Use the corresponding Wrangler
-config when prompted:
+Set the auth secrets and the web-side identity secret for preview and production.
+Use the corresponding Wrangler config when prompted:
 
 ```bash
 pnpm --filter @shaxda/web exec wrangler secret put BETTER_AUTH_SECRET --config wrangler.preview.jsonc
 pnpm --filter @shaxda/web exec wrangler secret put GOOGLE_CLIENT_ID --config wrangler.preview.jsonc
 pnpm --filter @shaxda/web exec wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.preview.jsonc
+pnpm --filter @shaxda/web exec wrangler secret put ONLINE_IDENTITY_SECRET --config wrangler.preview.jsonc
 
 pnpm --filter @shaxda/web exec wrangler secret put BETTER_AUTH_SECRET --config wrangler.jsonc
 pnpm --filter @shaxda/web exec wrangler secret put GOOGLE_CLIENT_ID --config wrangler.jsonc
 pnpm --filter @shaxda/web exec wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.jsonc
+pnpm --filter @shaxda/web exec wrangler secret put ONLINE_IDENTITY_SECRET --config wrangler.jsonc
+
+pnpm --filter @shaxda/worker exec wrangler secret put ONLINE_IDENTITY_SECRET --config wrangler.preview.toml
+pnpm --filter @shaxda/worker exec wrangler secret put ONLINE_IDENTITY_SECRET --config wrangler.production.toml
 ```
+
+Preview and production must use different random online-identity secrets. Within
+one environment, the web and game Worker values must match exactly. Do not add
+these values to `[vars]` in preview or production because a var shadows a Worker
+secret.
 
 Do not put real secrets in `vars`, shell history, screenshots, CI logs, or source
 control. The production bundle check rejects any supplied auth secret and the
-committed e2e secret if one appears in `.svelte-kit/cloudflare/`.
+committed e2e secrets if one appears in `.svelte-kit/cloudflare/`.
+
+### Online-identity secret rotation
+
+Apply this independently to preview and production:
+
+1. On the game Worker, set `ONLINE_IDENTITY_SECRET_PREVIOUS` to the old value and
+   replace `ONLINE_IDENTITY_SECRET` with the new value.
+2. On the web Worker, replace `ONLINE_IDENTITY_SECRET` with the new value.
+3. Wait at least 95 seconds after the last possible old-secret ticket mint.
+4. Delete `ONLINE_IDENTITY_SECRET_PREVIOUS` from the game Worker with
+   `wrangler secret delete`.
+
+The game Worker accepts both values only during the rotation window. Room
+creation does not persist or replay-track a create ticket; join/reconnect tickets
+are single-use per seat.
 
 ## Migrations
 
@@ -118,10 +150,12 @@ applied.
 1. Create distinct preview and production D1 databases.
 2. Replace and review all Wrangler placeholders.
 3. Apply the preview migration.
-4. Set preview secrets and deploy `shaxda-web` preview.
+4. Set matching preview online-identity secrets on both Workers, set auth
+   secrets, and deploy both preview Workers.
 5. Complete the preview smoke test below.
 6. Apply the production migration.
-7. Set production secrets and deploy `shaxda-web` production.
+7. Set matching production online-identity secrets on both Workers, set auth
+   secrets, and deploy both production Workers.
 8. Complete the production smoke test and monitor Worker/D1 errors.
 
 ## Retained identity data
@@ -159,6 +193,13 @@ Run this with a real Google test account:
 5. Verify an unsafe external `returnTo` ends at `/`.
 6. Submit logout from the account panel and confirm signed-out navigation appears.
 7. Verify `/local` offline play and guest `/online` still work without signing in.
+8. With a complete signed-in account, create and join an online room without a
+   guest-name field; verify `@username` appears and a move syncs to a guest peer.
+9. Refresh the signed-in player and verify it regains the same seat. Open the same
+   account in a second tab and verify the first shows the replacement notice and
+   does not reconnect.
+10. Inspect a presence frame and confirm it contains no account id, email, Google
+    full name, cookie, or token.
 
 Username confirmation starts the 30-day cooldown, so an immediate rename is
 expected to be rejected. Alias redirects and owner reclaim are covered by D1 and
@@ -167,11 +208,11 @@ manually exercised before 30 days.
 
 ## Rollback
 
-Code rollback is safe: revert the web deployment to restore signed-out navigation
-and remove route reachability. Do not down-migrate production D1. The migration is
-additive, and account rows should remain intact and unused until the fixed code is
-redeployed. If auth is unhealthy, roll back the web Worker first; do not change the
-game Worker or delete D1 data.
+For V1.1-A2, roll back both Workers together. Rolling back only the web Worker
+stops new tickets while existing guest play continues; rolling back only the game
+Worker makes newly minted account tickets unusable. Do not down-migrate production
+D1 or delete account data. If a deployment is unhealthy, restore the previous web
+and game Worker versions and their matching secret pair.
 
 V1.1-A intentionally has no self-service deletion backend. The account screen
 contains a non-interactive notice directing users to support until deletion work

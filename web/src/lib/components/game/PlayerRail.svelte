@@ -9,11 +9,21 @@
   } from "$lib/game/seating";
   import type { GameStatus } from "$lib/game/status";
   import ReserveTray from "./ReserveTray.svelte";
+  import Avatar from "$components/account/Avatar.svelte";
+
+  type PlayerAvatar = {
+    mode: "initial" | "google";
+    imageUrl: string | null;
+    color: string;
+    initial: string;
+  };
 
   interface Props {
     player: PlayerId;
     status: GameStatus;
     name: string;
+    username?: string;
+    avatar?: PlayerAvatar;
     viewer?: PlayerId | null;
     railState: RailState;
     instruction: RailInstructionKey | null;
@@ -28,6 +38,8 @@
     player,
     status,
     name,
+    username,
+    avatar,
     viewer = null,
     railState,
     instruction,
@@ -60,9 +72,20 @@
       class="avatar"
       class:light={player === "A"}
       class:dark={player === "B"}
-      aria-hidden="true"
+      aria-hidden={username === undefined ? "true" : undefined}
     >
-      {player}
+      {#if username !== undefined && avatar !== undefined}
+        <Avatar
+          {username}
+          initial={avatar.initial}
+          color={avatar.color}
+          avatarMode={avatar.mode}
+          imageUrl={avatar.imageUrl}
+          sizeClass="h-full w-full text-xs"
+        />
+      {:else}
+        {player}
+      {/if}
       {#if railState === "blocked"}
         <span class="lock"><LockKeyhole size={11} /></span>
       {/if}
@@ -70,7 +93,9 @@
 
     <div class="copy">
       <div class="name-row">
-        <h2>{name}</h2>
+        <h2 title={username === undefined ? name : `@${username}`}>
+          {username === undefined ? name : `@${username}`}
+        </h2>
         {#if badge !== null}
           <span class="player-badge">{badge}</span>
         {/if}

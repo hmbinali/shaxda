@@ -70,6 +70,8 @@
         {status}
         {viewer}
         name={playerName(seating.top)}
+        username={controller.presence[seating.top]?.username}
+        avatar={controller.presence[seating.top]?.avatar}
         railState={railStateFor(status, seating.top)}
         instruction={instructionKeyFor(status, seating.top, orientation)}
         notice={noticeFor(seating.top)}
@@ -132,6 +134,8 @@
         {status}
         {viewer}
         name={playerName(seating.bottom)}
+        username={controller.presence[seating.bottom]?.username}
+        avatar={controller.presence[seating.bottom]?.avatar}
         badge={`(${copy.youLabel})`}
         railState={railStateFor(status, seating.bottom)}
         instruction={instructionKeyFor(status, seating.bottom, orientation)}

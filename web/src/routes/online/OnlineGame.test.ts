@@ -31,12 +31,14 @@ describe("/online", () => {
     window.localStorage.clear();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        Response.json({
-          v: protocolVersion,
-          type: "roomCreated",
-          roomCode: "ABCDEFGH",
-        }),
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes("/api/online/identity")
+          ? Response.json({ status: "signedOut" })
+          : Response.json({
+              v: protocolVersion,
+              type: "roomCreated",
+              roomCode: "ABCDEFGH",
+            }),
       ),
     );
     vi.stubGlobal("WebSocket", FakeWebSocket);
@@ -70,9 +72,103 @@ describe("/online", () => {
     ).toHaveLength(0);
   });
 
+  it("renders a complete account identity without a guest-name field", async () => {
+    const ticket = `${"a".repeat(24)}.${"b".repeat(43)}`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).includes("/api/online/identity")) {
+          return init?.method === "POST"
+            ? Response.json({ ticket, expiresAt: Date.now() + 90_000 })
+            : Response.json({
+                status: "complete",
+                account: {
+                  username: "ayaan_7",
+                  avatar: {
+                    mode: "initial",
+                    imageUrl: null,
+                    color: "#332016",
+                    initial: "A",
+                  },
+                },
+              });
+        }
+        return Response.json({
+          v: protocolVersion,
+          type: "roomCreated",
+          roomCode: "ABCDEFGH",
+        });
+      }),
+    );
+    renderOnlineGame();
+
+    expect(
+      await screen.findByTestId("online-account-identity"),
+    ).toHaveTextContent("@ayaan_7");
+    expect(screen.queryByLabelText(copy.nameLabel)).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByTestId("create-room"));
+    await waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+    expect(roomCreateRequests()).toHaveLength(1);
+  });
+
+  it("keeps guest play available for an incomplete account", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ status: "incomplete" })),
+    );
+    renderOnlineGame();
+
+    expect(await screen.findByText(copy.identity.incomplete)).toBeVisible();
+    expect(
+      screen.getByRole("link", {
+        name: copy.identity.completeRegistration,
+      }),
+    ).toHaveAttribute("href", "/register?returnTo=%2Fonline");
+    expect(screen.getByLabelText(copy.nameLabel)).toBeVisible();
+  });
+
+  it("requires explicit guest continuation when identity status is unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+    renderOnlineGame();
+
+    expect(await screen.findByText(copy.identity.unavailable)).toBeVisible();
+    expect(screen.getByTestId("create-room")).toBeDisabled();
+    expect(screen.queryByLabelText(copy.nameLabel)).not.toBeInTheDocument();
+    await fireEvent.click(
+      screen.getByRole("button", { name: copy.identity.continueAsGuest }),
+    );
+    expect(screen.getByLabelText(copy.nameLabel)).toBeVisible();
+    expect(screen.getByTestId("create-room")).toBeEnabled();
+  });
+
+  it("does not auto-join an invite while identity status is loading", async () => {
+    window.localStorage.setItem("shaxda:guest-name:v1", "Ayaan");
+    window.history.replaceState({}, "", "/online?room=ROOM1234");
+    let resolveStatus: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          await new Promise<Response>((resolve) => {
+            resolveStatus = resolve;
+          }),
+      ),
+    );
+    renderOnlineGame();
+
+    expect(screen.getByTestId("join-room")).toBeDisabled();
+    expect(FakeWebSocket.sockets).toHaveLength(0);
+    resolveStatus?.(Response.json({ status: "signedOut" }));
+    await waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+  });
+
   it("joins on Enter when an invite code is present", async () => {
     window.history.replaceState({}, "", "/online?room=ROOM1234");
     renderOnlineGame();
+    await waitForGuestForm();
 
     const name = screen.getByLabelText(copy.nameLabel);
     await fireEvent.input(name, { target: { value: "Ayaan" } });
@@ -80,21 +176,23 @@ describe("/online", () => {
 
     await waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
     expect(FakeWebSocket.latest().url).toContain("/rooms/ROOM1234/ws");
-    expect(fetch).not.toHaveBeenCalled();
+    expect(roomCreateRequests()).toHaveLength(0);
   });
 
   it("creates on Enter when the code is empty", async () => {
     renderOnlineGame();
+    await waitForGuestForm();
     const name = screen.getByLabelText(copy.nameLabel);
     await fireEvent.input(name, { target: { value: "Ayaan" } });
     await fireEvent.submit(name.closest("form")!);
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(roomCreateRequests()).toHaveLength(1));
     expect(FakeWebSocket.latest().url).toContain("/rooms/ABCDEFGH/ws");
   });
 
   it("keeps Create and Join tied to their labels", async () => {
     const first = renderOnlineGame();
+    await waitForGuestForm();
     await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
       target: { value: "Ayaan" },
     });
@@ -103,7 +201,7 @@ describe("/online", () => {
     });
     await fireEvent.click(screen.getByTestId("create-room"));
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(roomCreateRequests()).toHaveLength(1));
     expect(FakeWebSocket.latest().url).toContain("/rooms/ABCDEFGH/ws");
 
     first.unmount();
@@ -112,6 +210,7 @@ describe("/online", () => {
     window.localStorage.clear();
     window.history.replaceState({}, "", "/online");
     renderOnlineGame();
+    await waitForGuestForm();
     await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
       target: { value: "Bilan" },
     });
@@ -121,11 +220,12 @@ describe("/online", () => {
     await fireEvent.click(screen.getByTestId("join-room"));
 
     expect(FakeWebSocket.latest().url).toContain("/rooms/ROOM5678/ws");
-    expect(fetch).not.toHaveBeenCalled();
+    expect(roomCreateRequests()).toHaveLength(0);
   });
 
   it("shows a useful empty-name error and focuses the field", async () => {
     renderOnlineGame();
+    await waitForGuestForm();
 
     await fireEvent.click(screen.getByTestId("create-room"));
 
@@ -226,14 +326,17 @@ describe("/online", () => {
   it("shows specific create-room errors", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        Response.json(
-          { error: "rateLimited", code: "rateLimited" },
-          { status: 429 },
-        ),
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes("/api/online/identity")
+          ? Response.json({ status: "signedOut" })
+          : Response.json(
+              { error: "rateLimited", code: "rateLimited" },
+              { status: 429 },
+            ),
       ),
     );
     renderOnlineGame();
+    await waitForGuestForm();
 
     await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
       target: { value: "Ayaan" },
@@ -251,7 +354,7 @@ describe("/online", () => {
       expect(screen.getByTestId("create-room")).toBeEnabled(),
     );
     await fireEvent.click(screen.getByTestId("create-room"));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(roomCreateRequests()).toHaveLength(2));
     await waitFor(() =>
       expect(screen.getByTestId("online-feedback")).not.toBe(firstNotice),
     );
@@ -262,6 +365,7 @@ describe("/online", () => {
 
   it("re-announces identical in-game server errors and clears lobby errors when play starts", async () => {
     renderOnlineGame();
+    await waitForGuestForm();
     await fireEvent.click(screen.getByTestId("create-room"));
     expect(screen.getByTestId("online-feedback")).toHaveTextContent(
       copy.errors.nameRequired,
@@ -410,6 +514,7 @@ describe("/online", () => {
 
   it("seats a player B viewer at the bottom without rotating or remapping colour", async () => {
     renderOnlineGame();
+    await waitForGuestForm();
 
     await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
       target: { value: "Bilan" },
@@ -487,6 +592,7 @@ describe("/online", () => {
 
   it("places connection notices with their owner and keeps claim-win actionable at centre", async () => {
     renderOnlineGame();
+    await waitForGuestForm();
 
     await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
       target: { value: "Ayaan" },
@@ -568,6 +674,16 @@ function renderOnlineGame() {
   return render(AppShellHarness, {
     component: OnlineGamePage,
     pathname: "/online",
+  });
+}
+
+async function waitForGuestForm(): Promise<void> {
+  await waitFor(() => expect(screen.getByTestId("create-room")).toBeEnabled());
+}
+
+function roomCreateRequests(): unknown[][] {
+  return vi.mocked(fetch).mock.calls.filter(([input, init]) => {
+    return String(input).endsWith("/rooms") && init?.method === "POST";
   });
 }
 

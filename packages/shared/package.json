@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./identity": {
+      "types": "./src/identity/ticket.ts",
+      "default": "./src/identity/ticket.ts"
     }
   },
   "scripts": {

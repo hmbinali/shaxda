@@ -7,6 +7,9 @@ import {
 } from "@shaxda/game-engine";
 import type { SerializedGameState } from "@shaxda/game-engine";
 import {
+  allowedGoogleAvatarUrl,
+  avatarColorForUserId,
+  avatarInitial,
   echoBroadcastServerMessageSchema,
   guestIdSchema,
   joinedServerMessageSchema,
@@ -17,6 +20,9 @@ import {
   serverMessageSchema,
   stateServerMessageSchema,
 } from "@shaxda/shared";
+import type { AvatarMode } from "@shaxda/shared";
+import { verifyIdentityTicket } from "@shaxda/shared/identity";
+import type { IdentityTicketPayload } from "@shaxda/shared/identity";
 import { roomInboundSchema, roomInitRequestSchema } from "./protocol";
 import type { PlayerSlot, RoomInboundMessage } from "./protocol";
 
@@ -31,6 +37,7 @@ const MESSAGE_RATE_MAX = 30;
 const MAX_SOCKETS_PER_ROOM = 8;
 const ACTIVITY_WRITE_MIN_INTERVAL_MS = 30_000;
 const PLAYER_SLOTS = ["A", "B"] as const;
+const MAX_USED_TICKETS_PER_SEAT = 16;
 
 type OnlineMatchEndReason = "opponentAbandoned" | "opponentIdleTimeout";
 
@@ -39,12 +46,32 @@ type ConnectionState = {
   disconnectedAt: number | null;
 };
 
+type UsedTicket = { jti: string; exp: number };
+
+type SeatIdentity =
+  | {
+      kind: "guest";
+      displayName?: string;
+      connectionEpoch: number;
+      usedTickets: [];
+    }
+  | {
+      kind: "account";
+      userId: string;
+      usernameSnapshot: string;
+      avatarMode: AvatarMode;
+      imageUrl: string | null;
+      connectionEpoch: number;
+      usedTickets: UsedTicket[];
+    };
+
 type RoomState = {
   roomCode: string;
   createdAt: number;
   lastActivityAt: number;
+  seatVersion: 2;
   slots: Partial<Record<PlayerSlot, string>>;
-  displayNames: Partial<Record<PlayerSlot, string>>;
+  seats: Partial<Record<PlayerSlot, SeatIdentity>>;
   gameState: SerializedGameState;
   connections: Partial<Record<PlayerSlot, ConnectionState>>;
   turnStartedAt: number | null;
@@ -57,17 +84,23 @@ type RoomState = {
 type SocketAttachment = {
   guestId?: string;
   slot?: PlayerSlot;
+  identityKey?: string;
+  epoch?: number;
   messageTimestamps?: number[];
 };
 
 type JoinedSocketAttachment = {
   guestId: string;
   slot: PlayerSlot;
+  identityKey: string;
+  epoch?: number;
   messageTimestamps?: number[];
 };
 
 export interface MatchRoomEnv {
   MATCH_COORDINATOR: DurableObjectNamespace;
+  ONLINE_IDENTITY_SECRET?: string;
+  ONLINE_IDENTITY_SECRET_PREVIOUS?: string;
 }
 
 export class MatchRoom implements DurableObject {
@@ -221,8 +254,9 @@ export class MatchRoom implements DurableObject {
       roomCode: body.data.roomCode,
       createdAt: now,
       lastActivityAt: now,
+      seatVersion: 2,
       slots: {},
-      displayNames: {},
+      seats: {},
       gameState: serialize(createInitialState("A")),
       connections: {},
       turnStartedAt: null,
@@ -245,23 +279,124 @@ export class MatchRoom implements DurableObject {
   ): Promise<void> {
     if (message.roomCode !== room.roomCode) {
       await this.refreshActivityIfStale(room, now);
-      this.sendError(ws, "roomMismatch", "Room code does not match this room.");
+      if (message.identityTicket) {
+        this.sendIdentityError(
+          ws,
+          "identityScope",
+          "Identity ticket does not belong to this room.",
+          true,
+        );
+      } else {
+        this.sendError(
+          ws,
+          "roomMismatch",
+          "Room code does not match this room.",
+        );
+      }
       return;
     }
 
-    const updated = this.assignSlot(room, message.guestId, message.displayName);
+    let accountPayload: IdentityTicketPayload | null = null;
+    if (message.identityTicket !== undefined) {
+      const secrets = [
+        this.env.ONLINE_IDENTITY_SECRET,
+        this.env.ONLINE_IDENTITY_SECRET_PREVIOUS,
+      ].filter((secret): secret is string => Boolean(secret?.trim()));
+      if (secrets.length === 0) {
+        this.sendIdentityError(
+          ws,
+          "identityUnavailable",
+          "Online account identity is unavailable.",
+          true,
+        );
+        return;
+      }
+
+      let verification: Awaited<ReturnType<typeof verifyIdentityTicket>>;
+      try {
+        verification = await verifyIdentityTicket(
+          message.identityTicket,
+          secrets,
+          { allowedActions: ["join", "reconnect"], roomCode: room.roomCode },
+          now,
+        );
+      } catch {
+        this.sendIdentityError(
+          ws,
+          "identityInvalid",
+          "Identity ticket could not be verified.",
+          true,
+        );
+        return;
+      }
+
+      if (!verification.ok) {
+        const code =
+          verification.code === "expired"
+            ? "identityExpired"
+            : verification.code === "scope"
+              ? "identityScope"
+              : "identityInvalid";
+        this.sendIdentityError(ws, code, "Identity ticket was rejected.", true);
+        return;
+      }
+      accountPayload = verification.payload;
+    }
+
+    // Ticket verification is a non-storage await. Re-read under the Durable
+    // Object input gate before assigning a seat or recording a JTI.
+    const authoritativeRoom = await this.readRoom();
+    if (!authoritativeRoom) {
+      this.sendError(ws, "roomNotFound", "Room not found.");
+      return;
+    }
+
+    const updated = accountPayload
+      ? this.assignAccountSlot(authoritativeRoom, accountPayload, now)
+      : this.assignGuestSlot(
+          authoritativeRoom,
+          message.guestId,
+          message.displayName,
+        );
+    if (updated !== null && "error" in updated) {
+      const retryable =
+        updated.error === "identityScope" &&
+        accountPayload?.action === "reconnect";
+      this.sendIdentityError(
+        ws,
+        updated.error,
+        "Account identity could not claim this seat.",
+        !retryable,
+      );
+      return;
+    }
     if (!updated) {
-      await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "roomFull", "Room already has two guests.");
       return;
     }
 
-    const { slot } = updated;
+    const { slot, identityKey, epoch } = updated;
     ws.serializeAttachment({
       ...rawSocketAttachment(ws),
       guestId: message.guestId,
       slot,
+      identityKey,
+      ...(epoch === undefined ? {} : { epoch }),
     } satisfies SocketAttachment);
+
+    if (accountPayload !== null) {
+      for (const socket of this.ctx.getWebSockets()) {
+        if (socket === ws) continue;
+        const attachment = socketAttachment(socket);
+        if (
+          attachment?.slot === slot &&
+          attachment.identityKey === identityKey
+        ) {
+          socket.serializeAttachment(null);
+          socket.close(4001, "replaced");
+        }
+      }
+    }
 
     const updatedRoom = this.reconcileClaimability(
       this.ensureTurnStarted(
@@ -318,7 +453,7 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
-    const attachment = socketAttachment(ws);
+    const attachment = this.authorizeSocket(room, ws);
     if (!attachment) {
       await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notJoined", "Join the room before playing.");
@@ -378,7 +513,7 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
-    const attachment = socketAttachment(ws);
+    const attachment = this.authorizeSocket(room, ws);
     if (!attachment) {
       await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notJoined", "Join the room before claiming a win.");
@@ -427,7 +562,7 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
-    const attachment = socketAttachment(ws);
+    const attachment = this.authorizeSocket(room, ws);
     if (!attachment) {
       this.sendError(
         ws,
@@ -448,87 +583,129 @@ export class MatchRoom implements DurableObject {
     );
 
     for (const socket of this.ctx.getWebSockets()) {
-      if (socketAttachment(socket)) {
+      if (this.authorizeSocket(room, socket)) {
         socket.send(broadcast);
       }
     }
   }
 
-  private assignSlot(
+  private assignGuestSlot(
     room: RoomState,
     guestId: string,
     displayName: string | undefined,
-  ): { room: RoomState; slot: PlayerSlot } | null {
-    if (room.slots.A === guestId) {
-      return {
-        room: this.withDisplayName(room, "A", displayName),
-        slot: "A",
-      };
-    }
+  ): {
+    room: RoomState;
+    slot: PlayerSlot;
+    identityKey: string;
+    epoch?: number;
+  } | null {
+    const identityKey = `guest:${guestId}`;
+    const existingSlot = PLAYER_SLOTS.find(
+      (slot) => room.slots[slot] === identityKey,
+    );
+    const slot =
+      existingSlot ?? PLAYER_SLOTS.find((candidate) => !room.slots[candidate]);
+    if (slot === undefined) return null;
 
-    if (room.slots.B === guestId) {
-      return {
-        room: this.withDisplayName(room, "B", displayName),
-        slot: "B",
-      };
-    }
-
-    if (!room.slots.A) {
-      return {
-        room: this.withDisplayName(
-          {
-            ...room,
-            slots: { ...room.slots, A: guestId },
-          },
-          "A",
-          displayName,
-        ),
-        slot: "A",
-      };
-    }
-
-    if (!room.slots.B) {
-      return {
-        room: this.withDisplayName(
-          {
-            ...room,
-            slots: { ...room.slots, B: guestId },
-          },
-          "B",
-          displayName,
-        ),
-        slot: "B",
-      };
-    }
-
-    return null;
+    const existing = room.seats[slot];
+    const connectionEpoch = Math.max(existing?.connectionEpoch ?? 0, 1);
+    const seat: SeatIdentity = {
+      kind: "guest",
+      ...(displayName === undefined
+        ? existing?.kind === "guest" && existing.displayName !== undefined
+          ? { displayName: existing.displayName }
+          : {}
+        : { displayName }),
+      connectionEpoch,
+      usedTickets: [],
+    };
+    return {
+      room: {
+        ...room,
+        slots: { ...room.slots, [slot]: identityKey },
+        seats: { ...room.seats, [slot]: seat },
+      },
+      slot,
+      identityKey,
+    };
   }
 
-  private withDisplayName(
+  private assignAccountSlot(
     room: RoomState,
-    slot: PlayerSlot,
-    displayName: string | undefined,
-  ): RoomState {
-    if (displayName === undefined) {
-      return room;
+    payload: IdentityTicketPayload,
+    now: number,
+  ):
+    | {
+        room: RoomState;
+        slot: PlayerSlot;
+        identityKey: string;
+        epoch: number;
+      }
+    | {
+        error: "identityScope" | "identityReplayed" | "rateLimited";
+      }
+    | null {
+    const identityKey = `account:${payload.userId}`;
+    const existingSlot = PLAYER_SLOTS.find(
+      (slot) => room.slots[slot] === identityKey,
+    );
+    if (payload.action === "reconnect" && existingSlot === undefined) {
+      return { error: "identityScope" };
     }
 
+    const slot =
+      existingSlot ?? PLAYER_SLOTS.find((candidate) => !room.slots[candidate]);
+    if (slot === undefined) return null;
+
+    const existing = room.seats[slot];
+    const usedTickets =
+      existing?.kind === "account"
+        ? existing.usedTickets.filter((ticket) => ticket.exp > now)
+        : [];
+    if (usedTickets.some((ticket) => ticket.jti === payload.jti)) {
+      return { error: "identityReplayed" };
+    }
+    if (usedTickets.length >= MAX_USED_TICKETS_PER_SEAT) {
+      return { error: "rateLimited" };
+    }
+
+    const epoch = (existing?.connectionEpoch ?? 0) + 1;
+    const seat: SeatIdentity = {
+      kind: "account",
+      userId: payload.userId,
+      usernameSnapshot:
+        existing?.kind === "account"
+          ? existing.usernameSnapshot
+          : payload.usernameSnapshot,
+      avatarMode: payload.avatarMode,
+      imageUrl:
+        payload.avatarMode === "google"
+          ? allowedGoogleAvatarUrl(payload.imageUrl)
+          : null,
+      connectionEpoch: epoch,
+      usedTickets: [...usedTickets, { jti: payload.jti, exp: payload.exp }],
+    };
     return {
-      ...room,
-      displayNames: { ...room.displayNames, [slot]: displayName },
+      room: {
+        ...room,
+        slots: { ...room.slots, [slot]: identityKey },
+        seats: { ...room.seats, [slot]: seat },
+      },
+      slot,
+      identityKey,
+      epoch,
     };
   }
 
   private async handleSocketDisconnect(ws: WebSocket): Promise<void> {
     const room = await this.readRoom();
-    const attachment = socketAttachment(ws);
-    ws.serializeAttachment(null);
-    if (!room || !attachment) {
+    if (!room || !this.authorizeSocket(room, ws)) {
       return;
     }
+    ws.serializeAttachment(null);
 
     const now = Date.now();
-    const liveConnections = this.liveConnections();
+    const liveConnections = this.liveConnections(room);
     const connections = { ...room.connections };
     for (const slot of PLAYER_SLOTS) {
       if (!room.slots[slot]) {
@@ -678,14 +855,14 @@ export class MatchRoom implements DurableObject {
         type: "presence",
         roomCode: room.roomCode,
         players: {
-          A: room.slots.A ? presencePlayer(room.displayNames.A) : null,
-          B: room.slots.B ? presencePlayer(room.displayNames.B) : null,
+          A: room.slots.A ? presencePlayer(room.seats.A) : null,
+          B: room.slots.B ? presencePlayer(room.seats.B) : null,
         },
         started: Boolean(room.slots.A && room.slots.B),
       }),
     );
 
-    this.broadcastToJoinedSockets(message);
+    this.broadcastToJoinedSockets(room, message);
   }
 
   private broadcastState(room: RoomState): void {
@@ -698,12 +875,12 @@ export class MatchRoom implements DurableObject {
       }),
     );
 
-    this.broadcastToJoinedSockets(message);
+    this.broadcastToJoinedSockets(room, message);
   }
 
   private broadcastMatchStatus(room: RoomState): void {
     const message = JSON.stringify(this.matchStatus(room));
-    this.broadcastToJoinedSockets(message);
+    this.broadcastToJoinedSockets(room, message);
   }
 
   private broadcastMatchEnded(
@@ -721,7 +898,7 @@ export class MatchRoom implements DurableObject {
       }),
     );
 
-    this.broadcastToJoinedSockets(message);
+    this.broadcastToJoinedSockets(room, message);
   }
 
   private sendMatchEnded(
@@ -777,9 +954,9 @@ export class MatchRoom implements DurableObject {
       : null;
   }
 
-  private broadcastToJoinedSockets(message: string): void {
+  private broadcastToJoinedSockets(room: RoomState, message: string): void {
     for (const socket of this.ctx.getWebSockets()) {
-      if (socketAttachment(socket)) {
+      if (this.authorizeSocket(room, socket)) {
         socket.send(message);
       }
     }
@@ -858,8 +1035,55 @@ export class MatchRoom implements DurableObject {
   }
 
   private normalizeRoom(stored: Partial<RoomState>): RoomState {
-    const liveConnections = this.liveConnections();
-    const slots = stored.slots ?? {};
+    const legacyDisplayNames = (
+      stored as Partial<RoomState> & {
+        displayNames?: Partial<Record<PlayerSlot, string>>;
+      }
+    ).displayNames;
+    const legacySlots = stored.slots ?? {};
+    const migrated = stored.seatVersion !== 2;
+    const slots: Partial<Record<PlayerSlot, string>> = {};
+    const seats: Partial<Record<PlayerSlot, SeatIdentity>> = {};
+    for (const slot of PLAYER_SLOTS) {
+      const legacyIdentity = legacySlots[slot];
+      if (migrated) {
+        if (legacyIdentity !== undefined) {
+          slots[slot] = `guest:${legacyIdentity}`;
+          seats[slot] = {
+            kind: "guest",
+            ...(legacyDisplayNames?.[slot] === undefined
+              ? {}
+              : { displayName: legacyDisplayNames[slot] }),
+            connectionEpoch: 0,
+            usedTickets: [],
+          };
+        }
+        continue;
+      }
+
+      if (legacyIdentity !== undefined) slots[slot] = legacyIdentity;
+      const existingSeat = stored.seats?.[slot];
+      if (existingSeat !== undefined) {
+        seats[slot] = normalizeSeat(existingSeat);
+      }
+    }
+
+    const baseRoom: RoomState = {
+      roomCode: stored.roomCode ?? "",
+      createdAt: stored.createdAt ?? Date.now(),
+      lastActivityAt: stored.lastActivityAt ?? Date.now(),
+      seatVersion: 2,
+      slots,
+      seats,
+      gameState: stored.gameState ?? serialize(createInitialState("A")),
+      connections: stored.connections ?? {},
+      turnStartedAt: stored.turnStartedAt ?? null,
+      nudgedTurnAt: stored.nudgedTurnAt ?? null,
+      claimableBy: stored.claimableBy ?? null,
+      claimReason: stored.claimReason ?? null,
+      onlineEndReason: stored.onlineEndReason ?? null,
+    };
+    const liveConnections = this.liveConnections(baseRoom);
     const connections: Partial<Record<PlayerSlot, ConnectionState>> = {};
 
     for (const slot of PLAYER_SLOTS) {
@@ -877,31 +1101,38 @@ export class MatchRoom implements DurableObject {
     }
 
     return {
-      roomCode: stored.roomCode ?? "",
-      createdAt: stored.createdAt ?? Date.now(),
-      lastActivityAt: stored.lastActivityAt ?? Date.now(),
-      slots,
-      displayNames: stored.displayNames ?? {},
-      gameState: stored.gameState ?? serialize(createInitialState("A")),
+      ...baseRoom,
       connections,
-      turnStartedAt: stored.turnStartedAt ?? null,
-      nudgedTurnAt: stored.nudgedTurnAt ?? null,
-      claimableBy: stored.claimableBy ?? null,
-      claimReason: stored.claimReason ?? null,
-      onlineEndReason: stored.onlineEndReason ?? null,
     };
   }
 
-  private liveConnections(): Record<PlayerSlot, boolean> {
+  private liveConnections(room: RoomState): Record<PlayerSlot, boolean> {
     const connections = { A: false, B: false };
     for (const socket of this.ctx.getWebSockets()) {
-      const attachment = socketAttachment(socket);
+      const attachment = this.authorizeSocket(room, socket);
       if (attachment) {
         connections[attachment.slot] = true;
       }
     }
 
     return connections;
+  }
+
+  private authorizeSocket(
+    room: RoomState,
+    ws: WebSocket,
+  ): JoinedSocketAttachment | null {
+    const attachment = socketAttachment(ws);
+    if (!attachment || room.slots[attachment.slot] !== attachment.identityKey) {
+      return null;
+    }
+
+    const seat = room.seats[attachment.slot];
+    if (seat?.kind === "account" && attachment.epoch !== seat.connectionEpoch) {
+      return null;
+    }
+
+    return attachment;
   }
 
   private sendError(ws: WebSocket, code: string, message: string): void {
@@ -915,6 +1146,16 @@ export class MatchRoom implements DurableObject {
         }),
       ),
     );
+  }
+
+  private sendIdentityError(
+    ws: WebSocket,
+    code: string,
+    message: string,
+    close: boolean,
+  ): void {
+    this.sendError(ws, code, message);
+    if (close) ws.close(4003, code);
   }
 
   private consumeMessageQuota(ws: WebSocket, now: number): boolean {
@@ -953,10 +1194,75 @@ export class MatchRoom implements DurableObject {
   }
 }
 
-function presencePlayer(displayName: string | undefined): {
+function presencePlayer(seat: SeatIdentity | undefined): {
   displayName?: string;
+  kind?: "guest" | "account";
+  username?: string;
+  avatar?: {
+    mode: AvatarMode;
+    imageUrl: string | null;
+    color: string;
+    initial: string;
+  };
 } {
-  return displayName === undefined ? {} : { displayName };
+  if (!seat) return {};
+  if (seat.kind === "guest") {
+    return {
+      kind: "guest",
+      ...(seat.displayName === undefined
+        ? {}
+        : { displayName: seat.displayName }),
+    };
+  }
+
+  return {
+    kind: "account",
+    displayName: seat.usernameSnapshot,
+    username: seat.usernameSnapshot,
+    avatar: {
+      mode: seat.avatarMode,
+      imageUrl: seat.imageUrl,
+      color: avatarColorForUserId(seat.userId),
+      initial: avatarInitial(seat.usernameSnapshot),
+    },
+  };
+}
+
+function normalizeSeat(seat: SeatIdentity): SeatIdentity {
+  if (seat.kind === "guest") {
+    return {
+      kind: "guest",
+      ...(seat.displayName === undefined
+        ? {}
+        : { displayName: seat.displayName }),
+      connectionEpoch: Number.isInteger(seat.connectionEpoch)
+        ? seat.connectionEpoch
+        : 0,
+      usedTickets: [],
+    };
+  }
+
+  return {
+    kind: "account",
+    userId: seat.userId,
+    usernameSnapshot: seat.usernameSnapshot,
+    avatarMode: seat.avatarMode,
+    imageUrl:
+      seat.avatarMode === "google"
+        ? allowedGoogleAvatarUrl(seat.imageUrl)
+        : null,
+    connectionEpoch: Number.isInteger(seat.connectionEpoch)
+      ? seat.connectionEpoch
+      : 0,
+    usedTickets: Array.isArray(seat.usedTickets)
+      ? seat.usedTickets
+          .filter(
+            (ticket) =>
+              typeof ticket?.jti === "string" && typeof ticket.exp === "number",
+          )
+          .slice(-MAX_USED_TICKETS_PER_SEAT)
+      : [],
+  };
 }
 
 function otherSlot(slot: PlayerSlot): PlayerSlot {
@@ -1021,6 +1327,13 @@ function socketAttachment(ws: WebSocket): JoinedSocketAttachment | null {
     return {
       guestId: attachment.guestId,
       slot: attachment.slot,
+      identityKey:
+        typeof attachment.identityKey === "string"
+          ? attachment.identityKey
+          : `guest:${attachment.guestId}`,
+      ...(typeof attachment.epoch === "number"
+        ? { epoch: attachment.epoch }
+        : {}),
       ...(attachment.messageTimestamps
         ? { messageTimestamps: attachment.messageTimestamps }
         : {}),
@@ -1051,6 +1364,10 @@ function rawSocketAttachment(ws: WebSocket): SocketAttachment {
     ...(candidate.slot === "A" || candidate.slot === "B"
       ? { slot: candidate.slot }
       : {}),
+    ...(typeof candidate.identityKey === "string"
+      ? { identityKey: candidate.identityKey }
+      : {}),
+    ...(typeof candidate.epoch === "number" ? { epoch: candidate.epoch } : {}),
     ...(messageTimestamps.length > 0 ? { messageTimestamps } : {}),
   };
 }

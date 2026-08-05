@@ -55,7 +55,9 @@ declare global {
     }
 
     interface Platform {
-      env: import("$lib/server/auth/options").AuthEnvironment;
+      env: import("$lib/server/auth/options").AuthEnvironment & {
+        ONLINE_IDENTITY_SECRET?: string;
+      };
       context?: {
         waitUntil(promise: Promise<unknown>): void;
       };

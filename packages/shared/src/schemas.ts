@@ -1,6 +1,8 @@
 import { ADJACENCY, JARE_LINES, POINT_IDS } from "@shaxda/game-engine";
 import { z } from "zod";
 import type { PointId } from "@shaxda/game-engine";
+import { avatarModeSchema } from "./account/avatar";
+import { usernameSchema } from "./account/username";
 
 export const protocolVersion = 1 as const;
 
@@ -123,6 +125,57 @@ export const roomCodeSchema = z
   .regex(roomCodePattern);
 export const guestIdSchema = z.string().min(8).max(128);
 export const guestDisplayNameSchema = z.string().min(1).max(40);
+export const identityTicketSchema = z
+  .string()
+  .max(1_024)
+  .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+export const ticketActionSchema = z.enum(["create", "join", "reconnect"]);
+
+const onlineAvatarSchema = z.object({
+  mode: avatarModeSchema,
+  imageUrl: z.string().max(512).url().nullable(),
+  color: z.string().min(1).max(32),
+  initial: z.string().length(1),
+});
+
+export const onlineIdentityStatusSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("signedOut") }),
+  z.object({ status: z.literal("incomplete") }),
+  z.object({
+    status: z.literal("complete"),
+    account: z.object({
+      username: usernameSchema,
+      avatar: onlineAvatarSchema,
+    }),
+  }),
+]);
+
+export const onlineIdentityTicketRequestSchema = z
+  .object({
+    action: ticketActionSchema,
+    roomCode: roomCodeSchema.optional(),
+  })
+  .superRefine((request, ctx) => {
+    if (request.action === "create" && request.roomCode !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["roomCode"],
+        message: "Create tickets must not carry a room code.",
+      });
+    }
+    if (request.action !== "create" && request.roomCode === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["roomCode"],
+        message: "Join and reconnect tickets require a room code.",
+      });
+    }
+  });
+
+export const onlineIdentityTicketResponseSchema = z.object({
+  ticket: identityTicketSchema,
+  expiresAt: z.number().int().positive(),
+});
 
 const envelopeBase = {
   v: z.literal(protocolVersion),
@@ -141,6 +194,7 @@ export const joinRoomClientMessageSchema = z.object({
   roomCode: roomCodeSchema,
   guestId: guestIdSchema,
   displayName: guestDisplayNameSchema.optional(),
+  identityTicket: identityTicketSchema.optional(),
 });
 
 export const gameActionClientMessageSchema = z.object({
@@ -194,6 +248,9 @@ export const joinedServerMessageSchema = z.object({
 
 const presencePlayerSchema = z.object({
   displayName: guestDisplayNameSchema.optional(),
+  kind: z.enum(["guest", "account"]).optional(),
+  username: usernameSchema.optional(),
+  avatar: onlineAvatarSchema.optional(),
 });
 
 export const presenceServerMessageSchema = z.object({
@@ -275,3 +332,8 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
+export type OnlineIdentityStatus = z.infer<typeof onlineIdentityStatusSchema>;
+export type OnlineIdentityAccount = Extract<
+  OnlineIdentityStatus,
+  { status: "complete" }
+>["account"];

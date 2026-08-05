@@ -18,6 +18,17 @@ pnpm check
 pnpm test:e2e
 ```
 
+Before authenticated local play, copy both Worker examples and put the same
+generated `ONLINE_IDENTITY_SECRET` value in each file:
+
+```bash
+cp web/.dev.vars.example web/.dev.vars
+cp worker/.dev.vars.example worker/.dev.vars
+```
+
+Keep the committed dev/test literal confined to Wrangler test configuration;
+use a fresh random value in local, preview, and production environments.
+
 Required milestone checks:
 
 ```bash

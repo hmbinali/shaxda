@@ -1,8 +1,8 @@
 import { fireEvent, render } from "@testing-library/svelte";
+import { allowedGoogleAvatarUrl } from "@shaxda/shared";
 import { describe, expect, it } from "vitest";
 import Avatar from "./Avatar.svelte";
 import UsernameField from "./UsernameField.svelte";
-import { allowedGoogleAvatarUrl } from "./avatar";
 
 describe("account avatars", () => {
   it.each([

@@ -89,15 +89,33 @@ these values to `[vars]` in preview or production because a var shadows a Worker
 secret.
 
 Set every secret an environment needs _before_ deploying the code that reads it.
-An unread secret on an older Worker version is inert, but `getAuthOptions` throws
-when `BETTER_AUTH_SECRET` is missing, so a web deploy that lands ahead of its
-secrets fails every request instead of degrading. `wrangler secret put` does
+An unread secret on an older Worker version is inert, but `createAuthOptions`
+throws when `BETTER_AUTH_SECRET` is missing, so a web deploy that lands ahead of
+its secrets fails every request instead of degrading. `wrangler secret put` does
 create a new Worker version, which is why the secret step precedes the deploy
 step in the release order below rather than following it.
+
+This holds for a brand-new environment too: `wrangler secret put` creates the
+Worker when it does not exist, as a script with no code and a deployment history
+showing only `Source: Secret Change`. The first real `wrangler deploy` then
+replaces the placeholder and applies any Durable Object migrations. Do not infer
+the opposite from `wrangler secret list`, which fails on a missing Worker with
+"If this is a new Worker, run `wrangler deploy` first to create it" — that advice
+applies to `list`, not to `put`.
 
 Do not put real secrets in `vars`, shell history, screenshots, CI logs, or source
 control. The production bundle check rejects any supplied auth secret and the
 committed e2e secrets if one appears in `.svelte-kit/cloudflare/`.
+
+### Public build variables and local tests
+
+`web/.env.production` holds the build-time `PUBLIC_*` values and is untracked. It
+is loaded by every production-mode `vite build`, including the one whose output
+`pnpm test:e2e` serves through `vite preview`. Leaving a preview or production
+`PUBLIC_WORKER_ORIGIN` in place therefore points the local end-to-end run at a
+deployed Worker instead of the Miniflare instance on `127.0.0.1:8787`, and the
+online specs fail against real Turnstile. Move the file aside before running
+`pnpm check` or `pnpm test:e2e` locally, and restore it before deploying.
 
 ### Online-identity secret rotation
 

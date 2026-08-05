@@ -18,6 +18,10 @@ playwright-report/
 .env
 .env.*
 !.env.example
+# Public E2E fixtures, tracked on purpose. Anchored to the two real files so no
+# other `.env.e2e` anywhere in the repo becomes trackable by accident.
+!/web/.env.e2e
+!/worker/.env.e2e
 .dev.vars
 .dev.vars.*
 !.dev.vars.example

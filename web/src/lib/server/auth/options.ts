@@ -141,6 +141,13 @@ export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
     },
     advanced: {
       useSecureCookies: baseURL.startsWith("https://"),
+      // Cloudflare never sets Better Auth's default `x-forwarded-for`, so rate
+      // limiting collapses into one shared bucket. `cf-connecting-ip` is a
+      // single-value header written by the edge, which Better Auth trusts
+      // without a `trustedProxies` list.
+      ipAddress: {
+        ipAddressHeaders: ["cf-connecting-ip"],
+      },
     },
     telemetry: { enabled: false },
     plugins: [sveltekitCookies(getRequestEvent)],

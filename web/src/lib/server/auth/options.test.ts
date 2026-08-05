@@ -26,6 +26,12 @@ describe("Better Auth options", () => {
     expect(options.telemetry).toEqual({ enabled: false });
   });
 
+  it("resolves the client IP from the Cloudflare edge header", () => {
+    expect(
+      createAuthOptions(environment()).advanced?.ipAddress?.ipAddressHeaders,
+    ).toEqual(["cf-connecting-ip"]);
+  });
+
   it("uses non-secure cookies only for an explicit HTTP development origin", () => {
     expect(
       createAuthOptions(environment("http://localhost:5173")).advanced

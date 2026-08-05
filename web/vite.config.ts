@@ -141,5 +141,16 @@ export default defineConfig({
     environment: "jsdom",
     passWithNoTests: true,
     setupFiles: ["./src/test/setup.ts"],
+    // Vite loads `.env.local` in every mode, `test` included, so a developer's
+    // real `PUBLIC_TURNSTILE_SITE_KEY` makes the online lobby render a Turnstile
+    // widget that never resolves under jsdom and leaves Create disabled. Pin the
+    // public values to the unset defaults CI runs with; `vi.stubEnv` still
+    // overrides them per test.
+    env: {
+      PUBLIC_SITE_ORIGIN: "",
+      PUBLIC_WORKER_ORIGIN: "",
+      PUBLIC_TURNSTILE_SITE_KEY: "",
+      PUBLIC_CF_BEACON_TOKEN: "",
+    },
   },
 });

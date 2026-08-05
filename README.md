@@ -29,6 +29,9 @@ cp worker/.dev.vars.example worker/.dev.vars
 Keep the committed dev/test literal confined to Wrangler test configuration;
 use a fresh random value in local, preview, and production environments.
 
+`pnpm test:e2e` builds and serves its own bundle from tracked fixtures, so your
+`.dev.vars` and `web/.env.production` can stay exactly where they are.
+
 Required milestone checks:
 
 ```bash

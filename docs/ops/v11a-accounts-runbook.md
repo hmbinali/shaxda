@@ -110,12 +110,16 @@ committed e2e secrets if one appears in `.svelte-kit/cloudflare/`.
 ### Public build variables and local tests
 
 `web/.env.production` holds the build-time `PUBLIC_*` values and is untracked. It
-is loaded by every production-mode `vite build`, including the one whose output
-`pnpm test:e2e` serves through `vite preview`. Leaving a preview or production
-`PUBLIC_WORKER_ORIGIN` in place therefore points the local end-to-end run at a
-deployed Worker instead of the Miniflare instance on `127.0.0.1:8787`, and the
-online specs fail against real Turnstile. Move the file aside before running
-`pnpm check` or `pnpm test:e2e` locally, and restore it before deploying.
+is loaded by every production-mode `vite build`.
+
+It has no effect on `pnpm test:e2e`, and neither does a real `web/.dev.vars` or
+`worker/.dev.vars`. Leave all three in place: the end-to-end run builds its own
+bundle into `web/.svelte-kit/e2e` with `--mode e2e`, from an environment that
+drops every inherited `PUBLIC_*` and re-reads the tracked `web/.env.e2e`. Both
+Workers are given an explicit env file — `platformProxy.envFiles` for the web
+Worker, `wrangler dev --env-file` for the game Worker — which is what makes
+Wrangler skip `.dev.vars` entirely. Nothing moves, rewrites, or reads your real
+files. See [Step 2 test determinism](./step2-test-determinism.md).
 
 ### Online-identity secret rotation
 

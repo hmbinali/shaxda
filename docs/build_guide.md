@@ -61,6 +61,11 @@ End-to-end work also runs:
 pnpm test:e2e
 ```
 
+`pnpm test:e2e` builds its own bundle from tracked fixtures and cleans its own
+Durable Object state, so it needs no manual setup and leaves your local
+`.dev.vars`, `web/.env.production`, and `.wrangler/state` untouched. See
+[Step 2 test determinism](./ops/step2-test-determinism.md).
+
 ## Contract Ownership
 
 `packages/game-engine` owns dependency-free rules, board data, game state/action types, serialization, replay helpers, and the reducer.

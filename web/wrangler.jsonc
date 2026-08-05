@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "shaxda-db",
-      "database_id": "REPLACE_WITH_SHAXDA_DB_ID",
+      "database_id": "b84cc232-ddbd-437d-acd0-0fa0d77e12b0",
       "migrations_dir": "../packages/db/migrations",
       "migrations_table": "d1_migrations",
     },

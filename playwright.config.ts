@@ -23,17 +23,22 @@ export default defineConfig({
       use: { ...devices["Pixel 5"] },
     },
   ],
+  // Never reuse a running server: the launchers clean the dedicated state
+  // directories on startup, and reusing one silently skips that, so rooms
+  // accumulate across runs until the per-IP limit rejects new ones. With this
+  // off, a second concurrent run fails loudly on the bound port instead of
+  // quietly sharing a persistence path.
   webServer: [
     {
-      command:
-        "rm -rf test-results/wrangler-e2e && pnpm --filter @shaxda/worker dev -- --ip 127.0.0.1 --port 8787 --persist-to ../test-results/wrangler-e2e",
-      reuseExistingServer: !process.env.CI,
+      command: "node scripts/start-worker-e2e.mjs",
+      reuseExistingServer: false,
       timeout: 120_000,
       url: "http://127.0.0.1:8787/health",
     },
     {
       command: "node scripts/start-web-e2e.mjs",
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
+      timeout: 180_000,
       url: "http://127.0.0.1:4173",
     },
   ],

@@ -1,9 +1,25 @@
+import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
 import { SvelteKitPWA } from "@vite-pwa/sveltekit";
 import { loadEnv, type Plugin } from "vite";
 import { defineConfig } from "vitest/config";
+
+// `@vite-pwa/sveltekit` never reads `svelte.config.js`, so it has to be told the
+// output directory or it globs the wrong tree. Matches its default when
+// `SHAXDA_KIT_OUT_DIR` is unset.
+//
+// It also cannot be told where to *move* the generated service worker: that path
+// is hardcoded to `.svelte-kit/output`, and its `outDir` option means the build
+// directory to the generator but the parent of `client/` to the mover, so the
+// two cannot both be satisfied. `scripts/start-web-e2e.mjs` performs the move
+// for the E2E build instead, and `scripts/check-e2e-bundle.mjs` fails if the
+// service worker is missing.
+const kitOutDir = resolve(
+  import.meta.dirname,
+  process.env.SHAXDA_KIT_OUT_DIR ?? ".svelte-kit",
+);
 
 function requireProductionPublicEnv(): Plugin {
   return {
@@ -42,6 +58,7 @@ export default defineConfig({
     sveltekit(),
     svelteTesting(),
     SvelteKitPWA({
+      kit: { outDir: kitOutDir },
       registerType: "prompt",
       injectRegister: false,
       includeAssets: [

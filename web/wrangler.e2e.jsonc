@@ -1,9 +1,15 @@
+// End-to-end configuration. Built and served out of `.svelte-kit/e2e` so an
+// E2E run never reuses or clobbers the production build in `.svelte-kit`.
+//
+// `vars` below are the reviewed, non-sensitive E2E auth fixtures and are the
+// single source for them. Public build values live in `web/.env.e2e`, which is
+// also passed as `platformProxy.envFiles` so `web/.dev.vars` is ignored here.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "shaxda-web-e2e",
   "compatibility_date": "2026-07-05",
   "compatibility_flags": ["nodejs_compat"],
-  "main": ".svelte-kit/cloudflare/_worker.js",
+  "main": ".svelte-kit/e2e/cloudflare/_worker.js",
   "workers_dev": true,
   "vars": {
     "AUTH_BASE_URL": "http://127.0.0.1:4173",
@@ -23,6 +29,6 @@
   ],
   "assets": {
     "binding": "ASSETS",
-    "directory": ".svelte-kit/cloudflare",
+    "directory": ".svelte-kit/e2e/cloudflare",
   },
 }

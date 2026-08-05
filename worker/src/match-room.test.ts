@@ -236,16 +236,12 @@ describe("match room hibernation spike", () => {
     const roomCode = await createRoom();
     const forged = await connectRoom(roomCode);
     const valid = await mintTestTicket("join", roomCode);
-    const [payload, signature] = valid.split(".");
+    const forgedTicket = forgeTicketSignature(valid);
+    expect(forgedTicket).not.toBe(valid);
     const forgedClosed = waitForClose(forged);
     sendJson(
       forged,
-      joinRoom(
-        roomCode,
-        "account-device-a",
-        undefined,
-        `${payload}.${signature?.slice(0, -1)}A`,
-      ),
+      joinRoom(roomCode, "account-device-a", undefined, forgedTicket),
     );
     await expect(waitForMessage(forged, "error")).resolves.toMatchObject({
       code: "identityInvalid",
@@ -1239,6 +1235,16 @@ function waitForClose(
       { once: true },
     );
   });
+}
+
+// A 32-byte HMAC-SHA-256 signature encodes to 43 base64url characters whose last
+// character carries only four significant bits, so it is one of just sixteen
+// values. Rewriting that character to a fixed one leaves the ticket untouched
+// about one time in sixteen. The leading character has no such constraint, so
+// flipping it always produces a signature that fails verification.
+function forgeTicketSignature(ticket: string): string {
+  const [payload, signature] = ticket.split(".") as [string, string];
+  return `${payload}.${signature.startsWith("A") ? "B" : "A"}${signature.slice(1)}`;
 }
 
 let ticketSequence = 0;

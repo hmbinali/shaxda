@@ -126,13 +126,47 @@ scope `email profile openid`, and PKCE `S256` — confirming the deployed
 `AUTH_BASE_URL`, the `trustedOrigins` entry derived from it, and the registered
 Google redirect URI all agree.
 
+## Preview browser smoke test and rotation drill
+
+All ten browser checks passed: Google sign-in and callback, registration and
+username confirmation, the 30-day cooldown rejecting an immediate rename, the
+account page showing the private email, the public profile hiding email and
+Google full name, the unsafe `returnTo` landing on `/`, guest create/join/
+reconnect, registered create/join with `@username`, registered reconnect, second-
+tab takeover with the replacement notice, and a presence frame carrying no
+account id, email, Google full name, cookie, or token.
+
+The rotation drill was then run against preview only, per the runbook: the old
+secret was installed as `ONLINE_IDENTITY_SECRET_PREVIOUS` on the game Worker, a
+new secret replaced `ONLINE_IDENTITY_SECRET` on both Workers, and after the
+overlap window `ONLINE_IDENTITY_SECRET_PREVIOUS` was deleted. Deployment history
+corroborates it — three post-deploy secret changes on the game Worker and one on
+the web Worker — and both preview Workers now hold exactly one current, matching
+identity secret with no `PREVIOUS` remaining.
+
+## Production rollout
+
+Rollback targets captured before any change:
+
+| Worker          | Version to roll back to                |
+| --------------- | -------------------------------------- |
+| `shaxda-worker` | `fad0f2f6-47a0-4834-b5a7-9d342cd76786` |
+| `shaxda-web`    | `e735a9c8-28a0-48f8-9bed-f85a3bed16b0` |
+
+Both date from 2026-08-03 and must be rolled back together.
+
+Applied `0000_accounts.sql` to `shaxda-db` (`b84cc232-ddbd-437d-acd0-0fa0d77e12b0`)
+remotely: 14 commands, tables `account`, `d1_migrations`, `session`, `user`,
+`username_claim`, `verification`, and the hand-written `user_username_unique`
+index confirmed present. `shaxda.app` continued serving 200 throughout, because
+the live V1.0 web Worker has no `DB` binding and cannot see the new tables.
+
+Starting production secret state: `shaxda-web` had none; `shaxda-worker` had only
+`TURNSTILE_SECRET` from the V1.0 launch, which must not be rotated by this
+release.
+
 ## Remaining work
 
-Preview: browser smoke test, identity-secret rotation drill, restore a single
-final secret.
-
-Production: apply `shaxda-db` migration, set the four web and one game secrets,
+Set the four `shaxda-web` secrets and the one `shaxda-worker` identity secret,
 swap `web/.env.production` to production values, deploy the game Worker then the
-web Worker, and re-run the smoke test. Record the pre-deploy version ids of
-`shaxda-web` and `shaxda-worker` first — they are the rollback targets, and both
-must be rolled back together.
+web Worker, and re-run the smoke test against `shaxda.app`.

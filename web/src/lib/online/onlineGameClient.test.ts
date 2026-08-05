@@ -161,6 +161,49 @@ describe("OnlineGameClient", () => {
     expect(socket.sent).toEqual([]);
   });
 
+  it("reports connected only after a minted join reaches the socket", async () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    let resolveTicket: ((ticket: string) => void) | undefined;
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onStatus: (status) => statuses.push(status),
+    });
+    client.connect({
+      roomCode: "ABCDEFGH",
+      guestId: "guest-id-a",
+      requestTicket: async () =>
+        new Promise<string>((resolve) => {
+          resolveTicket = resolve;
+        }),
+    });
+    const first = FakeWebSocket.latest();
+    first.open();
+    await vi.runAllTicks();
+    expect(statuses).toEqual(["connecting"]);
+    expect(first.sent).toEqual([]);
+
+    resolveTicket?.(`${"a".repeat(24)}.${"b".repeat(43)}`);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statuses).toEqual(["connecting", "connected"]);
+    expect(first.sent).toHaveLength(1);
+
+    first.close();
+    vi.advanceTimersByTime(1_000);
+    const second = FakeWebSocket.latest();
+    second.open();
+    await vi.runAllTicks();
+    expect(statuses.at(-1)).toBe("reconnecting");
+    expect(second.sent).toEqual([]);
+
+    resolveTicket?.(`${"c".repeat(24)}.${"d".repeat(43)}`);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statuses.at(-1)).toBe("connected");
+    expect(second.sent).toHaveLength(1);
+  });
+
   it("treats account replacement as intentional", () => {
     vi.useFakeTimers();
     const statuses: string[] = [];

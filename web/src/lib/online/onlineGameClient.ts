@@ -129,7 +129,6 @@ export class OnlineGameClient {
         return;
       }
       this.#reconnectAttempt = 0;
-      this.emitStatus("connected");
       const action: RoomTicketAction = this.#hasOpened ? "reconnect" : "join";
       this.#hasOpened = true;
       void this.sendJoin(socket, options, action);
@@ -207,6 +206,11 @@ export class OnlineGameClient {
       socket.send(
         JSON.stringify(buildJoinMessage(options, identityTicket ?? undefined)),
       );
+      // Only report the socket as connected once the seat claim is on the
+      // wire. Minting an identity ticket awaits a request, and a reconnect
+      // keeps the previous slot and state, so an earlier "connected" would let
+      // the board send a move ahead of the join.
+      this.emitStatus("connected");
     } catch (error) {
       if (this.#socket !== socket) return;
       this.#intentionalClose = true;

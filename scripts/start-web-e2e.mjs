@@ -16,7 +16,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import {
   cleanE2eStateDirectory,
@@ -24,6 +24,7 @@ import {
   testResultsRoot,
 } from "./lib/e2e-state.mjs";
 import { E2E_ENV_FILE, buildE2eEnv, readE2eFixture } from "./lib/e2e-env.mjs";
+import { spawnGroup } from "./lib/spawn-group.mjs";
 import { fingerprintTree } from "./lib/fs-tree.mjs";
 
 export const WEB_E2E_STATE = "wrangler-web-e2e";
@@ -109,14 +110,20 @@ step("Applying E2E migrations", "pnpm", [
 
 // Same child environment and same `SHAXDA_KIT_OUT_DIR`, so the artifact that was
 // just built is exactly the artifact that gets served.
-const preview = spawn(
+// `--strictPort` matters: without it `vite preview` quietly moves to the next
+// free port when 4173 is taken, and Playwright then waits out its timeout
+// polling a port nothing is listening on.
+spawnGroup(
   "pnpm",
-  ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", "4173"],
+  [
+    "exec",
+    "vite",
+    "preview",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "4173",
+    "--strictPort",
+  ],
   { cwd: web, stdio: "inherit", env },
 );
-
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => preview.kill(signal));
-}
-
-preview.on("exit", (code) => process.exit(code ?? 0));

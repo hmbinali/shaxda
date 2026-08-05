@@ -1,34 +1,11 @@
 import { readdir, readFile } from "node:fs/promises";
+import { parseEnv } from "./lib/env-file.mjs";
 const webRoot = new URL("../web/", import.meta.url);
 const bundleRoot = new URL(".svelte-kit/cloudflare/", webRoot);
 const fallbackOrigins = ["https://shaxda.example", "http://127.0.0.1:8787"];
 const committedTestSecret = "shaxda-e2e-only-secret-48-characters-long-000000";
 const committedOnlineIdentityTestSecret =
   "shaxda-online-identity-dev-test-secret-000000000001";
-
-function parseEnv(contents) {
-  const env = {};
-
-  for (const line of contents.split(/\r?\n/)) {
-    const match = line.match(
-      /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/,
-    );
-    if (!match) continue;
-
-    let value = match[2];
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    } else {
-      value = value.replace(/\s+#.*$/, "");
-    }
-    env[match[1]] = value;
-  }
-
-  return env;
-}
 
 async function productionEnv() {
   const env = {};

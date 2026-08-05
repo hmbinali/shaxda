@@ -1,10 +1,15 @@
-name = "shaxda-worker"
+# Must never match the production Worker name in wrangler.production.toml: a
+# preview deploy under that name would replace the live shaxda.app script.
+name = "shaxda-worker-preview"
 main = "src/index.ts"
 compatibility_date = "2026-07-05"
 workers_dev = true
 
 [observability]
 enabled = true
+
+[vars]
+ALLOWED_ORIGIN = "https://shaxda-web-preview.shaxda.workers.dev"
 
 [[durable_objects.bindings]]
 name = "MATCH_ROOM"

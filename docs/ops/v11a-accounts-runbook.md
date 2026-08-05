@@ -5,16 +5,9 @@ online-room identity integration. Auth is served by `shaxda-web` under
 `/api/auth/*`; the game Worker verifies signed identity tickets only. Guest rooms
 and Turnstile remain available without an account.
 
-## Prerequisites and placeholders
+## Prerequisites and environment separation
 
-The committed production and preview Wrangler files deliberately contain
-placeholders. Do not deploy until all three are replaced:
-
-- `REPLACE_WITH_SHAXDA_DB_ID` in `web/wrangler.jsonc`;
-- `REPLACE_WITH_SHAXDA_DB_PREVIEW_ID` in `web/wrangler.preview.jsonc`;
-- `REPLACE_WITH_SHAXDA_WEB_SUBDOMAIN` in the preview `AUTH_BASE_URL`.
-
-Create separate databases and copy the returned ids into those files:
+Create separate databases and copy the returned ids into the Wrangler files:
 
 ```bash
 pnpm --filter @shaxda/web exec wrangler d1 create shaxda-db
@@ -22,6 +15,21 @@ pnpm --filter @shaxda/web exec wrangler d1 create shaxda-db-preview
 ```
 
 Never reuse the production database id in preview.
+
+Preview and production Workers must never share a script name. Wrangler deploys
+by name, so a preview deploy under a production name replaces the live
+`shaxda.app` script with a build bound to the preview database and the preview
+auth origin. The four names are:
+
+| Environment | Web Worker           | Game Worker             |
+| ----------- | -------------------- | ----------------------- |
+| Production  | `shaxda-web`         | `shaxda-worker`         |
+| Preview     | `shaxda-web-preview` | `shaxda-worker-preview` |
+
+Preview hosts follow from those names on the account workers.dev subdomain, and
+the preview `AUTH_BASE_URL`, the preview game Worker `ALLOWED_ORIGIN`, the
+build-time `PUBLIC_*` origins, and the Google redirect URI must all agree with
+them.
 
 ## Google OAuth client
 
@@ -31,7 +39,7 @@ authorized redirect URI used by Shaxda:
 ```txt
 http://localhost:5173/api/auth/callback/google
 http://127.0.0.1:4173/api/auth/callback/google
-https://shaxda-web.<your-workers-subdomain>.workers.dev/api/auth/callback/google
+https://shaxda-web-preview.<your-workers-subdomain>.workers.dev/api/auth/callback/google
 https://shaxda.app/api/auth/callback/google
 ```
 
@@ -79,6 +87,13 @@ Preview and production must use different random online-identity secrets. Within
 one environment, the web and game Worker values must match exactly. Do not add
 these values to `[vars]` in preview or production because a var shadows a Worker
 secret.
+
+Set every secret an environment needs _before_ deploying the code that reads it.
+An unread secret on an older Worker version is inert, but `getAuthOptions` throws
+when `BETTER_AUTH_SECRET` is missing, so a web deploy that lands ahead of its
+secrets fails every request instead of degrading. `wrangler secret put` does
+create a new Worker version, which is why the secret step precedes the deploy
+step in the release order below rather than following it.
 
 Do not put real secrets in `vars`, shell history, screenshots, CI logs, or source
 control. The production bundle check rejects any supplied auth secret and the

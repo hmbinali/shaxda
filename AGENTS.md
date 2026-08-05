@@ -322,6 +322,11 @@ End-to-end tasks:
 pnpm test:e2e
 ```
 
+`pnpm test:e2e` builds and serves its own bundle from tracked fixtures. Never
+tell a developer to move `.dev.vars` or `web/.env.production` aside, and never
+add a script that reads, renames, or deletes them. Changes to the E2E harness
+must keep `pnpm check:e2e-isolation` passing; `pnpm check` runs it.
+
 ## Commit Conventions
 
 Use Conventional Commits with scopes:

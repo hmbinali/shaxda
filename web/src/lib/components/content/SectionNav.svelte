@@ -99,7 +99,7 @@
 </script>
 
 <div
-  class="sticky top-0 z-30 -mx-4 min-w-0 max-w-full border-y border-board-700/15 bg-board-50/95 px-4 py-2 backdrop-blur lg:static lg:z-auto lg:mx-0 lg:self-start lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+  class="sticky top-0 z-30 -mx-4 min-w-0 max-w-full border-y border-board-700/15 bg-board-50/95 px-4 py-2 backdrop-blur lg:top-6 lg:mx-0 lg:self-start lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
 >
   <nav class="min-w-0 lg:hidden" aria-label={label}>
     <div
@@ -123,7 +123,7 @@
     </div>
   </nav>
 
-  <nav class="sticky top-6 hidden lg:block" aria-label={label}>
+  <nav class="hidden lg:block" aria-label={label}>
     <p class="px-3 text-xs font-bold uppercase tracking-wider text-red-800">
       {label}
     </p>

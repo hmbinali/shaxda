@@ -124,7 +124,16 @@
     <PwaNotices />
     <AppTopBar pathname={page.url.pathname} account={data.account} />
     <!-- svelte-ignore a11y_no_noninteractive_tabindex (the independently scrolling main region must be keyboard reachable) -->
-    <main id="main-content" tabindex="0" class="min-w-0 flex-1 overflow-y-auto">
+    <!-- `relative` is load-bearing: without a positioned ancestor, absolutely
+         positioned descendants (Tailwind's `sr-only`, board overlays) resolve
+         against the initial containing block, escape this scroller's clip, and
+         grow the document so the browser paints a second scrollbar over empty
+         space. -->
+    <main
+      id="main-content"
+      tabindex="0"
+      class="relative min-w-0 flex-1 overflow-y-auto"
+    >
       {@render children()}
     </main>
   </div>

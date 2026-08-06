@@ -228,4 +228,27 @@ test.describe("complete learn guide", () => {
     expect(railWidth).toBeGreaterThanOrEqual(239);
     expect(railWidth).toBeLessThanOrEqual(241);
   });
+
+  for (const width of [390, 1440]) {
+    test(`scrolls in one region only at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/learn");
+
+      // Absolutely positioned descendants (`sr-only` labels, board overlays)
+      // resolve against `#main-content` rather than the initial containing
+      // block, so they cannot grow the document past the viewport and give the
+      // browser a second scrollbar over empty space.
+      const document_ = await page.evaluate(() => ({
+        scrollHeight: document.documentElement.scrollHeight,
+        clientHeight: document.documentElement.clientHeight,
+      }));
+
+      expect(document_.scrollHeight).toBeLessThanOrEqual(
+        document_.clientHeight + 1,
+      );
+
+      await page.evaluate(() => window.scrollTo(0, 5000));
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    });
+  }
 });

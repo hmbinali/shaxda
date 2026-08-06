@@ -220,13 +220,44 @@ test.describe("complete learn guide", () => {
     await page.goto("/learn");
 
     const desktopNav = page.locator('nav[aria-label="Qaybaha hagaha"]:visible');
-    const railWidth = await desktopNav
-      .locator("..")
-      .evaluate((element) => element.getBoundingClientRect().width);
+    const rail = desktopNav.locator("..");
+    const railWidth = await rail.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
 
-    await expect(desktopNav).toHaveCSS("position", "sticky");
+    // The rail, not the inner nav, has to be the sticky box: the inner nav can
+    // only stick inside its parent, and the parent is only as tall as the nav
+    // itself, so sticking it there scrolls the whole rail away with the article.
+    await expect(rail).toHaveCSS("position", "sticky");
     expect(railWidth).toBeGreaterThanOrEqual(239);
     expect(railWidth).toBeLessThanOrEqual(241);
+
+    const main = page.locator("#main-content");
+    await main.evaluate((element) => {
+      element.style.scrollBehavior = "auto";
+      element.scrollTop = 3000;
+    });
+    await expect.poll(() => main.evaluate((el) => el.scrollTop)).toBe(3000);
+
+    const pinned = await desktopNav.evaluate((element) => {
+      const mainContent = document.getElementById("main-content");
+
+      if (mainContent === null) {
+        throw new Error("main content is missing");
+      }
+
+      const nav = element.getBoundingClientRect();
+      const region = mainContent.getBoundingClientRect();
+
+      return {
+        offsetFromTop: nav.top - region.top,
+        fullyVisible: nav.top >= region.top - 1 && nav.bottom <= region.bottom,
+      };
+    });
+
+    // `lg:top-6` pins the rail 1.5rem below the top of the scrolling region.
+    expect(pinned.offsetFromTop).toBeCloseTo(24, 0);
+    expect(pinned.fullyVisible).toBe(true);
   });
 
   for (const width of [390, 1440]) {

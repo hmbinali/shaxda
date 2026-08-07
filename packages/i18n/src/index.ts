@@ -227,6 +227,22 @@ export const messages = {
         claimAvailable:
           "Ciyaaryahanka kale ma joogo; guusha waad qaadan kartaa.",
       },
+      // TODO(translation-review): A native/fluent Somali reviewer must verify
+      // this rematch negotiation copy before release.
+      rematch: {
+        request: "Dib u ciyaar",
+        accept: "Aqbal dib-u-ciyaarka",
+        decline: "Diid",
+        notices: {
+          requested:
+            "Codsigii dib-u-ciyaar waa la diray; sug ciyaaryahanka kale.",
+          opponentRequested:
+            "Ciyaaryahanka kale wuxuu codsaday inaad dib u ciyaartaan.",
+          declinedByMe: "Waad diiday dib-u-ciyaarka.",
+          declinedByOpponent: "Ciyaaryahanka kale wuu diiday dib-u-ciyaarka.",
+          starting: "Ciyaar cusub ayaa bilaabanaysa...",
+        },
+      },
       result: {
         reasons: {
           opponentAbandoned: {
@@ -270,6 +286,8 @@ export const messages = {
         notSpaceMaking: "Dhaqaaqaas meel bannayn sharci ah ma aha.",
         unsupportedAction: "Tallaabadaas lama taageero.",
         notClaimable: "Guusha hadda lama qaadan karo.",
+        rematchUnavailable:
+          "Dib-u-ciyaar waxaa la codsan karaa marka ciyaartu dhammaato.",
         rateLimited: "Codsiyo badan ayaa yimid; sug wax yar.",
         identityInvalid: "Aqoonsiga koontada lama xaqiijin.",
         identityExpired:

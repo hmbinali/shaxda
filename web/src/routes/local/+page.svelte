@@ -235,8 +235,20 @@
               ? null
               : copy.result.reasons[status.endReason]}
             testId="game-result"
-            onNewGame={() => controller.startNewGame()}
-            onExit={() => void goto(resolve("/"))}
+            actions={[
+              {
+                id: "new-game",
+                label: copy.controls.newGame,
+                variant: "primary",
+                onSelect: () => controller.startNewGame(),
+              },
+              {
+                id: "exit",
+                label: copy.controls.exit,
+                variant: "outline",
+                onSelect: () => void goto(resolve("/")),
+              },
+            ]}
             inertTargets={[topBar, topRailElement, bottomRailElement]}
           />
         {/if}

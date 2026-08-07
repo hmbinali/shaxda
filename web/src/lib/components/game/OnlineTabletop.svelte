@@ -13,6 +13,7 @@
   } from "$lib/game/seating";
   import BoardNotice from "./BoardNotice.svelte";
   import GameResultOverlay from "./GameResultOverlay.svelte";
+  import type { GameResultAction } from "./gameResultActions";
   import InvalidToast from "./InvalidToast.svelte";
   import PlayerRail from "./PlayerRail.svelte";
   import TabletopShell from "./TabletopShell.svelte";
@@ -24,11 +25,17 @@
     toast: TransientToastMessage | null;
     playerName: (player: PlayerId) => string;
     resultReason: string | null;
-    onLeave: () => void;
+    onNewMatch: () => void;
   }
 
-  let { controller, viewer, toast, playerName, resultReason, onLeave }: Props =
-    $props();
+  let {
+    controller,
+    viewer,
+    toast,
+    playerName,
+    resultReason,
+    onNewMatch,
+  }: Props = $props();
 
   const copy = messages.so.onlineGame;
   const orientation = $derived({ orientation: "solo", viewer } as const);
@@ -40,6 +47,66 @@
 
   onMount(() => {
     topBar = document.querySelector<HTMLElement>('[data-testid="app-top-bar"]');
+  });
+
+  const newMatchAction = $derived({
+    id: "new-match",
+    label: copy.newRoom,
+    variant: "outline" as const,
+    onSelect: onNewMatch,
+    testId: "online-new-match",
+  });
+  const rematchAction = $derived({
+    id: "rematch",
+    label: copy.rematch.request,
+    variant: "primary" as const,
+    onSelect: () => controller.requestRematch(),
+    testId: "online-rematch",
+  });
+  const resultActions = $derived.by((): GameResultAction[] => {
+    if (!controller.canRematch) {
+      return [{ ...newMatchAction, variant: "primary" }];
+    }
+
+    switch (controller.rematchStage) {
+      case "opponentRequested":
+        return [
+          { ...rematchAction, label: copy.rematch.accept },
+          {
+            id: "rematch-decline",
+            label: copy.rematch.decline,
+            variant: "outline",
+            onSelect: () => controller.declineRematch(),
+            testId: "online-rematch-decline",
+          },
+          newMatchAction,
+        ];
+      case "requested":
+      case "starting":
+        return [{ ...newMatchAction, variant: "primary" }];
+      default:
+        return [rematchAction, newMatchAction];
+    }
+  });
+  const resultNotice = $derived.by((): string | null => {
+    if (!controller.canRematch) {
+      return null;
+    }
+
+    switch (controller.rematchStage) {
+      case "requested":
+        return copy.rematch.notices.requested;
+      case "opponentRequested":
+        return copy.rematch.notices.opponentRequested;
+      case "declinedByMe":
+        return copy.rematch.notices.declinedByMe;
+      case "declinedByOpponent":
+        return copy.rematch.notices.declinedByOpponent;
+      case "starting":
+        return copy.rematch.notices.starting;
+      default:
+        return null;
+    }
   });
 
   function noticeFor(player: PlayerId): string | null {
@@ -119,8 +186,9 @@
             {status}
             {playerName}
             reason={resultReason}
+            notice={resultNotice}
             testId="online-game-result"
-            {onLeave}
+            actions={resultActions}
             inertTargets={[topBar, topRailElement, bottomRailElement]}
           />
         {/if}

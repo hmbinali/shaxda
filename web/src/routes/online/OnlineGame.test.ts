@@ -20,6 +20,7 @@ vi.mock("$app/navigation", () => ({
   replaceState: vi.fn(),
 }));
 
+import { replaceState } from "$app/navigation";
 import OnlineGamePage from "./+page.svelte";
 
 const copy = messages.so.onlineGame;
@@ -496,11 +497,15 @@ describe("/online", () => {
       "aria-modal",
       "true",
     );
+    expect(screen.getByTestId("online-rematch")).toHaveFocus();
+    expect(screen.getByTestId("online-new-match")).toHaveTextContent(
+      copy.newRoom,
+    );
     expect(
-      within(screen.getByTestId("online-game-result")).getByRole("button", {
-        name: copy.leave,
+      within(screen.getByTestId("app-top-bar")).queryByRole("button", {
+        name: messages.so.localGame.controls.newGame,
       }),
-    ).toHaveFocus();
+    ).not.toBeInTheDocument();
     expect(document.querySelector('[data-point-id="O1"]')).not.toHaveAttribute(
       "role",
     );
@@ -590,6 +595,112 @@ describe("/online", () => {
     ).toBeVisible();
   });
 
+  it("negotiates a rematch from the result overlay and waits for the server", async () => {
+    const socket = await startFinishedGame();
+
+    await fireEvent.click(screen.getByTestId("online-rematch"));
+
+    expect(sentRematchVotes(socket)).toEqual(["accept"]);
+    // The finished game must stay on screen until the server confirms.
+    expect(screen.getByTestId("online-game-result")).toBeInTheDocument();
+
+    socket.message(rematchStatusMessage(1, { A: "accept", B: null }));
+    await waitFor(() =>
+      expect(screen.getByTestId("online-game-result-notice")).toHaveTextContent(
+        copy.rematch.notices.requested,
+      ),
+    );
+    expect(screen.queryByTestId("online-rematch")).not.toBeInTheDocument();
+
+    socket.message(rematchStatusMessage(1, { A: null, B: "decline" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("online-game-result-notice")).toHaveTextContent(
+        copy.rematch.notices.declinedByOpponent,
+      ),
+    );
+    expect(screen.getByTestId("online-rematch")).toHaveTextContent(
+      copy.rematch.request,
+    );
+
+    socket.message(rematchStatusMessage(1, { A: null, B: "accept" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("online-game-result-notice")).toHaveTextContent(
+        copy.rematch.notices.opponentRequested,
+      ),
+    );
+    expect(screen.getByTestId("online-rematch")).toHaveTextContent(
+      copy.rematch.accept,
+    );
+    expect(screen.getByTestId("online-rematch-decline")).toBeVisible();
+
+    await fireEvent.click(screen.getByTestId("online-rematch"));
+    expect(sentRematchVotes(socket)).toEqual(["accept", "accept"]);
+    await waitFor(() =>
+      expect(screen.getByTestId("online-game-result-notice")).toHaveTextContent(
+        copy.rematch.notices.starting,
+      ),
+    );
+
+    socket.message(rematchStatusMessage(2, { A: null, B: null }));
+    socket.message({
+      v: protocolVersion,
+      type: "state",
+      roomCode: "ABCDEFGH",
+      state: gameFixtures.emptyBoard,
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("online-game-result"),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("online-board")).toBeVisible();
+    expect(document.querySelector('[data-point-id="O1"]')).toHaveAttribute(
+      "role",
+      "button",
+    );
+  });
+
+  it("declines a rematch and keeps the completed result", async () => {
+    const socket = await startFinishedGame();
+    socket.message(rematchStatusMessage(1, { A: null, B: "accept" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("online-rematch-decline")).toBeVisible(),
+    );
+    await fireEvent.click(screen.getByTestId("online-rematch-decline"));
+
+    expect(sentRematchVotes(socket)).toEqual(["decline"]);
+
+    socket.message(rematchStatusMessage(1, { A: "decline", B: null }));
+    await waitFor(() =>
+      expect(screen.getByTestId("online-game-result-notice")).toHaveTextContent(
+        copy.rematch.notices.declinedByMe,
+      ),
+    );
+    expect(screen.getByTestId("online-game-result")).toHaveTextContent(
+      `${messages.so.localGame.result.winnerLabel}: Bilan`,
+    );
+  });
+
+  it("returns to a clean lobby on new match without rejoining the room", async () => {
+    const socket = await startFinishedGame();
+
+    await fireEvent.click(screen.getByTestId("online-new-match"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("online-page")).toBeVisible(),
+    );
+    expect(socket.readyState).toBe(FakeWebSocket.CLOSED);
+    expect(replaceState).toHaveBeenLastCalledWith("/online", {});
+    expect(screen.getByLabelText(copy.roomCodeLabel)).toHaveValue("");
+    expect(screen.getByTestId("create-room")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("app-top-bar")).queryAllByRole("button"),
+    ).toHaveLength(0);
+    expect(FakeWebSocket.sockets).toHaveLength(1);
+  });
+
   it("places connection notices with their owner and keeps claim-win actionable at centre", async () => {
     renderOnlineGame();
     await waitForGuestForm();
@@ -669,6 +780,62 @@ describe("/online", () => {
     );
   });
 });
+
+async function startFinishedGame(): Promise<FakeWebSocket> {
+  renderOnlineGame();
+  await waitForGuestForm();
+  await fireEvent.input(screen.getByLabelText(copy.nameLabel), {
+    target: { value: "Ayaan" },
+  });
+  await fireEvent.click(screen.getByTestId("create-room"));
+  await waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+
+  const socket = FakeWebSocket.latest();
+  socket.open();
+  socket.message({
+    v: protocolVersion,
+    type: "joined",
+    roomCode: "ABCDEFGH",
+    guestId: "guest-id-a",
+    slot: "A",
+  });
+  socket.message({
+    v: protocolVersion,
+    type: "presence",
+    roomCode: "ABCDEFGH",
+    players: { A: { displayName: "Ayaan" }, B: { displayName: "Bilan" } },
+    started: true,
+  });
+  socket.message({
+    v: protocolVersion,
+    type: "state",
+    roomCode: "ABCDEFGH",
+    state: { ...gameFixtures.win, winner: "B", endReason: "resignation" },
+  });
+
+  await screen.findByTestId("online-game-result");
+  return socket;
+}
+
+function rematchStatusMessage(
+  matchNumber: number,
+  votes: { A: string | null; B: string | null },
+): unknown {
+  return {
+    v: protocolVersion,
+    type: "rematchStatus",
+    roomCode: "ABCDEFGH",
+    matchNumber,
+    votes,
+  };
+}
+
+function sentRematchVotes(socket: FakeWebSocket): string[] {
+  return socket.sent
+    .map((message) => JSON.parse(message) as { type: string; vote?: string })
+    .filter((message) => message.type === "rematch")
+    .map((message) => String(message.vote));
+}
 
 function renderOnlineGame() {
   return render(AppShellHarness, {

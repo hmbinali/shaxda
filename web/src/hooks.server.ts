@@ -3,8 +3,15 @@ import { svelteKitHandler } from "better-auth/svelte-kit";
 import type { Handle } from "@sveltejs/kit";
 import { getAuth } from "$lib/server/auth";
 
+const prerenderedGameRouteIds = new Set(["/local", "/online"]);
+
 export const handle: Handle = async ({ event, resolve }) => {
-  if (building) return resolve(event);
+  event.locals.session = null;
+  event.locals.user = null;
+
+  if (building || prerenderedGameRouteIds.has(event.route.id ?? "")) {
+    return resolve(event);
+  }
 
   const env = event.platform?.env;
   if (env === undefined) {

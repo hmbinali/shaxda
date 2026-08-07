@@ -210,6 +210,15 @@ export const claimWinClientMessageSchema = z.object({
   roomCode: roomCodeSchema,
 });
 
+export const rematchVoteSchema = z.enum(["accept", "decline"]);
+
+export const rematchClientMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("rematch"),
+  roomCode: roomCodeSchema,
+  vote: rematchVoteSchema,
+});
+
 export const echoClientMessageSchema = z.object({
   ...envelopeBase,
   type: z.literal("echo"),
@@ -228,6 +237,7 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
   joinRoomClientMessageSchema,
   gameActionClientMessageSchema,
   claimWinClientMessageSchema,
+  rematchClientMessageSchema,
   echoClientMessageSchema,
   pingClientMessageSchema,
 ]);
@@ -297,6 +307,19 @@ export const matchEndedServerMessageSchema = z.object({
   reason: onlineMatchEndReasonSchema,
 });
 
+export const rematchStatusServerMessageSchema = z.object({
+  ...envelopeBase,
+  type: z.literal("rematchStatus"),
+  roomCode: roomCodeSchema,
+  // Increments once per completed logical match inside a room so a rematch is
+  // never mistaken for a continuation of the game before it.
+  matchNumber: z.number().int().positive(),
+  votes: z.object({
+    A: rematchVoteSchema.nullable(),
+    B: rematchVoteSchema.nullable(),
+  }),
+});
+
 export const echoBroadcastServerMessageSchema = z.object({
   ...envelopeBase,
   type: z.literal("echoBroadcast"),
@@ -325,6 +348,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
   stateServerMessageSchema,
   matchStatusServerMessageSchema,
   matchEndedServerMessageSchema,
+  rematchStatusServerMessageSchema,
   echoBroadcastServerMessageSchema,
   errorServerMessageSchema,
   pongServerMessageSchema,
@@ -332,6 +356,10 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
+export type RematchVote = z.infer<typeof rematchVoteSchema>;
+export type RematchVotes = z.infer<
+  typeof rematchStatusServerMessageSchema
+>["votes"];
 export type OnlineIdentityStatus = z.infer<typeof onlineIdentityStatusSchema>;
 export type OnlineIdentityAccount = Extract<
   OnlineIdentityStatus,

@@ -6,7 +6,11 @@ import {
   SELF,
 } from "cloudflare:test";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { serialize } from "@shaxda/game-engine";
+import {
+  createInitialState,
+  deserialize,
+  serialize,
+} from "@shaxda/game-engine";
 import type {
   GameAction,
   GameState,
@@ -1072,6 +1076,329 @@ describe("match room hibernation spike", () => {
     second.close();
   });
 
+  it("rejects rematch votes while the match is still live", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+
+    sendRematch(first, roomCode, "accept");
+
+    await expect(waitForMessage(first, "error")).resolves.toMatchObject({
+      code: "rematchUnavailable",
+    });
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      matchNumber: 1,
+      rematch: { A: null, B: null },
+    });
+
+    first.close();
+    second.close();
+  });
+
+  it("rejects rematch votes from sockets without a seat", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+    const observer = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await resignToGameOver(first, second, roomCode);
+
+    sendRematch(observer, roomCode, "accept");
+
+    await expect(waitForMessage(observer, "error")).resolves.toMatchObject({
+      code: "notJoined",
+    });
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      rematch: { A: null, B: null },
+    });
+
+    first.close();
+    second.close();
+    observer.close();
+  });
+
+  it("keeps the finished game until both seats accept a rematch", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await resignToGameOver(first, second, roomCode);
+
+    const opponentRequest = waitForMessage(second, "rematchStatus");
+    sendRematch(first, roomCode, "accept");
+
+    await expect(opponentRequest).resolves.toMatchObject({
+      matchNumber: 1,
+      votes: { A: "accept", B: null },
+    });
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      matchNumber: 1,
+      rematch: { A: "accept", B: null },
+    });
+
+    // A retried request must not restart the game or re-broadcast, so the
+    // opponent's next message is the pong it asks for.
+    sendRematch(first, roomCode, "accept");
+    await expect(waitForMessage(first, "rematchStatus")).resolves.toMatchObject(
+      {
+        matchNumber: 1,
+        votes: { A: "accept", B: null },
+      },
+    );
+    sendJson(second, { v: protocolVersion, type: "ping", nonce: "idempotent" });
+    await expect(nextJson(second)).resolves.toMatchObject({
+      type: "pong",
+      nonce: "idempotent",
+    });
+
+    const stored = await readStoredRoom(roomCode);
+    expect(stored).toMatchObject({ matchNumber: 1 });
+    expect(deserialize(String(stored?.gameState)).phase).toBe("gameOver");
+
+    first.close();
+    second.close();
+  });
+
+  it("starts one fresh match when the second seat accepts", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await resignToGameOver(first, second, roomCode);
+
+    await waitForRematchVotes(first, second, roomCode, "accept", {
+      A: "accept",
+      B: null,
+    });
+
+    const firstFresh = waitForMessage(first, "state");
+    const secondFresh = waitForMessage(second, "state");
+    const firstStatus = waitForMessage(second, "rematchStatus");
+    sendRematch(second, roomCode, "accept");
+
+    await expect(firstStatus).resolves.toMatchObject({
+      matchNumber: 2,
+      votes: { A: null, B: null },
+    });
+    for (const state of [await firstFresh, await secondFresh]) {
+      expect(state.state).toEqual(createInitialState("A"));
+      expect(state.state.winner).toBeNull();
+      expect(state.state.endReason).toBeNull();
+    }
+
+    const stored = await readStoredRoom(roomCode);
+    expect(stored).toMatchObject({
+      matchNumber: 2,
+      rematch: { A: null, B: null },
+      claimableBy: null,
+      claimReason: null,
+      onlineEndReason: null,
+      nudgedTurnAt: null,
+      slots: { A: "guest:guest-id-a", B: "guest:guest-id-b" },
+    });
+    expect(stored?.gameState).toEqual(serialize(createInitialState("A")));
+    expect(stored?.turnStartedAt).toEqual(expect.any(Number));
+
+    first.close();
+    second.close();
+  });
+
+  it("resolves crossed rematch requests as one mutual agreement", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await resignToGameOver(first, second, roomCode);
+
+    const firstFresh = waitForMessage(first, "state");
+    const secondFresh = waitForMessage(second, "state");
+    sendRematch(first, roomCode, "accept");
+    sendRematch(second, roomCode, "accept");
+
+    expect((await firstFresh).state.phase).toBe("placement");
+    expect((await secondFresh).state.phase).toBe("placement");
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      matchNumber: 2,
+      rematch: { A: null, B: null },
+    });
+
+    first.close();
+    second.close();
+  });
+
+  it("keeps the completed result when a seat declines", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await resignToGameOver(first, second, roomCode);
+    await waitForRematchVotes(first, second, roomCode, "accept", {
+      A: "accept",
+      B: null,
+    });
+
+    const declined = waitForMessageWhere(
+      first,
+      "rematchStatus",
+      (message) => message.votes.B !== null,
+    );
+    sendRematch(second, roomCode, "decline");
+
+    await expect(declined).resolves.toMatchObject({
+      matchNumber: 1,
+      votes: { A: null, B: "decline" },
+    });
+
+    const stored = await readStoredRoom(roomCode);
+    expect(stored).toMatchObject({ matchNumber: 1 });
+    expect(deserialize(String(stored?.gameState))).toMatchObject({
+      phase: "gameOver",
+      winner: "B",
+      endReason: "resignation",
+    });
+
+    first.close();
+    second.close();
+  });
+
+  it("clears a pending rematch on disconnect and restores it on reconnect", async () => {
+    const roomCode = await createRoom();
+    const first = await connectRoom(roomCode);
+    const second = await connectRoom(roomCode);
+
+    await joinAndWait(first, roomCode, "guest-id-a");
+    await joinAndWait(second, roomCode, "guest-id-b");
+    await resignToGameOver(first, second, roomCode);
+    await waitForRematchVotes(first, second, roomCode, "accept", {
+      A: "accept",
+      B: null,
+    });
+
+    const withdrawn = waitForMessageWhere(
+      second,
+      "rematchStatus",
+      (message) => message.votes.A === null,
+    );
+    first.close();
+    await expect(withdrawn).resolves.toMatchObject({
+      matchNumber: 1,
+      votes: { A: null, B: null },
+    });
+
+    // The opponent now asks, and the reconnecting seat has to see that request.
+    sendRematch(second, roomCode, "accept");
+    await expect(
+      waitForMessage(second, "rematchStatus"),
+    ).resolves.toMatchObject({ votes: { A: null, B: "accept" } });
+
+    const reconnected = await connectRoom(roomCode);
+    await joinAndWait(reconnected, roomCode, "guest-id-a");
+    await expect(
+      waitForMessage(reconnected, "rematchStatus"),
+    ).resolves.toMatchObject({
+      matchNumber: 1,
+      votes: { A: null, B: "accept" },
+    });
+
+    const fresh = waitForMessage(reconnected, "state");
+    sendRematch(reconnected, roomCode, "accept");
+    expect((await fresh).state.phase).toBe("placement");
+
+    reconnected.close();
+    second.close();
+  });
+
+  it("clears online end state and replays two rematches for mixed identities", async () => {
+    const roomCode = await createRoom();
+    const account = await connectRoom(roomCode);
+    const guest = await connectRoom(roomCode);
+    const ticket = await mintTestTicket("join", roomCode, {
+      userId: "private-user-id",
+      usernameSnapshot: "ayaan_7",
+    });
+
+    await joinAndWait(account, roomCode, "account-device-a", undefined, ticket);
+    await joinAndWait(guest, roomCode, "guest-id-b", "Cabdi");
+
+    // End the first match through the resilience path so claim state exists.
+    guest.close();
+    await waitForMessageWhere(
+      account,
+      "matchStatus",
+      (message) => message.connections.B === false,
+    );
+    await patchStoredRoom(roomCode, (room) => ({
+      ...room,
+      connections: {
+        ...(room.connections as Record<string, unknown>),
+        B: { connected: false, disconnectedAt: Date.now() - 60_000 },
+      },
+    }));
+    await triggerRoomAlarm(roomCode);
+    await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+      claimableBy: "A",
+      claimReason: "opponentAbandoned",
+    });
+
+    const ended = waitForMessage(account, "matchEnded");
+    sendClaimWin(account, roomCode);
+    await expect(ended).resolves.toMatchObject({
+      winner: "A",
+      reason: "opponentAbandoned",
+    });
+
+    const rejoined = await connectRoom(roomCode);
+    await joinAndWait(rejoined, roomCode, "guest-id-b", "Cabdi");
+
+    for (const matchNumber of [2, 3]) {
+      const fresh = waitForMessage(account, "state");
+      sendRematch(account, roomCode, "accept");
+      await waitForMessageWhere(
+        rejoined,
+        "rematchStatus",
+        (message) => message.votes.A === "accept",
+      );
+      sendRematch(rejoined, roomCode, "accept");
+
+      expect((await fresh).state).toEqual(createInitialState("A"));
+      await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
+        matchNumber,
+        onlineEndReason: null,
+        claimableBy: null,
+        claimReason: null,
+        rematch: { A: null, B: null },
+        slots: { A: "account:private-user-id", B: "guest:guest-id-b" },
+      });
+
+      // End the fresh match so the next rematch can be negotiated.
+      await resignToGameOver(account, rejoined, roomCode);
+    }
+
+    const presence = waitForMessage(account, "presence");
+    sendJson(rejoined, joinRoom(roomCode, "guest-id-b", "Cabdi"));
+    expect((await presence).players).toMatchObject({
+      A: { kind: "account", username: "ayaan_7" },
+      B: { kind: "guest", displayName: "Cabdi" },
+    });
+
+    account.close();
+    guest.close();
+    rejoined.close();
+  });
+
   it("cleans room storage when the alarm runs after idle expiry", async () => {
     const roomCode = await createRoom();
     const stub = roomStub(roomCode);
@@ -1167,6 +1494,44 @@ function sendAction(
     roomCode,
     action,
   });
+}
+
+function sendRematch(
+  socket: WebSocket,
+  roomCode: string,
+  vote: "accept" | "decline",
+): void {
+  sendJson(socket, {
+    v: protocolVersion,
+    type: "rematch",
+    roomCode,
+    vote,
+  });
+}
+
+async function resignToGameOver(
+  first: WebSocket,
+  second: WebSocket,
+  roomCode: string,
+): Promise<void> {
+  const firstState = waitForMessage(first, "state");
+  const secondState = waitForMessage(second, "state");
+  sendAction(first, roomCode, { type: "resign", player: "A" });
+
+  expect((await firstState).state.phase).toBe("gameOver");
+  expect((await secondState).state.phase).toBe("gameOver");
+}
+
+async function waitForRematchVotes(
+  voter: WebSocket,
+  opponent: WebSocket,
+  roomCode: string,
+  vote: "accept" | "decline",
+  expected: { A: string | null; B: string | null },
+): Promise<void> {
+  const broadcast = waitForMessage(opponent, "rematchStatus");
+  sendRematch(voter, roomCode, vote);
+  await expect(broadcast).resolves.toMatchObject({ votes: expected });
 }
 
 function sendClaimWin(socket: WebSocket, roomCode: string): void {

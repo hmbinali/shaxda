@@ -4,7 +4,7 @@ import {
   serverMessageSchema,
 } from "@shaxda/shared";
 import type { GameAction } from "@shaxda/game-engine";
-import type { ServerMessage } from "@shaxda/shared";
+import type { RematchVote, ServerMessage } from "@shaxda/shared";
 import type { TicketAction } from "@shaxda/shared/identity";
 import { httpOrigin, wsOrigin } from "./workerOrigin";
 
@@ -278,6 +278,25 @@ export class OnlineGameClient {
       v: protocolVersion,
       type: "claimWin",
       roomCode,
+    });
+    this.#socket.send(JSON.stringify(message));
+    return true;
+  }
+
+  sendRematchVote(vote: RematchVote): boolean {
+    if (
+      this.#socket === null ||
+      this.#roomCode === null ||
+      this.#socket.readyState !== this.#WebSocketCtor.OPEN
+    ) {
+      return false;
+    }
+
+    const message = clientMessageSchema.parse({
+      v: protocolVersion,
+      type: "rematch",
+      roomCode: this.#roomCode,
+      vote,
     });
     this.#socket.send(JSON.stringify(message));
     return true;

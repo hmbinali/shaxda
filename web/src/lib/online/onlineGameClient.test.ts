@@ -497,6 +497,41 @@ describe("OnlineGameClient", () => {
       roomCode: "ABCDEFGH",
     });
   });
+
+  it("sends rematch votes only over an open room socket", () => {
+    const client = new OnlineGameClient({
+      httpBase: "http://worker.test",
+      wsBase: "ws://worker.test",
+      fetchFn: vi.fn() as unknown as typeof fetch,
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+    });
+
+    expect(client.sendRematchVote("accept")).toBe(false);
+
+    client.connect({ roomCode: "ABCDEFGH", guestId: "guest-id-a" });
+    const socket = FakeWebSocket.latest();
+    socket.open();
+
+    expect(client.sendRematchVote("accept")).toBe(true);
+    expect(client.sendRematchVote("decline")).toBe(true);
+    expect(socket.sent.slice(1).map((sent) => JSON.parse(sent))).toEqual([
+      {
+        v: protocolVersion,
+        type: "rematch",
+        roomCode: "ABCDEFGH",
+        vote: "accept",
+      },
+      {
+        v: protocolVersion,
+        type: "rematch",
+        roomCode: "ABCDEFGH",
+        vote: "decline",
+      },
+    ]);
+
+    client.close();
+    expect(client.sendRematchVote("accept")).toBe(false);
+  });
 });
 
 class FakeWebSocket extends EventTarget {

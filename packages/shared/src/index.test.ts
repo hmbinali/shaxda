@@ -369,6 +369,92 @@ describe("WebSocket protocol schemas", () => {
       code: "notClaimable",
     });
   });
+
+  it("keeps rematch negotiation additive on protocol version 1", () => {
+    expect(
+      clientMessageSchema.parse({
+        v: protocolVersion,
+        type: "rematch",
+        roomCode: "ABCDEFGH",
+        vote: "accept",
+      }),
+    ).toEqual({
+      v: 1,
+      type: "rematch",
+      roomCode: "ABCDEFGH",
+      vote: "accept",
+    });
+
+    expect(
+      serverMessageSchema.parse({
+        v: protocolVersion,
+        type: "rematchStatus",
+        roomCode: "ABCDEFGH",
+        matchNumber: 2,
+        votes: { A: "accept", B: null },
+      }),
+    ).toEqual({
+      v: 1,
+      type: "rematchStatus",
+      roomCode: "ABCDEFGH",
+      matchNumber: 2,
+      votes: { A: "accept", B: null },
+    });
+  });
+
+  it("rejects malformed rematch messages", () => {
+    const malformedClientMessages = [
+      { v: 2, type: "rematch", roomCode: "ABCDEFGH", vote: "accept" },
+      { v: protocolVersion, type: "rematch", roomCode: "ABCDEFGH" },
+      {
+        v: protocolVersion,
+        type: "rematch",
+        roomCode: "ABCDEFGH",
+        vote: "maybe",
+      },
+      { v: protocolVersion, type: "rematch", roomCode: "abc", vote: "accept" },
+      { v: protocolVersion, type: "rematch", vote: "accept" },
+    ];
+
+    for (const message of malformedClientMessages) {
+      expect(() => clientMessageSchema.parse(message)).toThrow();
+    }
+
+    const malformedServerMessages = [
+      {
+        v: protocolVersion,
+        type: "rematchStatus",
+        roomCode: "ABCDEFGH",
+        matchNumber: 0,
+        votes: { A: null, B: null },
+      },
+      {
+        v: protocolVersion,
+        type: "rematchStatus",
+        roomCode: "ABCDEFGH",
+        matchNumber: 1.5,
+        votes: { A: null, B: null },
+      },
+      {
+        v: protocolVersion,
+        type: "rematchStatus",
+        roomCode: "ABCDEFGH",
+        matchNumber: 1,
+        votes: { A: "accept" },
+      },
+      {
+        v: protocolVersion,
+        type: "rematchStatus",
+        roomCode: "ABCDEFGH",
+        matchNumber: 1,
+        votes: { A: "accept", B: "yes" },
+      },
+    ];
+
+    for (const message of malformedServerMessages) {
+      expect(() => serverMessageSchema.parse(message)).toThrow();
+    }
+  });
 });
 
 describe("fixture action scripts", () => {

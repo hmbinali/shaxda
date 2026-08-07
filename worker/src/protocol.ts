@@ -5,6 +5,7 @@ import {
   joinRoomClientMessageSchema,
   playerSlotSchema,
   pingClientMessageSchema,
+  rematchClientMessageSchema,
   roomCodeSchema,
 } from "@shaxda/shared";
 import { z } from "zod";
@@ -17,6 +18,7 @@ export const roomInboundSchema = z.discriminatedUnion("type", [
   joinRoomClientMessageSchema,
   gameActionClientMessageSchema,
   claimWinClientMessageSchema,
+  rematchClientMessageSchema,
   pingClientMessageSchema,
   echoClientMessageSchema,
 ]);

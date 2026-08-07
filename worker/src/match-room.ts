@@ -17,10 +17,11 @@ import {
   matchStatusServerMessageSchema,
   presenceServerMessageSchema,
   protocolVersion,
+  rematchStatusServerMessageSchema,
   serverMessageSchema,
   stateServerMessageSchema,
 } from "@shaxda/shared";
-import type { AvatarMode } from "@shaxda/shared";
+import type { AvatarMode, RematchVote } from "@shaxda/shared";
 import { verifyIdentityTicket } from "@shaxda/shared/identity";
 import type { IdentityTicketPayload } from "@shaxda/shared/identity";
 import { roomInboundSchema, roomInitRequestSchema } from "./protocol";
@@ -65,6 +66,8 @@ type SeatIdentity =
       usedTickets: UsedTicket[];
     };
 
+type RematchVotes = Record<PlayerSlot, RematchVote | null>;
+
 type RoomState = {
   roomCode: string;
   createdAt: number;
@@ -72,6 +75,10 @@ type RoomState = {
   seatVersion: 2;
   slots: Partial<Record<PlayerSlot, string>>;
   seats: Partial<Record<PlayerSlot, SeatIdentity>>;
+  // Counts the logical matches played by this room's two seats. The first game
+  // is match 1 and every accepted rematch starts the next numbered match, so a
+  // completed game is never conflated with the rematch that follows it.
+  matchNumber: number;
   gameState: SerializedGameState;
   connections: Partial<Record<PlayerSlot, ConnectionState>>;
   turnStartedAt: number | null;
@@ -79,6 +86,7 @@ type RoomState = {
   claimableBy: PlayerSlot | null;
   claimReason: OnlineMatchEndReason | null;
   onlineEndReason: OnlineMatchEndReason | null;
+  rematch: RematchVotes;
 };
 
 type SocketAttachment = {
@@ -174,6 +182,9 @@ export class MatchRoom implements DurableObject {
       case "claimWin":
         await this.handleClaimWin(ws, room, parsed.message, now);
         return;
+      case "rematch":
+        await this.handleRematch(ws, room, parsed.message, now);
+        return;
       case "ping":
         await this.refreshActivityIfStale(room, now);
         ws.send(
@@ -257,6 +268,7 @@ export class MatchRoom implements DurableObject {
       seatVersion: 2,
       slots: {},
       seats: {},
+      matchNumber: 1,
       gameState: serialize(createInitialState("A")),
       connections: {},
       turnStartedAt: null,
@@ -264,6 +276,7 @@ export class MatchRoom implements DurableObject {
       claimableBy: null,
       claimReason: null,
       onlineEndReason: null,
+      rematch: emptyRematchVotes(),
     };
 
     await this.persistRoom(room);
@@ -439,6 +452,9 @@ export class MatchRoom implements DurableObject {
         updatedRoom.onlineEndReason,
       );
     }
+    // A reconnecting seat has to learn the authoritative rematch state, which
+    // includes a request the opponent placed while this socket was away.
+    this.sendRematchStatus(ws, updatedRoom);
   }
 
   private async handleGameAction(
@@ -550,6 +566,93 @@ export class MatchRoom implements DurableObject {
     this.broadcastState(updatedRoom);
     this.broadcastMatchStatus(updatedRoom);
     this.broadcastMatchEnded(updatedRoom, result.state.winner, reason);
+  }
+
+  private async handleRematch(
+    ws: WebSocket,
+    room: RoomState,
+    message: Extract<RoomInboundMessage, { type: "rematch" }>,
+    now: number,
+  ): Promise<void> {
+    if (message.roomCode !== room.roomCode) {
+      await this.refreshActivityIfStale(room, now);
+      this.sendError(ws, "roomMismatch", "Room code does not match this room.");
+      return;
+    }
+
+    const attachment = this.authorizeSocket(room, ws);
+    if (!attachment) {
+      await this.refreshActivityIfStale(room, now);
+      this.sendError(
+        ws,
+        "notJoined",
+        "Join the room before asking for a rematch.",
+      );
+      return;
+    }
+
+    if (
+      !room.slots.A ||
+      !room.slots.B ||
+      deserialize(room.gameState).phase !== "gameOver"
+    ) {
+      await this.refreshActivityIfStale(room, now);
+      this.sendError(
+        ws,
+        "rematchUnavailable",
+        "A rematch is only available once the game is over.",
+      );
+      return;
+    }
+
+    const votes = applyRematchVote(room.rematch, attachment.slot, message.vote);
+    if (sameRematchVotes(votes, room.rematch)) {
+      // A retried vote changes nothing, so keep the room untouched and just
+      // resync the sender.
+      await this.refreshActivityIfStale(room, now);
+      this.sendRematchStatus(ws, room);
+      return;
+    }
+
+    if (votes.A === "accept" && votes.B === "accept") {
+      await this.startRematch(room, now);
+      return;
+    }
+
+    const updatedRoom: RoomState = {
+      ...room,
+      lastActivityAt: now,
+      rematch: votes,
+    };
+    await this.persistRoom(updatedRoom);
+    this.broadcastRematchStatus(updatedRoom);
+  }
+
+  private async startRematch(room: RoomState, now: number): Promise<void> {
+    const updatedRoom = this.reconcileClaimability(
+      this.ensureTurnStarted(
+        {
+          ...room,
+          lastActivityAt: now,
+          matchNumber: room.matchNumber + 1,
+          gameState: serialize(createInitialState("A")),
+          turnStartedAt: null,
+          nudgedTurnAt: null,
+          claimableBy: null,
+          claimReason: null,
+          onlineEndReason: null,
+          rematch: emptyRematchVotes(),
+        },
+        now,
+      ),
+      now,
+    );
+    await this.persistRoom(updatedRoom);
+    // Announce the new match generation before its board so clients drop the
+    // finished game's result before the fresh state arrives.
+    this.broadcastRematchStatus(updatedRoom);
+    this.broadcastState(updatedRoom);
+    this.broadcastMatchStatus(updatedRoom);
   }
 
   private handleEcho(
@@ -707,6 +810,7 @@ export class MatchRoom implements DurableObject {
     const now = Date.now();
     const liveConnections = this.liveConnections(room);
     const connections = { ...room.connections };
+    const rematch = { ...room.rematch };
     for (const slot of PLAYER_SLOTS) {
       if (!room.slots[slot]) {
         continue;
@@ -722,14 +826,20 @@ export class MatchRoom implements DurableObject {
         connected: false,
         disconnectedAt: existing?.disconnectedAt ?? now,
       };
+      // A seat that is gone cannot be waiting on, or agreeing to, a rematch.
+      rematch[slot] = null;
     }
 
+    const rematchChanged = !sameRematchVotes(rematch, room.rematch);
     const updatedRoom = this.reconcileClaimability(
-      { ...room, lastActivityAt: now, connections },
+      { ...room, lastActivityAt: now, connections, rematch },
       now,
     );
     await this.persistRoom(updatedRoom);
     this.broadcastMatchStatus(updatedRoom);
+    if (rematchChanged) {
+      this.broadcastRematchStatus(updatedRoom);
+    }
   }
 
   private markSlotConnected(
@@ -876,6 +986,26 @@ export class MatchRoom implements DurableObject {
     );
 
     this.broadcastToJoinedSockets(room, message);
+  }
+
+  private broadcastRematchStatus(room: RoomState): void {
+    this.broadcastToJoinedSockets(room, this.rematchStatus(room));
+  }
+
+  private sendRematchStatus(ws: WebSocket, room: RoomState): void {
+    ws.send(this.rematchStatus(room));
+  }
+
+  private rematchStatus(room: RoomState): string {
+    return JSON.stringify(
+      rematchStatusServerMessageSchema.parse({
+        v: protocolVersion,
+        type: "rematchStatus",
+        roomCode: room.roomCode,
+        matchNumber: room.matchNumber,
+        votes: { A: room.rematch.A, B: room.rematch.B },
+      }),
+    );
   }
 
   private broadcastMatchStatus(room: RoomState): void {
@@ -1075,6 +1205,10 @@ export class MatchRoom implements DurableObject {
       seatVersion: 2,
       slots,
       seats,
+      matchNumber:
+        Number.isInteger(stored.matchNumber) && Number(stored.matchNumber) > 0
+          ? Number(stored.matchNumber)
+          : 1,
       gameState: stored.gameState ?? serialize(createInitialState("A")),
       connections: stored.connections ?? {},
       turnStartedAt: stored.turnStartedAt ?? null,
@@ -1082,6 +1216,7 @@ export class MatchRoom implements DurableObject {
       claimableBy: stored.claimableBy ?? null,
       claimReason: stored.claimReason ?? null,
       onlineEndReason: stored.onlineEndReason ?? null,
+      rematch: normalizeRematchVotes(stored.rematch),
     };
     const liveConnections = this.liveConnections(baseRoom);
     const connections: Partial<Record<PlayerSlot, ConnectionState>> = {};
@@ -1267,6 +1402,43 @@ function normalizeSeat(seat: SeatIdentity): SeatIdentity {
 
 function otherSlot(slot: PlayerSlot): PlayerSlot {
   return slot === "A" ? "B" : "A";
+}
+
+function emptyRematchVotes(): RematchVotes {
+  return { A: null, B: null };
+}
+
+function normalizeRematchVotes(stored: unknown): RematchVotes {
+  const candidate = (stored ?? {}) as Partial<RematchVotes>;
+
+  return {
+    A: isRematchVote(candidate.A) ? candidate.A : null,
+    B: isRematchVote(candidate.B) ? candidate.B : null,
+  };
+}
+
+function isRematchVote(value: unknown): value is RematchVote {
+  return value === "accept" || value === "decline";
+}
+
+function applyRematchVote(
+  votes: RematchVotes,
+  slot: PlayerSlot,
+  vote: RematchVote,
+): RematchVotes {
+  const next: RematchVotes = { A: votes.A, B: votes.B };
+  next[slot] = vote;
+  if (vote === "decline") {
+    // A decline closes the current negotiation for both seats so a standing
+    // request can never restart the game after the opponent said no.
+    next[otherSlot(slot)] = null;
+  }
+
+  return next;
+}
+
+function sameRematchVotes(left: RematchVotes, right: RematchVotes): boolean {
+  return left.A === right.A && left.B === right.B;
 }
 
 function parseMessage(

@@ -311,6 +311,140 @@ describe("OnlineGameController", () => {
     expect(game.feedback?.cues).toEqual(["invalid"]);
   });
 
+  it("rejects rematch votes until the server reports game over", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    game.requestRematch();
+
+    expect(game.canRematch).toBe(false);
+    expect(game.rematchStage).toBe("unavailable");
+    expect(game.invalid?.reason).toBe("actionRejected");
+    expect(client.rematchVotes).toEqual([]);
+
+    endGame(client);
+    game.requestRematch();
+
+    expect(game.canRematch).toBe(true);
+    expect(client.rematchVotes).toEqual(["accept"]);
+    // The finished game stays on screen until the server confirms a new match.
+    expect(game.state.phase).toBe("gameOver");
+    expect(game.matchNumber).toBe(1);
+  });
+
+  it("blocks rematch votes while the connection is not live", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    endGame(client);
+    client.status("reconnecting");
+    game.requestRematch();
+
+    expect(game.canRematch).toBe(false);
+    expect(client.rematchVotes).toEqual([]);
+  });
+
+  it("tracks the negotiation and clears the finished game on a fresh match", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    endGame(client);
+    client.message({
+      v: protocolVersion,
+      type: "matchEnded",
+      roomCode: "ABCDEFGH",
+      winner: "B",
+      reason: "opponentAbandoned",
+    });
+    client.message(rematchStatus(1, { A: null, B: "accept" }));
+
+    expect(game.rematchStage).toBe("opponentRequested");
+
+    game.requestRematch();
+
+    expect(client.rematchVotes).toEqual(["accept"]);
+    expect(game.rematchStage).toBe("starting");
+
+    client.message(rematchStatus(2, { A: null, B: null }));
+    client.message({
+      v: protocolVersion,
+      type: "state",
+      roomCode: "ABCDEFGH",
+      state: createInitialState("A"),
+    });
+
+    expect(game.matchNumber).toBe(2);
+    expect(game.state).toEqual(createInitialState("A"));
+    expect(game.status.winner).toBeNull();
+    expect(game.status.endReason).toBeNull();
+    expect(game.lastAction).toBeNull();
+    expect(game.selected).toBeNull();
+    expect(game.onlineEndReason).toBeNull();
+    expect(game.rematchStage).toBe("unavailable");
+    expect(game.canInteract).toBe(true);
+  });
+
+  it("keeps the finished game after a decline and allows asking again", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    endGame(client);
+    game.requestRematch();
+    client.message(rematchStatus(1, { A: null, B: "decline" }));
+
+    expect(game.rematchStage).toBe("declinedByOpponent");
+    expect(game.state.phase).toBe("gameOver");
+    expect(game.matchNumber).toBe(1);
+
+    game.requestRematch();
+    client.message(rematchStatus(1, { A: "accept", B: "decline" }));
+
+    expect(client.rematchVotes).toEqual(["accept", "accept"]);
+    expect(game.rematchStage).toBe("requested");
+
+    game.declineRematch();
+    client.message(rematchStatus(1, { A: "decline", B: null }));
+
+    expect(client.rematchVotes).toEqual(["accept", "accept", "decline"]);
+    expect(game.rematchStage).toBe("declinedByMe");
+  });
+
+  it("drops an optimistic starting state when the server rejects the vote", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+
+    joinStartedGame(game, client);
+    endGame(client);
+    client.message(rematchStatus(1, { A: null, B: "accept" }));
+    game.requestRematch();
+
+    expect(game.rematchStage).toBe("starting");
+
+    client.message({
+      v: protocolVersion,
+      type: "error",
+      code: "rematchUnavailable",
+      message: "A rematch is only available once the game is over.",
+    });
+
+    expect(game.rematchStage).toBe("opponentRequested");
+    expect(game.lastServerError).toBe("rematchUnavailable");
+  });
+
   it("resets displayed game state when joining and leaving rooms", () => {
     const client = new FakeClient();
     const game = createOnlineGameController({
@@ -390,6 +524,28 @@ function joinStartedGame(
   });
 }
 
+function endGame(client: FakeClient): void {
+  client.message({
+    v: protocolVersion,
+    type: "state",
+    roomCode: "ABCDEFGH",
+    state: { ...gameFixtures.win, winner: "B", endReason: "resignation" },
+  });
+}
+
+function rematchStatus(
+  matchNumber: number,
+  votes: { A: "accept" | "decline" | null; B: "accept" | "decline" | null },
+): ServerMessage {
+  return {
+    v: protocolVersion,
+    type: "rematchStatus",
+    roomCode: "ABCDEFGH",
+    matchNumber,
+    votes,
+  };
+}
+
 function firstPlacementState(): GameState {
   return {
     ...gameFixtures.emptyBoard,
@@ -416,12 +572,16 @@ function expectDisplayedInitialState(
   expect(game.feedback).toBeNull();
   expect(game.stateSyncNonce).toBe(0);
   expect(game.lastServerError).toBeNull();
+  expect(game.matchNumber).toBe(1);
+  expect(game.rematchVotes).toEqual({ A: null, B: null });
+  expect(game.rematchStage).toBe("unavailable");
 }
 
 class FakeClient {
   callbacks: OnlineGameClientCallbacks = {};
   actions: GameAction[] = [];
   claims: (string | null)[] = [];
+  rematchVotes: ("accept" | "decline")[] = [];
   joined: JoinRoomOptions | null = null;
 
   async createRoom(): Promise<string> {
@@ -439,6 +599,11 @@ class FakeClient {
 
   sendClaimWin(roomCode: string | null): boolean {
     this.claims.push(roomCode);
+    return true;
+  }
+
+  sendRematchVote(vote: "accept" | "decline"): boolean {
+    this.rematchVotes.push(vote);
     return true;
   }
 

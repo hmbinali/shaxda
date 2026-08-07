@@ -5,7 +5,7 @@ import type {
   PlayerId,
   PointId,
 } from "@shaxda/game-engine";
-import type { ServerMessage } from "@shaxda/shared";
+import type { RematchVote, RematchVotes, ServerMessage } from "@shaxda/shared";
 import {
   mapPointClick,
   type PointInteractionInvalidReason,
@@ -52,6 +52,15 @@ export interface OnlineGameControllerOptions {
   client?: OnlineGameClient;
 }
 
+export type OnlineRematchStage =
+  | "unavailable"
+  | "idle"
+  | "requested"
+  | "opponentRequested"
+  | "declinedByMe"
+  | "declinedByOpponent"
+  | "starting";
+
 export class OnlineGameController {
   state = $state<GameState>(createInitialState("A"));
   roomCode = $state<string | null>(null);
@@ -70,6 +79,9 @@ export class OnlineGameController {
   feedback = $state<OnlineGameFeedback | null>(null);
   stateSyncNonce = $state(0);
   lastServerError = $state<string | null>(null);
+  matchNumber = $state(1);
+  rematchVotes = $state<RematchVotes>({ A: null, B: null });
+  rematchStarting = $state(false);
   status = $derived(buildGameStatus(this.state));
   started = $derived(this.presence.A !== null && this.presence.B !== null);
   opponentConnected = $derived(
@@ -93,6 +105,31 @@ export class OnlineGameController {
   canInteract = $derived(
     this.boardInteractive && getActingPlayer(this.state) === this.mySlot,
   );
+  canRematch = $derived(
+    this.connectionStatus === "connected" &&
+      this.started &&
+      this.mySlot !== null &&
+      this.state.phase === "gameOver",
+  );
+  rematchStage = $derived.by((): OnlineRematchStage => {
+    if (
+      this.mySlot === null ||
+      !this.started ||
+      this.state.phase !== "gameOver"
+    )
+      return "unavailable";
+    if (this.rematchStarting) return "starting";
+
+    // A standing request outranks an earlier decline on either side, so asking
+    // again after a refusal still reaches the opponent as a live request.
+    const mine = this.rematchVotes[this.mySlot];
+    const opponent = this.rematchVotes[otherSlot(this.mySlot)];
+    if (mine === "accept") return "requested";
+    if (opponent === "accept") return "opponentRequested";
+    if (mine === "decline") return "declinedByMe";
+    if (opponent === "decline") return "declinedByOpponent";
+    return "idle";
+  });
 
   readonly #client: OnlineGameClient;
   #invalidNonce = 0;
@@ -213,11 +250,40 @@ export class OnlineGameController {
     }
   }
 
+  requestRematch(): void {
+    // The opponent's standing request turns this vote into the second half of a
+    // mutual agreement, so the server starts the next match straight away.
+    this.sendRematchVote(
+      "accept",
+      this.mySlot !== null &&
+        this.rematchVotes[otherSlot(this.mySlot)] === "accept",
+    );
+  }
+
+  declineRematch(): void {
+    this.sendRematchVote("decline", false);
+  }
+
   leave(): void {
     this.#client.close();
     this.roomCode = null;
     this.connectionStatus = "idle";
     this.resetDisplayedRoomState();
+  }
+
+  private sendRematchVote(vote: RematchVote, starting: boolean): void {
+    if (!this.canRematch) {
+      this.markInvalid("actionRejected");
+      return;
+    }
+
+    const sent = this.#client.sendRematchVote(vote);
+    if (!sent) {
+      this.markInvalid("actionRejected");
+      return;
+    }
+
+    this.rematchStarting = starting;
   }
 
   private sendAction(action: GameAction): void {
@@ -250,8 +316,12 @@ export class OnlineGameController {
       case "matchEnded":
         this.onlineEndReason = message.reason;
         return;
+      case "rematchStatus":
+        this.receiveRematchStatus(message.matchNumber, message.votes);
+        return;
       case "error":
         this.#pendingAction = null;
+        this.rematchStarting = false;
         this.lastServerError = message.code;
         this.markInvalid("actionRejected");
         return;
@@ -260,6 +330,23 @@ export class OnlineGameController {
       case "pong":
         return;
     }
+  }
+
+  private receiveRematchStatus(matchNumber: number, votes: RematchVotes): void {
+    if (matchNumber !== this.matchNumber) {
+      // The server confirmed a new logical match. Drop everything scoped to the
+      // finished game; its replacement board arrives in the state broadcast.
+      this.matchNumber = matchNumber;
+      this.selected = null;
+      this.invalid = null;
+      this.lastAction = null;
+      this.onlineEndReason = null;
+      this.lastServerError = null;
+      this.#pendingAction = null;
+    }
+
+    this.rematchVotes = votes;
+    this.rematchStarting = false;
   }
 
   private receiveState(nextState: GameState): void {
@@ -321,6 +408,9 @@ export class OnlineGameController {
     this.feedback = null;
     this.stateSyncNonce = 0;
     this.lastServerError = null;
+    this.matchNumber = 1;
+    this.rematchVotes = { A: null, B: null };
+    this.rematchStarting = false;
     this.#pendingAction = null;
   }
 }

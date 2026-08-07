@@ -4,15 +4,15 @@
   import { modal } from "$lib/a11y/modal";
   import type { GameStatus } from "$lib/game/status";
   import Button from "$components/ui/Button.svelte";
+  import type { GameResultAction } from "./gameResultActions";
 
   interface Props {
     status: GameStatus;
     playerName: (player: PlayerId) => string;
     reason?: string | null;
+    notice?: string | null;
     testId: string;
-    onNewGame?: () => void;
-    onExit?: () => void;
-    onLeave?: () => void;
+    actions: readonly GameResultAction[];
     inertTargets?: readonly (HTMLElement | null | undefined)[];
   }
 
@@ -20,17 +20,21 @@
     status,
     playerName,
     reason = null,
+    notice = null,
     testId,
-    onNewGame,
-    onExit,
-    onLeave,
+    actions,
     inertTargets = [],
   }: Props = $props();
 
   const copy = messages.so.localGame;
-  const onlineCopy = messages.so.onlineGame;
   const titleId = $derived(`${testId}-title`);
   const reasonId = $derived(`${testId}-reason`);
+  const noticeId = $derived(`${testId}-notice`);
+  const describedBy = $derived(
+    [reason === null ? null : reasonId, notice === null ? null : noticeId]
+      .filter((id) => id !== null)
+      .join(" "),
+  );
   let primaryAction = $state<HTMLButtonElement | null>(null);
 </script>
 
@@ -41,7 +45,7 @@
   tabindex="-1"
   aria-modal="true"
   aria-labelledby={titleId}
-  aria-describedby={reason === null ? undefined : reasonId}
+  aria-describedby={describedBy.length === 0 ? undefined : describedBy}
   use:modal={{ inertTargets, initialFocus: primaryAction, onEscape: null }}
 >
   <div class="result-panel" data-testid="game-result-panel">
@@ -67,31 +71,38 @@
       <p id={reasonId}>{reason}</p>
     {/if}
 
-    <div class="actions" class:single={!onNewGame || !onExit}>
-      {#if onNewGame}
-        <Button
-          bind:element={primaryAction}
-          variant="primary"
-          onclick={onNewGame}
-          data-result-primary
-        >
-          {copy.controls.newGame}
-        </Button>
-        {#if onExit}
-          <Button variant="outline" onclick={onExit}>
-            {copy.controls.exit}
+    {#if notice !== null}
+      <p id={noticeId} class="notice" data-testid="{testId}-notice">
+        {notice}
+      </p>
+    {/if}
+
+    <div
+      class="actions"
+      class:single={actions.length === 1}
+      class:lead={actions.length % 2 === 1 && actions.length > 1}
+    >
+      {#each actions as action, index (action.id)}
+        {#if index === 0}
+          <Button
+            bind:element={primaryAction}
+            variant={action.variant ?? "primary"}
+            onclick={action.onSelect}
+            testId={action.testId}
+            data-result-primary
+          >
+            {action.label}
+          </Button>
+        {:else}
+          <Button
+            variant={action.variant ?? "outline"}
+            onclick={action.onSelect}
+            testId={action.testId}
+          >
+            {action.label}
           </Button>
         {/if}
-      {:else if onLeave}
-        <Button
-          bind:element={primaryAction}
-          variant="primary"
-          onclick={onLeave}
-          data-result-primary
-        >
-          {onlineCopy.leave}
-        </Button>
-      {/if}
+      {/each}
     </div>
   </div>
 </div>
@@ -185,6 +196,15 @@
 
   .actions.single {
     grid-template-columns: 1fr;
+  }
+
+  /* An odd action count keeps the primary action on its own full-width row. */
+  .actions.lead > :global(:first-child) {
+    grid-column: 1 / -1;
+  }
+
+  .notice {
+    font-weight: 600;
   }
 
   @keyframes result-enter {

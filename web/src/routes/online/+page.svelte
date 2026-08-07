@@ -5,7 +5,6 @@
     LogOut,
     Menu,
     Plus,
-    RotateCcw,
     Volume2,
     VolumeX,
   } from "@lucide/svelte";
@@ -127,13 +126,6 @@
                     icon: soundEnabled ? Volume2 : VolumeX,
                     onSelect: toggleSound,
                     pressed: soundEnabled,
-                  },
-                  {
-                    id: "new-game",
-                    label: gameCopy.controls.newGame,
-                    shortLabel: gameCopy.controls.newGame,
-                    icon: RotateCcw,
-                    disabled: true,
                   },
                 ]
               : []),
@@ -373,6 +365,9 @@
     controller.leave();
     roomCodeInput = "";
     toast.clear();
+    // Drop the finished room from the URL and from the sign-in return path so
+    // the lobby cannot rejoin it.
+    returnTo = "/online";
     replaceState(resolve("/online"), {});
   }
 
@@ -536,7 +531,7 @@
         : status.endReason === null
           ? null
           : gameCopy.result.reasons[status.endReason]}
-      onLeave={leaveRoom}
+      onNewMatch={leaveRoom}
     />
   {:else}
     <section

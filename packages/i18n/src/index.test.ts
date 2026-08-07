@@ -85,4 +85,25 @@ describe("i18n scaffold", () => {
       expect(reason.loser.length).toBeGreaterThan(0);
     }
   });
+
+  it("covers every online rematch negotiation state in Somali", () => {
+    const { rematch } = messages.so.onlineGame;
+
+    expect(Object.keys(rematch.notices).sort()).toEqual([
+      "declinedByMe",
+      "declinedByOpponent",
+      "opponentRequested",
+      "requested",
+      "starting",
+    ]);
+    for (const copy of [
+      rematch.request,
+      rematch.accept,
+      rematch.decline,
+      ...Object.values(rematch.notices),
+    ]) {
+      expect(copy.length).toBeGreaterThan(0);
+      expect(copy).not.toMatch(/[A-Za-z]+ (game|match|rematch)/i);
+    }
+  });
 });

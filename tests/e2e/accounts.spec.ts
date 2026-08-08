@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { seedAccount } from "./fixtures/auth";
 import { openAccountPanel } from "./fixtures/panel";
 
@@ -123,6 +123,77 @@ test("auth API reaches the handler and logout clears the session", async ({
   }
 });
 
+test("sharing copies the canonical URL of the current username", async ({
+  page,
+  context,
+}) => {
+  const account = await seedAccount(context, { alias: "share_e2e_alias" });
+  if (account.username === null)
+    throw new Error("Expected a complete account.");
+  const canonical = `http://127.0.0.1:4173/u/${account.username}`;
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  try {
+    // An old alias still redirects, and the page it lands on shares only the
+    // current username.
+    await page.goto("/u/share_e2e_alias");
+    await expect(page).toHaveURL(canonical);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      canonical,
+    );
+
+    await share(page, "share-profile", "Xiriiriyaha bogga waa la koobiyeeyay.");
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toBe(canonical);
+    expect(copied).not.toContain(account.email);
+    expect(copied).not.toContain(account.id);
+    expect(copied).not.toContain("share_e2e_alias");
+
+    await page.goto("/account");
+    await share(
+      page,
+      "share-my-profile",
+      "Xiriiriyaha bogga waa la koobiyeeyay.",
+    );
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      canonical,
+    );
+  } finally {
+    account.cleanup();
+  }
+});
+
+test("the profile share action uses the Web Share sheet when available", async ({
+  page,
+  context,
+}) => {
+  const account = await seedAccount(context);
+  if (account.username === null)
+    throw new Error("Expected a complete account.");
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: (data: ShareData) => {
+        (window as unknown as { __shared?: ShareData }).__shared = data;
+        return Promise.resolve();
+      },
+    });
+  });
+  try {
+    await page.goto(`/u/${account.username}`);
+    await share(page, "share-profile", "Bogga waa la wadaagay.");
+
+    const shared = await page.evaluate(
+      () => (window as unknown as { __shared?: ShareData }).__shared,
+    );
+    expect(shared?.url).toBe(`http://127.0.0.1:4173/u/${account.username}`);
+    expect(JSON.stringify(shared)).not.toContain(account.email);
+    expect(JSON.stringify(shared)).not.toContain(account.id);
+  } finally {
+    account.cleanup();
+  }
+});
+
 test("unknown public profiles use the Somali 404 page", async ({ page }) => {
   const response = await page.goto("/u/definitely_missing_e2e");
   expect(response?.status()).toBe(404);
@@ -130,3 +201,19 @@ test("unknown public profiles use the Somali 404 page", async ({ page }) => {
     page.getByRole("heading", { name: "Bogga lama helin" }),
   ).toBeVisible();
 });
+
+/**
+ * Both share buttons live on server-rendered pages, so a click that lands
+ * before hydration does nothing; retry until the status region reports back.
+ */
+async function share(
+  page: Page,
+  testId: string,
+  expected: string,
+): Promise<void> {
+  const status = page.getByRole("status", { name: "Xaaladda wadaagista" });
+  await expect(async () => {
+    await page.getByTestId(testId).click();
+    await expect(status).toHaveText(expected, { timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
+}

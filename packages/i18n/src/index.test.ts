@@ -57,6 +57,34 @@ describe("i18n scaffold", () => {
     expect(siteContent.so.pages).not.toHaveProperty("rules");
   });
 
+  it("templates public profile copy on the username alone", () => {
+    const { profile } = siteContent.so.pages;
+    const templates = [
+      profile.pageTitle,
+      profile.pageDescription,
+      profile.share.shareTitle,
+      profile.share.shareText,
+    ];
+
+    for (const template of templates) {
+      expect(template).toContain("{username}");
+      // A profile template must not carry any other slot that could be filled
+      // with a private field such as the email or the Google name.
+      expect(template.match(/\{[a-z]+\}/gi)).toEqual(["{username}"]);
+    }
+    for (const state of [
+      profile.share.action,
+      profile.share.statusLabel,
+      profile.share.shared,
+      profile.share.copied,
+      profile.share.failed,
+      siteContent.so.pages.account.shareProfile,
+    ]) {
+      expect(state.length).toBeGreaterThan(0);
+      expect(state).not.toContain("{");
+    }
+  });
+
   it("provides Somali copy for not-found and unexpected errors", () => {
     expect(siteContent.so.errorPage).toMatchObject({
       notFound: { title: "Bogga lama helin" },

@@ -457,6 +457,7 @@ export const siteContent = {
         joinedLabel: "Ku biiray",
         nextChangeLabel: "Beddelka magaca wuxuu furmayaa",
         profileLink: "Fur bogga dadweynaha",
+        shareProfile: "La wadaag boggayga",
         saveUsername: "Kaydi magaca",
         saveAvatar: "Kaydi sawirka",
         logout: "Ka bax akoonka",
@@ -467,9 +468,24 @@ export const siteContent = {
       profile: {
         path: "/u/[username]",
         title: "Bogga ciyaaryahanka",
-        titleSuffix: "Bogga Shaxda",
         description: "Bog dadweyne oo ciyaaryahan Shaxda ah.",
+        // Only the public username may appear in the title, the description or
+        // the share payload; the account email, the Google name and the user id
+        // stay private.
+        pageTitle: "@{username}",
+        pageDescription: "Bogga dadweynaha ee @{username} ee ciyaarta Shaxda.",
         memberLabel: "Ciyaaryahan Shaxda",
+        // TODO(translation-review): A native/fluent Somali reviewer must verify
+        // this profile sharing copy before release.
+        share: {
+          action: "La wadaag bogga",
+          statusLabel: "Xaaladda wadaagista",
+          shareTitle: "@{username} — Shaxda",
+          shareText: "Eeg bogga Shaxda ee @{username}.",
+          shared: "Bogga waa la wadaagay.",
+          copied: "Xiriiriyaha bogga waa la koobiyeeyay.",
+          failed: "Wadaagiddu ma shaqayn. Xiriiriyaha gacanta ku koobi.",
+        },
       },
     },
     accountErrors: {

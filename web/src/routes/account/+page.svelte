@@ -3,10 +3,12 @@
   import { siteContent } from "@shaxda/i18n";
   import { untrack } from "svelte";
   import Avatar from "$components/account/Avatar.svelte";
+  import ShareProfile from "$components/account/ShareProfile.svelte";
   import UsernameField from "$components/account/UsernameField.svelte";
   import Button from "$components/ui/Button.svelte";
   import ButtonLink from "$components/ui/ButtonLink.svelte";
   import PageMeta from "$components/PageMeta.svelte";
+  import { profilePath } from "$lib/site/metadata";
   import type { ActionData, PageData } from "./$types";
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -71,11 +73,16 @@
             </div>{/if}
         </dl>
       </div>
-      <ButtonLink
-        class="mt-5"
-        href={`/u/${encodeURIComponent(data.settings.username)}`}
-        >{copy.profileLink}</ButtonLink
-      >
+      <div class="mt-5 flex flex-wrap items-start gap-3">
+        <ButtonLink href={profilePath(data.settings.username)}
+          >{copy.profileLink}</ButtonLink
+        >
+        <ShareProfile
+          username={data.settings.username}
+          label={copy.shareProfile}
+          testId="share-my-profile"
+        />
+      </div>
     </article>
 
     <form

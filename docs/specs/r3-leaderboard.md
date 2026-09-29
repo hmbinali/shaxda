@@ -214,7 +214,7 @@ client strips unknown keys, so an additive field never breaks a cached PWA.
   behind (`rank − 3` to `rank + 3`, fewer at either end); rank 10,000 costs
   one batch, and the client never loops through pages.
 - Unranked shows the rounded rating with R1's `?` when provisional (the only
-  `?` anywhere), the rated-game count, and the reasons in order; `excluded`
+  `?` on these routes), the rated-game count, and the reasons in order; `excluded`
   reads only "not currently listed". No rank, no neighbours.
 - The card stays visible across pages without covering page controls on a
   narrow screen. On a page that holds the viewer (matched by username), it
@@ -224,8 +224,8 @@ client strips unknown keys, so an additive field never breaks a cached PWA.
 
 ### 4.4 Freshness
 
-The page trails a processed match, exclusion, rename, swap, or
-`eligible_until` exit by at most 55 s; the standing and R4's rank see each at
+The page trails a processed match, exclusion, deletion request, rename, swap,
+or `eligible_until` exit by at most 55 s; the standing and R4's rank see each at
 once. A time-based exit needs no write. If the processor stops, the board
 keeps the last processed state until R1's minute sweep catches up; a pending
 match is uncounted, never a guessed rank.
@@ -319,7 +319,7 @@ streak drafts.
 | `empty.title` / `empty.body`                          | Weli cidna kuma jirto miiska darajada / Ciyaaryahanka ugu horreeya ee buuxiya shuruudaha kor ku xusan ayaa halkan ka soo muuqan doona.                                                                                  |
 | `me.title` / `me.rank` / `me.around` / `me.jump`      | Kaalintaada / Kaalinta {rank}aad / Kuwa kuu dhow / U gudub safkaaga                                                                                                                                                     |
 | `me.signedOut` / `me.incomplete`                      | Gal si aad u aragto kaalintaada. / Dhammee isdiiwaangelinta si aad kaalin u hesho.                                                                                                                                      |
-| `me.unranked` / `me.notRated` / `me.provisionalLabel` | Weli kuma jirtid miiska darajada. / Weli ciyaar tartan ah laguuma xisaabin. / Darajo aan weli xasilin                                                                                                                   |
+| `me.unranked` / `me.notRated` / `me.provisionalLabel` | Weli kuma jirtid miiska darajada. / Weli ciyaar tartan ah laguuma xisaabin. / Darajo ku meel gaar ah                                                                                                                    |
 | `me.reasons.tooFewGames` / `provisional`              | Waxaad u baahan tahay {remaining} ciyaarood oo tartan ah oo kale; 10 ayaa loo baahan yahay. / Darajadaadu weli ma xasilin; ciyaaro tartan ah oo kale ayaa xasiliya.                                                     |
 | `me.reasons.inactive` / `excluded`                    | 90-kii maalmood ee la soo dhaafay kuma aadan ciyaarin ciyaar tartan ah. / Hadda laguma soo bandhigayo miiska darajada.                                                                                                  |
 | `me.loading` / `me.error` / `me.retry`                | Kaalintaada waa la raadinayaa… / Kaalintaada lama soo saari karo hadda. / Isku day mar kale                                                                                                                             |
@@ -412,7 +412,7 @@ and `check:hibernation`). Tests never run remote migrations.
 
 | Environment | Steps                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dev, e2e    | Local Miniflare D1 with the R1, R2, and R6-core migrations; fixtures only.                                                                                                                                                                                                                                                                                                                                                                              |
+| dev, e2e    | Local Miniflare D1 with every migration through R1's and R6-core's; fixtures only.                                                                                                                                                                                                                                                                                                                                                                      |
 | preview     | Once R1, R2, and R6-core run in preview: apply R3's index migration explicitly if E6 required one, then deploy the web preview. Check that a real qualifying game appears within a minute, an unlisted player, rank beyond 100, identical anonymous and signed-in bytes, no D1 read for a repeat request within 55 s, a time-window exit, a rename, and the note in a rehearsed correction. Record plans, p95, rows read, and completion-to-visibility. |
 | production  | The same order, after E5 is recorded and the preview checks pass.                                                                                                                                                                                                                                                                                                                                                                                       |
 

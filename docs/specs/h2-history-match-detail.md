@@ -156,15 +156,18 @@ row means pending (contracts §2.5).
 | 0             | any, or none             | "Saaxiibtinimo" only                                       |
 | 1             | none                     | "Tartan" and "Waa la xisaabinayaa"                         |
 | 1             | `held`                   | "Tartan" and "Waa la hubinayaa"                            |
-| 1             | `processed`              | "Tartan" only (R4 adds the delta)                          |
+| 1             | `processed`              | "Tartan" only (the change is on R1's overlay, R4's list)   |
 | 1             | `skipped`, `pairCap`     | "Tartan" and "Darajo laguma xisaabin"                      |
 | 1             | `skipped`, `invalidated` | "Tartan" and "Darajada waa laga saaray"; the result stands |
 
 The labels come from R2's single mapping (`web/src/lib/rated-play/label.ts`),
-so the overlay, `/history`, `/match/<id>`, and R4's list always agree. During
-an R1 correction the labels show the last published decision (contracts
-§7.4). Before this slice, rated rows
-show "Tartan" only; none exist until R2 and R1 activate.
+so the overlay, `/history`, `/match/<id>`, and R4's list always agree.
+R6-core adds "Darajada waa la saxay" (rating corrected) to that mapping for
+a match its correction changed, beside the labels above unless invalidated,
+with one primary-key lookup on `rating_correction_mark` in these reads.
+During an R1 correction the labels show the last published decision
+(contracts §7.4). Before this slice, rated rows show "Tartan" only; none
+exist until R2 and R1 activate.
 
 ## 4. Behaviour and failure handling
 
@@ -174,8 +177,9 @@ Both routes are `prerender = false`, server `load` only, and set
 `cache-control: no-store` first (§5).
 
 - `/history` (`web/src/routes/history/+page.server.ts`):
-  `requireCompleteAccount(locals, "/history")`, moved unchanged from
-  `/account` to `web/src/lib/server/account.ts`, redirects (303) to
+  `requireCompleteAccount(locals, "/history")`, moved from `/account` to
+  `web/src/lib/server/account.ts` with a return-path parameter (today it
+  always returns to `/account`), redirects (303) to
   `/login?returnTo=/history` or `/register?returnTo=/history`. The first
   page reads the summary and the page with `Promise.all`, later pages only
   the page. The summary ignores the filter.
@@ -316,12 +320,12 @@ Drafts ship behind `TODO(translation-review)` and reuse the
 | `match.details.heading` / `playedAt` / `utc` / `duration` / `mode` / `startingSeat` / `pieces` / `captures` / `actions`                                            | Faahfaahinta ciyaarta / Taariikhda / UTC / Muddada / Nooca / Bilaabay / Dhagaxa haray / Qabashooyin / Tallaabooyin                                                                                |
 | `match.details.firstAdvantage` / `undecided` / `firstAdvantageBy.placementJare` / `noJareFallback`                                                                 | Horrayn / Lama go'aamin / jare intii dhigista / jare la'aan, ciyaaryahanka labaad                                                                                                                 |
 | `siteContent.so.neutralMember` (shared with R3, R4, A3), `match.privateNote`                                                                                       | Xubin la tirtiray; Ciyaartan waxaa arki kara labada ciyaaryahan oo keliya.                                                                                                                        |
-| `match.ratingStatus.pending` / `notCounted` / `removed`                                                                                                            | Waa la xisaabinayaa / Darajo laguma xisaabin / Darajada waa laga saaray                                                                                                                           |
+| Reused: R2 `status.pending` / `held` / `notCounted` / `removed` (R2 §4.5)                                                                                          | Waa la xisaabinayaa / Waa la hubinayaa / Darajo laguma xisaabin / Darajada waa laga saaray                                                                                                        |
+| Reused: R6 `ratingStatus.corrected`                                                                                                                                | Darajada waa la saxay                                                                                                                                                                             |
 | `match.share.action` / `statusLabel` / `shareText` / `shared` / `copied` / `failed`                                                                                | La wadaag ciyaarta / Xaaladda wadaagista / Eeg ciyaartan Shaxda ah. / Ciyaarta waa la wadaagay. / Xiriiriyaha ciyaarta waa la koobiyeeyay. / Wadaagiddu ma shaqayn. Xiriiriyaha gacanta ku koobi. |
 
 `{a}`, `{b}`, `{winner}`, `{loser}`, and `{name}` take `@username` for a
-member and the neutral label otherwise. "Darajada waa laga saaray" (rating
-removed) is a new draft for the Q4 review.
+member and the neutral label otherwise. The rating labels are README glossary drafts awaiting the Q4 review.
 
 **`/legal`, wave 1.** In `packages/i18n/src/content/legal.so.ts`, the
 `xogta` sentences saying Shaxda stores no game history, results, or replays
@@ -459,9 +463,9 @@ Rated rows are seeded; the real game covers M1's shape end to end.
 | --- | -------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------- |
 | M1  | listed, "Saaxiibtinimo"                      | same 404 as an unknown id                                       | full, `noindex`, generic OG, private note       |
 | M2  | listed, "Tartan", "Is dhiibid"               | public; resignation; first advantage "not decided"; names in OG | "(Adiga)"; no rating label once processed       |
-| M3  | listed, "Hakad"                              | public; the idle sentence names A, never "resigned"             | no rating label once processed                  |
+| M3  | listed, "Tartan", "Hakad"                    | public; the idle sentence names A, never "resigned"             | no rating label once processed                  |
 | M4  | listed, "Tartan"                             | public                                                          | "Darajo laguma xisaabin" once R1 exists         |
-| M5  | listed, "Barbaro"                            | public; draw headline and reason                                | no rating label once processed                  |
+| M5  | listed, "Tartan", "Barbaro"                  | public; draw headline and reason                                | no rating label once processed                  |
 | M6  | nothing (no row)                             | no id exists                                                    | the overlay shows no link                       |
 | M7  | nothing (no row)                             | no id exists                                                    | the overlay shows no link                       |
 | M8  | listed, result unchanged                     | public, result unchanged                                        | "Darajada waa laga saaray" once R1 and R6 exist |

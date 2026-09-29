@@ -80,6 +80,8 @@ above effective RD 110), P19 (via R3), P21 (statistics may be missing).
 | [H4](h4-match-stats.md)              | `readMatchStats` from `@shaxda/shared/stats`: the only way R4 reads `stats_json` (Zod-validated, `STATS_V = 1`, a typed reason instead of zeros); the backfill that brings saved matches to `stats_status = 'ok'`.                                             |
 | [R1](r1-rating-system.md)            | `match_rating`, `match_player_rating`, and `player_rating` ([§2.5](v2-contracts.md#25-r1-extension)); `isProvisional` in `packages/rating` ([§7.3](v2-contracts.md#73-arithmetic-and-reads)); the `maintenance` flag ([§7.4](v2-contracts.md#74-corrections)). |
 | [R3](r3-leaderboard.md)              | `readPublicRankForUser(db, userId, asOf)`: the P19 predicate and the `/leaderboard` ordering.                                                                                                                                                                  |
+| [R2](r2-ranked-play-rules.md)        | The rating-state label mapping (`RatedLabel.svelte`, `ratedPlay.status.*`).                                                                                                                                                                                    |
+| [R6](r6-ranking-integrity.md)        | R6-core's `rating_correction_mark` (existence only), `ratingStatus.corrected`, and `check-consistency`.                                                                                                                                                        |
 | [A3](a3-account-deletion.md), V1.1-A | A3's [§8](v2-contracts.md#8-deletion) predicates behind the profile 404 and the neutral label, once shipped; V1.1-A's `resolveProfile`, alias redirect, `PageMeta`, `Avatar`, and `ShareProfile`.                                                              |
 
 ## 3. Contracts
@@ -99,8 +101,8 @@ Read-only statements in `packages/db`; none selects `match.replay`.
   2. `rating_processor_state.maintenance`;
   3. the list: `match_player_owner_idx` range, newest first → `match` by
      `id` with `rated = 1` → the opponent's `match_player` → left joins by
-     key to `match_rating`, the own seat's `match_player_rating`, and the
-     opponent's `user`; `LIMIT 10`;
+     key to `match_rating`, the own seat's `match_player_rating`, R6's
+     `rating_correction_mark`, and the opponent's `user`; `LIMIT 10`;
   4. the included matches: the same owner range → `match_rating` by key
      with `rating_status = 'processed'` → `match` by `id`, with the columns
      §3.5 needs; only `readMatchStats` parses the stats columns.
@@ -140,7 +142,8 @@ type ProfilePageData = {
 Each `ProfileMatchRow` carries the public match id, `href` (`/match/<id>`),
 the owner's `outcome`, `reason` (`online_end_reason` when set, else
 `end_reason`, as in H2), `endedAt` (epoch ms), `opponent` (H2's
-participant), and `rating`. Only a processed match counts in any number.
+participant), `rating`, and `corrected`. Only a processed match counts in
+any number.
 
 | Rating state                    | `rating`                                                                                                                  | Label (§7)       |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------- |
@@ -150,8 +153,11 @@ participant), and `rating`. Only a processed match counts in any number.
 | `skipped`, `pairCap`            | `{ kind: "notCounted" }`                                                                                                  | not counted      |
 | `skipped`, `invalidated`        | `{ kind: "removed" }`                                                                                                     | rating removed   |
 
-The delta always equals the difference of the displayed ratings.
-`skipped:friendly` exists only for `rated = 0` matches, never read here.
+Labels come from R2's mapping (§7). `corrected` is true when R6 has a
+`rating_correction_mark` for the match (its existence only) and adds "rating
+corrected" beside the label, except on a removed match. The delta always
+equals the difference of the displayed ratings. `skipped:friendly` exists
+only for `rated = 0` matches, never read here.
 
 ### 3.5 Shaxda aggregates
 
@@ -229,8 +235,8 @@ labelled), and "Pending/deleted account" (profile 404, neutral label).
   `peak_seq`, `last_seq`, RD, volatility, `excluded`, replay, or
   `stats_json`.
 - Friendly matches leave no row, id, count, or difference between a
-  friendly-only and a new account (P2). Exclusions and holds surface only
-  as the ordinary "not ranked yet" and "being calculated".
+  friendly-only and a new account (P2). Exclusions surface only as the
+  ordinary "not ranked yet", and holds as the ordinary "being checked".
 - Every profile response is `private, no-store` (session state in the root
   layout, `isOwner` on the page); shared caching waits for proven
   session-independent output, as R3 requires for `/leaderboard`.
@@ -244,13 +250,13 @@ account ([§12](v2-contracts.md#12-evidence)), before implementation.
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | D1 round trips            | `resolveProfile`, one four-statement batch, R3's rank read when rated                                                                                |
 | Rows read: record, flag   | 2, by primary key; R3's rank read is on R3's budget                                                                                                  |
-| Rows read: list           | About 2 per owner row walked until ten rated matches are found, plus about 4 per listed match                                                        |
+| Rows read: list           | About 2 per owner row walked until ten rated matches are found, plus about 5 per listed match                                                        |
 | Rows read: included       | About 2 per saved match of the owner, plus 1 per processed match                                                                                     |
 | Rows written; DO wake-ups | 0; 0                                                                                                                                                 |
 | Storage                   | No new table ([§2.5](v2-contracts.md#25-r1-extension)); an index only if E6 finds a plan without one ([§11](v2-contracts.md#11-migration-ownership)) |
 | Requests; Worker CPU      | One SSR request per view (plus the existing session read); one `readMatchStats` parse per processed match                                            |
 
-About 350 rows per view for 100 saved games. The worst case walks the whole
+About 370 rows per view for 100 saved games. The worst case walks the whole
 owner range twice, friendly games included, as neither `rated` nor the
 rating state is on `match_player`: about 25,000 rows at 5,000 saved games,
 so 200 such views use D1's 5 million free daily reads. Preview records p95,
@@ -264,7 +270,8 @@ New keys in `siteContent.so.pages.profile`, behind
 [glossary drafts](README.md#somali-glossary-drafts-q4) (Q4). H2's history
 keys supply outcome words, end-reason labels (also for the
 `forcedJareSpaceMaking` and `bothBlocked` draw groups), streak and form
-copy, duration units, and "Eeg ciyaarta". `shaxda` and `jare` stay;
+copy, duration units, and "Eeg ciyaarta"; R2's and R6's keys supply the
+rating-state labels (the "reused" rows). `shaxda` and `jare` stay;
 `horrayn` follows `/learn`. New templates use only `{n}`.
 
 | Key                                                                    | Draft                                                                                                                           |
@@ -276,7 +283,8 @@ copy, duration units, and "Eeg ciyaarta". `shaxda` and `jare` stay;
 | `overview.rankRule`                                                    | Kaalin waxaa hela ciyaaryahan leh 10 ciyaarood oo tartan ah, darajo degan, iyo ciyaar 90-kii maalmood ee u dambeeyay.           |
 | `overview.notRated` / `notRatedBody` / `ratingsUpdating`               | Weli darajo ma laha / Tirooyinku waxay soo baxaan marka ciyaar tartan ah la xisaabiyo. / Darajooyinka waa la cusboonaysiinayaa. |
 | `matches.title` / `empty` / `history`                                  | Ciyaaraha tartanka ee u dambeeyay / Weli ciyaar tartan ah ma jirto. / Eeg dhammaan ciyaarahayga                                 |
-| `matches.rating.pending` / `held` / `notCounted` / `removed`           | Waa la xisaabinayaa / Waa la hubinayaa (R2's `status.held`) / Darajo laguma xisaabin / Darajada waa laga saaray                 |
+| Reused: R2 `status.pending` / `held` / `notCounted` / `removed`        | Waa la xisaabinayaa / Waa la hubinayaa / Darajo laguma xisaabin / Darajada waa laga saaray                                      |
+| Reused: R6 `ratingStatus.corrected`                                    | Darajada waa la saxay                                                                                                           |
 | `matches.rating.up` / `down` / `same`                                  | Darajadu waxay kor u kacday {n} / Darajadu waxay hoos u dhacday {n} / Darajadu isma beddelin                                    |
 | `stats.title` / `incomplete`                                           | Tirakoobka Shaxda / Tirakoobku weli ma dhammaystirna ({n} ciyaarood).                                                           |
 | `stats.captures` / `capturesPerGame` / `jare` / `repeatedJare`         | Dhagxaan la qabtay / Qabasho ciyaartiiba / Jare / Jare soo noqnoqday                                                            |
@@ -312,7 +320,8 @@ also `pnpm test:e2e` with `pnpm check:e2e-isolation` green.
   above; a peak below 1500 shows as stored; win rate 1/3 → 33 %, 2/3 →
   67 %; form `WLD` → win, loss, draw; no row → `notRated`.
 - Delta: before 1499.5 and after 1500.4 show `0`, not `+1`.
-- Each rating state maps to its §3.4 label; `bothBlocked` hides at zero;
+- Each rating state maps to its §3.4 label; a marked match adds "rating
+  corrected" unless removed; `bothBlocked` hides at zero;
   no fastest win renders `stats.noBoardWin`. Copy is Somali only.
 
 ### Workers and D1 (Workers Vitest pool, Miniflare D1)

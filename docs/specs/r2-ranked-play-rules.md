@@ -7,7 +7,7 @@
 | Depends on | H1, R1 (activated together)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Register   | F1, F2, F4, P1, P2, P3, P7, P10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Contracts  | Owns the behaviour behind [§6.3](v2-contracts.md#63-client-to-server) (`rateConsent`, rated rematch votes), `RATED_DISCLOSURE_V`, steps 1, 3, and 4 of [§4.2](v2-contracts.md#42-rating-decision) as `rating_policy_v = 1` (R1 owns step 2's validation), and `RATED_PLAY_ENABLED` ([§10.3](v2-contracts.md#103-bindings-flags-and-rollout-by-milestone)). Consumes [§1](v2-contracts.md#1-vocabulary), [§2.5](v2-contracts.md#25-r1-extension), [§3](v2-contracts.md#3-room-lifecycle), [§4.1](v2-contracts.md#41-which-endings-write-a-row), [§4.3](v2-contracts.md#43-canonical-sample-matches), [§5](v2-contracts.md#5-access-matrix), [§6.2](v2-contracts.md#62-server-to-client), [§6.4](v2-contracts.md#64-quick-match-queue), [§6.5](v2-contracts.md#65-deploy-order), [§7](v2-contracts.md#7-rating-processor) |
-| Brief      | `docs/shaxda-v2.md` §10 (R2); F1 supersedes the earlier default in §16 D2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Brief      | `docs/shaxda-v2.md` §10 (R2), §6.6; F1 supersedes the earlier default in §16 D2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Touches    | `packages/shared` (`rated-play` module, protocol schemas), `worker/` (MatchRoom consent and rematch handling, Wrangler vars), `web/` (`/online` create, lobby, rematch, result; labels on `/history` and `/match/<id>`), `packages/i18n` (`ratedPlay` copy, `/learn#tartan`, `/legal`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 R2 decides how two account players agree to rated play and which saved games
@@ -22,8 +22,8 @@ R6 owns invalidation; K1 owns queue entry; H2 and R4 own page access.
 **Outcome.** Before the first move, both players of an invite room know
 whether the game is rated and that rated games are public. An invite game is
 friendly unless both accept. Every saved game gets one explainable rating
-decision, and one pair of accounts earns at most three counted games in any
-24 hours.
+decision, and a pair's game counts only when fewer than three of its counted
+games ended in the 24 hours before it.
 
 | Must                                                                                                                                                                                   | See     |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
@@ -32,7 +32,7 @@ decision, and one pair of accounts earns at most three counted games in any
 | 3. The consent handshake on the game Worker (P3): the creating client consents automatically; a decline or an old cached client means friendly.                                        | §3.3    |
 | 4. The server never blocks play for consent: the first non-terminal action freezes `rated` (P1); the starting player's client warns first while consent is pending.                    | §4.2    |
 | 5. Consent never carries across matches: a rematch is rated only with two rated accept votes; quick rooms accept only rated rematches.                                                 | §4.3    |
-| 6. The `RATED_PLAY_ENABLED` kill switch: the server refuses consent with `ratedPlayDisabled`, so games stay friendly.                                                                  | §3.5    |
+| 6. The `RATED_PLAY_ENABLED` kill switch: the server refuses new consent and rated votes with `ratedPlayDisabled`; recorded consent stands.                                             | §3.5    |
 | 7. Policy v1 for v2-contracts §4.2 steps 1, 3, and 4, used by R1's processor and rebuild, beside the v2-contracts §4.1 predicate shared by room and processor.                         | §3.4    |
 | 8. Somali labels for rated/friendly and rating status in the lobby, result, `/history`, and `/match/<id>`; cap-skipped and invalidated rated matches stay public and say why (P2, P8). | §4.5    |
 | 9. `/learn#tartan`, linked from lobby and result: no fixed rating gain; games against new or high-RD accounts move an established rating less.                                         | §7      |
@@ -54,7 +54,7 @@ tiers, guest or local ratings (F8); changing a room's request; game rules.
 | F2   | The disclosure is shown before play wherever a player commits to rated play; labels say public or private.                                                                 |
 | F4   | Once play began, resign or a valid claim is a loss in every phase (§9); a pre-play ending writes nothing.                                                                  |
 | P1   | The consent window closes at the first accepted non-terminal action, which freezes `rated`.                                                                                |
-| P2   | Labels derive from `rated`; cap-skipped and invalidated rated matches stay public, marked "Darajo laguma xisaabin".                                                        |
+| P2   | Labels derive from `rated`; cap-skipped and invalidated rated matches stay public, marked "Darajo laguma xisaabin" or "Darajada waa laga saaray".                          |
 | P3   | The handshake in §3.3 and §4.1–§4.3.                                                                                                                                       |
 | P7   | `PAIR_CAP = 3` in a 24 h `ended_at` window, evaluated in `seq` order; no per-account daily cap.                                                                            |
 | P10  | An account may hold several rated rooms at once; the pair cap, Glicko dampening, and R6 cover abuse.                                                                       |
@@ -63,9 +63,9 @@ tiers, guest or local ratings (F8); changing a room's request; game rules.
 | Dependency  | Provides                                                                                                                                                                                                   |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | H1          | `ratedRequest` storage, per-match `consent`, `rated` frozen at play began, the `matchStatus` fields, the outbox and ledger rows, `staleMatch`, own off-turn resign, random then alternating starting seat. |
-| R1          | Step 1 validation, `seq`-order processing that calls R2's policy, `match_rating` rows, rebuilds, and the rating-status read the result overlay polls.                                                      |
+| R1          | Step 2 validation, `seq`-order processing that calls R2's policy, `match_rating` rows, rebuilds, and the rating-status read the result overlay polls.                                                      |
 | H2 (wave 1) | `/history` and `/match/<id>` with their access checks, where R2's labels render; the `/legal` saved-games paragraph.                                                                                       |
-| R6-core     | Invalidation and rescission records read at step 3.                                                                                                                                                        |
+| R6-core     | Invalidation and rescission records read at step 1.                                                                                                                                                        |
 | Consumers   | K1 (disclosure and version at queue entry), R4 (label mapping), R6 (`writesLedgerRow` in consistency checks).                                                                                              |
 
 ## 3. Contracts
@@ -121,9 +121,10 @@ and the following two functions.
   `ended_at` of the pair's earlier-`seq` matches with a processed
   `match_rating` row (a superset bounded below by
   `endedAt − PAIR_CAP_WINDOW_MS` is fine: the function applies the window).
-- `writesLedgerRow({ bothSeatsAccounts, playBegan, reachedGameOver })` is
-  v2-contracts §4.1. The Match DO calls it at game over; R1's step 1 and R6's
-  consistency check call it with facts replayed from a row, so a row with no
+- `writesLedgerRow({ seatKinds, playBegan, endedBy })` (H1's signature) is
+  v2-contracts §4.1. The Match DO calls it at game over; R1's step 2
+  validation and R6's consistency check call it with facts replayed from a
+  row, so a row with no
   non-terminal action is `held`. H1 creates this module with
   `writesLedgerRow` and its tests in wave 1; R2 adds the policy beside it.
 - R1's processor and rebuild record `RATING_POLICY_V` on every
@@ -159,7 +160,7 @@ repeats the chosen mode.
 | Rated request, an answer `null`, no decline | Tartan · waiting for agreement                                              | false (warning first)      |
 | A seat declined                             | Saaxiibtinimo · not agreed                                                  | false                      |
 | Both accepted the current version           | Tartan · both agreed                                                        | true                       |
-| Client got `ratedPlayDisabled`              | Saaxiibtinimo · rated play paused                                           | false                      |
+| `ratedPlayDisabled` before both accepted    | Saaxiibtinimo · rated play paused                                           | false                      |
 | Quick room (consent from `joinQueue`)       | Kulan degdeg ah · Tartan                                                    | true                       |
 
 Once both seats are accounts, the joiner sees the prompt (disclosure, "Aqbal
@@ -219,7 +220,7 @@ once, R1's status once `save.matchId` exists, and a `/learn#tartan` link.
 | ------------------------------------- | --------------------------------- | -------------------------------------- |
 | `rated = 0`                           | Saaxiibtinimo                     | only the two of you can see it         |
 | `rated = 1`, no `match_rating` row    | Tartan                            | Waa la xisaabinayaa                    |
-| processed                             | Tartan                            | R1's rating change                     |
+| processed                             | Tartan                            | R1's change (overlay, R4's list)       |
 | skipped `pairCap`                     | Tartan · Darajo laguma xisaabin   | pair-cap reason                        |
 | skipped `invalidated`                 | Tartan · Darajada waa laga saaray | removed after a review                 |
 | held                                  | Tartan                            | Waa la hubinayaa                       |
@@ -236,11 +237,11 @@ once, R1's status once `save.matchId` exists, and a `/learn#tartan` link.
 
 ## 5. Privacy and access
 
-- v2-contracts §5 rows implemented: rated `/match/<id>` shows the label and
+- [v2-contracts §5](v2-contracts.md#5-access-matrix) rows implemented: rated `/match/<id>` shows the label and
   rating status, reasons included, to everyone; friendly `/match/<id>`
   renders R2's label only after H2's participant check (others get the
   unknown-id 404); `/history` labels every saved game; the `/u/<username>`
-  match list labels pending, cap-skipped, and invalidated rated matches.
+  match list labels pending, held, cap-skipped, and invalidated rated matches.
 - The pair-cap reason reveals only three counted, already public rated games
   between the pair in 24 h; friendly games never count.
 - Only seated sockets receive `matchStatus` and `rematchStatus`; consent is
@@ -250,17 +251,17 @@ once, R1's status once `save.matchId` exists, and a `/learn#tartan` link.
 
 ## 6. Resource budget
 
-| Item                             | Cost                                                                                                                                                                                                                                                               |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Invite room with a rated request | ≤ 2 recorded `rateConsent` frames → ≤ 2 `room` puts and 2 `matchStatus` broadcasts; repeats write nothing; the existing 30-frames-per-10 s limit bounds changes                                                                                                    |
-| Rematch                          | No new frames; `ratedVotes` adds < 40 bytes per `rematchStatus`                                                                                                                                                                                                    |
-| Room storage                     | Answers and version: < 100 bytes in H1's `room` value                                                                                                                                                                                                              |
-| Alarms, timers, DO wake-ups      | None added; frames wake the DO as today; `pnpm check:hibernation` unchanged                                                                                                                                                                                        |
-| D1 from the game Worker          | None added by R2                                                                                                                                                                                                                                                   |
-| Processor, friendly row          | No extra reads                                                                                                                                                                                                                                                     |
-| Processor, rated row             | One primary-key read of R6's invalidation record; one pair-cap query from `match_player_owner_idx` over 24 h, joined by key to the other seat and `match_rating`: rows read ≈ one account's saved games in 24 h; `EXPLAIN QUERY PLAN` recorded with R1's migration |
-| D1 writes                        | None by R2; R1 writes `match_rating` in its event batch                                                                                                                                                                                                            |
-| Web                              | No new requests; `/learn` stays prerendered (≤ 220 more words)                                                                                                                                                                                                     |
+| Item                             | Cost                                                                                                                                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invite room with a rated request | ≤ 2 recorded `rateConsent` frames → ≤ 2 `room` puts and 2 `matchStatus` broadcasts; repeats write nothing; the existing 30-frames-per-10 s limit bounds changes                                                                   |
+| Rematch                          | No new frames; `ratedVotes` adds < 40 bytes per `rematchStatus`                                                                                                                                                                   |
+| Room storage                     | Answers and version: < 100 bytes in H1's `room` value                                                                                                                                                                             |
+| Alarms, timers, DO wake-ups      | None added; frames wake the DO as today; `pnpm check:hibernation` unchanged                                                                                                                                                       |
+| D1 from the game Worker          | None added by R2                                                                                                                                                                                                                  |
+| Processor, friendly row          | One indexed lookup on R6's invalidation view: step 1 runs for every row                                                                                                                                                           |
+| Processor, rated row             | The same lookup; one pair-cap query from `match_player_owner_idx` over 24 h, joined by key to the other seat and `match_rating`: rows read ≈ one account's saved games in 24 h; `EXPLAIN QUERY PLAN` recorded with R1's migration |
+| D1 writes                        | None by R2; R1 writes `match_rating` in its event batch                                                                                                                                                                           |
+| Web                              | No new requests; `/learn` stays prerendered (≤ 220 more words)                                                                                                                                                                    |
 
 ## 7. Somali copy
 
@@ -302,6 +303,7 @@ production enablement. Keys are under `messages.so.ratedPlay` unless shown.
 | Rule 4                                                                        | Laba ciyaaryahan 24-kii saac 3 Tartan oo keliya ayaa Darajo loogu xisaabiyaa; kuwa kale waa dadweyne, waxaana lagu calaamadeeyaa "Darajo laguma xisaabin".                                                                                |
 | Rule 5                                                                        | Natiijada kadib waxaa muuqda "Waa la xisaabinayaa" ilaa xisaabtu dhammaato.                                                                                                                                                               |
 | Callout (`talo`)                                                              | Darajadu ma laha dhibco go'an. Guul aad ka gaarto ciyaaryahan cusub ama mid Darajadiisa aan weli la hubin wax yar ayay beddeshaa Darajo xasiloon; Darajadaaduna way dhaqso u beddelantaa inta aad cusub tahay.                            |
+| `/legal`, H2's visibility sentence (enabling commit)                          | "Ciyaar la kaydiyay waxaa bogga ku arki kara …" becomes "Ciyaar Saaxiibtinimo ah oo la kaydiyay waxaa bogga ku arki kara labada ciyaaryahan ee ciyaaray oo keliya; ciyaaryahannada kale iyo booqdayaashu ma arkaan."                      |
 | `/legal`, section `xogta`, after H2's saved-games paragraph (enabling commit) | Ciyaaraha Tartanka ah waa dadweyne: natiijada, dib u daawada, iyo magacyada dadweynaha ee labada ciyaaryahan qof walba wuu arki karaa, xitaa isagoo aan akoon gelin. Nooca ciyaarta waa la sheegaa ka hor tallaabada koowaad.             |
 
 ## 8. Implementation slices
@@ -326,7 +328,7 @@ production enablement. Keys are under `messages.so.ratedPlay` unless shown.
 
 | Case                                                                                        | Expected                                                    |
 | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Friendly and invalidated; invalidated and capped                                            | `friendly`; `invalidated`                                   |
+| Invalidated and friendly; invalidated and capped; friendly and capped                       | `invalidated`; `invalidated`; `friendly`                    |
 | Two or three earlier processed pair games in the window                                     | processed; `pairCap`                                        |
 | An earlier game at `endedAt − 86_400_000`; at `endedAt − 86_399_999`; at an equal `endedAt` | not counted; counted; counted                               |
 | Earlier `seq`, later `endedAt` (late save); superset input                                  | not counted; same decision                                  |
@@ -365,30 +367,31 @@ production enablement. Keys are under `messages.so.ratedPlay` unless shown.
 | ID  | Lobby before the first move                                   | Result overlay                                             | `/history` (owner)                                           | Decision              | Public        |
 | --- | ------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ | --------------------- | ------------- |
 | M1  | Saaxiibtinimo                                                 | Saaxiibtinimo                                              | Saaxiibtinimo                                                | `skipped:friendly`    | no (404)      |
-| M2  | Tartan · both agreed                                          | Tartan, pending → R1's change                              | Tartan, R1's change                                          | `processed`           | yes           |
-| M3  | Tartan · both agreed                                          | A lost (idle); Tartan, pending → change                    | Tartan, R1's change                                          | `processed`           | yes           |
+| M2  | Tartan · both agreed                                          | Tartan, pending → R1's change                              | Tartan                                                       | `processed`           | yes           |
+| M3  | Tartan · both agreed                                          | A lost (idle); Tartan, pending → change                    | Tartan                                                       | `processed`           | yes           |
 | M4  | Tartan · both agreed (a cap is never predicted)               | Tartan, pending → Darajo laguma xisaabin + pair-cap reason | same                                                         | `skipped:pairCap`     | yes, labelled |
-| M5  | Tartan · both agreed                                          | draw; Tartan, pending → change                             | Tartan, R1's change                                          | `processed`           | yes           |
+| M5  | Tartan · both agreed                                          | draw; Tartan, pending → change                             | Tartan                                                       | `processed`           | yes           |
 | M6  | none; "needs two accounts; not saved" if Tartan was requested | V1 overlay, no label                                       | no row                                                       | —                     | nothing saved |
 | M7  | Tartan · both agreed                                          | "ended before the first move: not saved"                   | no row                                                       | —                     | nothing saved |
 | M8  | Tartan · both agreed                                          | Tartan, pending → change                                   | after the rebuild: Darajada waa laga saaray + removal reason | `skipped:invalidated` | yes, labelled |
 | M9  | rematch: Saaxiibtinimo + "started friendly" notice            | Saaxiibtinimo                                              | Saaxiibtinimo                                                | `skipped:friendly`    | no (404)      |
 
-M10 changes no R2 label; the player's name is H2's and A3's concern.
+M10 changes no R2 label or decision (M2 stays `processed`); B's neutral
+label is H2's and A3's concern.
 
 ## 10. Rollout and rollback
 
-| Environment | `RATED_PLAY_ENABLED`                            | Where                                                               |
-| ----------- | ----------------------------------------------- | ------------------------------------------------------------------- |
-| dev and e2e | `"true"`                                        | `worker/wrangler.toml` `[vars]` (the e2e launcher uses this config) |
-| preview     | `"true"`                                        | `worker/wrangler.preview.toml`                                      |
-| production  | `"false"`, then `"true"` in the enabling commit | `worker/wrangler.production.toml`                                   |
+| Environment | `RATED_PLAY_ENABLED`                            | Where                                                                  |
+| ----------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| dev and e2e | `"true"`                                        | `[vars]` in `worker/wrangler.toml` and H1's `worker/wrangler.e2e.toml` |
+| preview     | `"true"`                                        | `worker/wrangler.preview.toml`                                         |
+| production  | `"false"`, then `"true"` in the enabling commit | `worker/wrangler.production.toml`                                      |
 
 - **Order** ([§6.5](v2-contracts.md#65-deploy-order)): R1's migration, the
   game Worker, then the web Worker. An unrelated web deploy that ships R2's
   web slices before enabling only exposes the paused state: safe.
 - **Enabling commit** (slice 13) once the wave-2 gate passes on preview,
-  R1's processor is live, Q1 is answered (A3 in production first if yes),
+  E5 does not contradict P18, R1's processor is live, Q1 is answered (A3 in production first if yes),
   and Q4 has cleared §7: game Worker, then web Worker in one window.
 - **Kill switch:** `"false"` by a configuration deploy (§3.5); local and
   guest play are unaffected. **Rollback:** prefer the switch; a code

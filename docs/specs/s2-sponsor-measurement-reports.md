@@ -28,8 +28,9 @@ make-goods, and claims.
 For every pilot booking the founder can print or export a report that states,
 per UTC day and in total, the qualified views and clicks Shaxda measured, how
 many distinct browsers saw the creative, what those words mean, where the data
-stops, and when measurement or display failed. No third-party code, cookie,
-or stored personal identifier is involved.
+stops, and when measurement or display failed. No third-party code or cookie
+is involved, and the only stored identifier is a booking-scoped pseudonymous
+key (§3.2).
 
 ### Must (S2-min)
 
@@ -246,15 +247,17 @@ ON CONFLICT (booking_id, day) DO UPDATE SET qualified_views = excluded.qualified
   `last_at`). Finalization inserts `count(*)` of the booking's
   `sponsor_viewer` rows with `ON CONFLICT DO NOTHING`, then deletes the
   booking's rows from both pseudonymous tables in fenced chunks of 5,000
-  (`rowid IN (SELECT … LIMIT 5000)`), as X1's prune does.
+  (`rowid IN (SELECT … LIMIT 5000)`), in bounded chunks like X1's prune
+  (which deletes by key, since `active_user_day` is `WITHOUT ROWID`).
 - Every statement starts from `booking_id` on a primary key or listed index;
   the migration test records `EXPLAIN QUERY PLAN` for each.
 
 ### 3.6 Nightly job
 
-The dispatcher entry `s2.nightly` is due 00:15–00:19 UTC (test cron
-`15 0 * * *`) and runs under X1's lease: a `job_state` row of that name, the
-`job_fence` guard on every write batch
+The dispatcher entry `s2.nightly` is due from 00:15 UTC until its
+`last_success_at` passes that day's 00:15, one bounded step per minute tick
+(test cron `15 0 * * *`), and runs under X1's lease: a `job_state` row of
+that name, the `job_fence` guard on every write batch
 ([§10.1](v2-contracts.md#101-one-cron-one-dispatcher)), `last_success_at` on
 release, and `last_error` on failure. It ignores the kill switch. `D` is
 yesterday (UTC). A booking's measured interval is
@@ -271,10 +274,10 @@ means never live, and the job skips it.
    `unique_browsers = NULL` if it has none, then loses its rows. With a run
    each night, no row reaches 90 days.
 4. Every step is idempotent. A failure logs `sponsorJobFailed` (step, booking
-   id); a retry inside the window or the next night catches up, and a missed
-   night fails the health check (§3.8). A finalized booking is never
-   recomputed; a later correction is a gap note plus a message to the sponsor
-   (BRD §10).
+   id); the job stays due, so the next minute tick resumes from its cursor,
+   and a `last_success_at` 26 hours old fails the health check (§3.8). A
+   finalized booking is never recomputed; a later correction is a gap note
+   plus a message to the sponsor (BRD §10).
 
 ### 3.7 Report and CSV
 
@@ -538,9 +541,10 @@ and is counted; the downloaded CSV totals match the page;
 and unknown tokens get the same `404`; only the hash is stored; responses
 carry `no-store`, `noindex`, and `no-referrer`; no admin control or price.
 
-**Sample matches:** S2 neither shows nor counts matches, and no match id or
-result reaches it. M1–M10 have no S2 effect; the `result` card behaves the
-same after guest, friendly, rated, local, and online games.
+**Sample matches:** S2 shows, counts, rates, replays, and deletes no match,
+and no match id or result reaches it, so M1–M10 have no S2 effect: the
+`result` card behaves the same after guest, friendly, rated, local, and
+online games.
 
 ## 10. Rollout and rollback
 

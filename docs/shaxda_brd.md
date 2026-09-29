@@ -14,7 +14,7 @@
 
 Shaxda is a free game first. Retention comes before revenue (F3): players
 need a reason to return — saved games, a meaningful rating, a leaderboard,
-and quick matches — before anyone can sell their attention honestly.
+and quick matches — before a sponsor placement can be sold honestly.
 
 Sponsorship runs as a **measured pilot**: a small number of direct-sold,
 first-party placements whose delivery is reported with published
@@ -210,12 +210,12 @@ relied on.
 
 What V2 adds per unit (from the specs):
 
-| Unit                    | Adds                                                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Completed account game  | 3 ledger rows; ≈ 8 rating rows per decision once R1 runs; ≈ 4 counter upserts (P13); one D1 round trip at game over |
-| Active identity per day | 1 pseudonymous beacon row per browser, plus 1 per signed-in account (kept 90 days, P12)                             |
-| Sponsor qualified view  | at most one gated batch (2–4 row writes) per browser, booking, and slot per 30 minutes (S2)                         |
-| Idle room               | nothing while hibernating; alarms only for deadlines and unsaved matches                                            |
+| Unit                    | Adds                                                                                                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Completed account game  | 3 ledger rows; ≈ 8 rating rows per decision once R1 runs; ≈ 4 counter upserts (P13; about 9 for a quick game with K1's queue counters); one D1 round trip at game over |
+| Active identity per day | 1 pseudonymous beacon row per browser, plus 1 per signed-in account (kept 90 days, P12)                                                                                |
+| Sponsor qualified view  | 2–4 row writes at most once per browser, booking, and slot per 30 minutes; a suppressed beacon writes nothing (S2)                                                     |
+| Idle room               | nothing while hibernating; alarms only for deadlines and unsaved matches                                                                                               |
 
 At the §2 planning inputs (about 1,500 active browsers a day), D1 writes stay far inside the free daily allowance. Billing alerts are set from
 the Q3 budget, and the "Cloudflare bill per 1,000 completed online games"

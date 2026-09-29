@@ -216,8 +216,8 @@ and operations.
 
 The matchmaking queue uses `ctx.acceptWebSocket(...)`, no `setInterval`, no
 lifecycle `setTimeout`, and alarms only while someone waits or a handoff is
-unfinished, plus (once K2 ships) one for the next cooldown incident's
-24-hour expiry. `pnpm check:hibernation` covers it.
+unfinished, plus (once K2 ships) one for the next expiry of a K2 incident
+row (24 hours) or cooldown row. `pnpm check:hibernation` covers it.
 
 ### 6.5 The starting seat is fair for every room (H1)
 
@@ -250,7 +250,8 @@ Browser (SvelteKit, PWA)
   ├── /local, /online              prerendered, client-only (unchanged)
   ├── /history, /match/<id>, /u/…  SSR; friendly matches private, rated public
   ├── /leaderboard                 SSR, public list edge-cached; private rank context
-  ├── /sponsor, /admin/*           SSR; admin gated by allowlisted user ids
+    ├── /sponsor                     prerendered, static; no session or data (S3)
+  ├── /admin/*                     SSR; gated by allowlisted user ids
   └── beacons → /api/analytics/*, /api/sponsor/event; clicks → /go/<bookingId>;
       sponsor cards ← /api/sponsor/active; queue presence ← /api/queue/presence (K2)
 
@@ -396,8 +397,8 @@ Spec: [`docs/specs/r2-ranked-play-rules.md`](specs/r2-ranked-play-rules.md).
 
 **Goal.** Players choose rated play knowingly, and farming stays unattractive.
 Consent handshake with a versioned Somali disclosure (P3); old cached clients
-stay friendly; rematches are rated only when both votes are rated votes. Pair
-cap of 3 processed rated games per pair in 24 h (P7); cap-skipped games stay
+stay friendly; rematches are rated only when both votes are rated votes. Pair cap: a game counts only if fewer than 3 of the pair's earlier processed
+rated games ended in the 24 hours before it (P7); cap-skipped games stay
 public, labelled "rating not counted", and invalidated ones "rating
 removed". `RATED_PLAY_ENABLED` off refuses new consent. Explanation on
 `/learn`. R2 and R1 activate together.
@@ -463,12 +464,13 @@ Spec: [`docs/specs/k1-quick-match-queue.md`](specs/k1-quick-match-queue.md).
 
 **Goal.** A signed-in player finds an opponent without sharing a link. One
 global hibernating queue; queue tickets with a rating snapshot; pairing P15
-(both windows must admit the pair; new accounts meet anyone after two
-minutes, F6); entering states and records rated, public consent (P3);
+(both windows must admit the pair; after two minutes an account's own
+window, new and provisional accounts included, admits any gap, F6); entering states and records rated, public consent (P3);
 pre-claimed rated rooms; 45 s no-show grace; minimum telemetry through P13
-counters. **Done when** two accounts on separate preview devices queue and
-start a rated game without sharing anything; then a community beta at
-scheduled play windows.
+counters. **Done when** two accounts on separate preview devices queue, start, and
+finish a rated game without sharing anything, and the no-show and cancel
+paths recover; the community beta at scheduled play windows follows as an
+operational step.
 
 ### K2 — Queue Quality
 
@@ -495,8 +497,8 @@ The BRD governs policy, prices, fulfilment, and claims. Specs:
   and CSV with definitions and a gap log. Token links later.
 - **S3a:** a Somali contact page with no numbers or prices. **S3b:** a dated
   rate card after a first delivered report.
-- **Done when** a real booking is sold, shown on both slots for its period,
-  removed on time, and reported with published definitions.
+- **Done when** real bookings for both slots are sold, each shown for its
+  period, removed on time, and reported with published definitions.
 
 ---
 

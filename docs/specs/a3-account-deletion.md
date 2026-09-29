@@ -122,17 +122,19 @@ identity (username, chosen avatar) or to `neutral`: public only when the row
 exists, is active, and has a username; `neutral` renders the neutral label
 with no link or avatar. Readers resolve seats by `match_player.user_id`,
 never by a username string, so a reclaimed name never inherits old match
-links. The leaderboard, profile numbers, head-to-head, and every profile
-listing exclude non-active accounts with the same predicate, and
-`resolveProfile` returns `missing` (no alias redirect) for them.
+links. The leaderboard, profile numbers, and head-to-head exclude non-active
+accounts with the same predicate; match lists keep the match with that seat
+neutral (M10); and `resolveProfile` returns `missing` (no alias redirect)
+for them.
 
 ### 3.5 Jobs
 
 Both run in the [§10.1](v2-contracts.md#101-one-cron-one-dispatcher)
-dispatcher at 00:15 UTC under their own `job_state` leases (`a3_finalize`,
-`a3_release`), at most 25 accounts per run, one D1 batch per account. No
-stored cursor: finalized rows leave `user_deletion_due_idx`, and released
-accounts stop matching the release probe.
+dispatcher from 00:15 UTC under their own `job_state` leases (`a3.finalize`, `a3.release`), at most 25 accounts per step, one D1 batch per account. A step
+that completes some accounts and finds a full 25 leaves the run unfinished,
+so it resumes on the next minute tick. No stored cursor: finalized rows leave
+`user_deletion_due_idx`, and released accounts stop matching the release
+probe.
 
 | Batch    | Statements, in order                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -224,8 +226,8 @@ serializes this against the finalize guard, so at the due time one wins.
 - The first 00:15 UTC run at or after the due time finalizes, normally
   within 24 hours; the status page then shows `finalizing`, never a minute.
   Each account is one all-or-nothing batch, never partly scrubbed; a failed
-  batch waits for the next run and blocks no other account; a backlog above
-  25 drains over runs. Logs carry counts and error classes
+  batch waits for the next night and blocks no other account; a backlog above
+  25 drains on the following minute ticks. Logs carry counts and error classes
   (`a3FinalizeFailed`), never ids, names, or emails.
 - During the hold, claim rows block claim, rename, and
   `isUsernameAvailable`, and names and aliases return 404. After the release
@@ -236,8 +238,8 @@ serializes this against the finalize guard, so at the due time one wins.
 
 ### 4.6 Restores and `account:ops`
 
-`pnpm account:ops -- counts | export-deletions | replay-deletions` (with
-`--database <env>`) runs `packages/db` statements through Wrangler D1, like
+`pnpm account:ops -- counts | export-deletions | replay-deletions [--time-travel <bookmark>]`
+(with `--database <env>`) runs `packages/db` statements through Wrangler D1, like
 R6-core; `counts` shows pending, overdue, final, and held accounts, no ids.
 No D1 restore (Time Travel or import) may revive a deleted account:
 
@@ -248,8 +250,8 @@ No D1 restore (Time Travel or import) may revive a deleted account:
    export: pending keeps its due time and loses sessions older than the
    request; final reruns the finalize batch with its original `deleted_at`,
    so the hold end stays; pending but not exported becomes active.
-3. An import is replayed before the binding switch; an in-place Time Travel
-   restore runs restore and replay in one command, and the replay revokes
+3. An import is replayed before the binding switch; an in-place Time Travel restore runs as `replay-deletions --time-travel
+<bookmark>`, which restores and replays in one command, and the replay revokes
    whatever the copy served in between. The export is then deleted.
 
 ## 5. Privacy and access
@@ -264,10 +266,11 @@ A3 implements these [§5](v2-contracts.md#5-access-matrix) rows:
 | `/history`                             | Opponents keep every game with the neutral label; the pending owner is sent to the status page.                                                             |
 | `/u/<username>` numbers and match list | 404 while pending and after finalization.                                                                                                                   |
 | Head-to-head card                      | Hidden: the target profile is 404.                                                                                                                          |
-| `/leaderboard`                         | Excluded; holds no rank. A3 purges no cache: a name-bearing shared cache (today only the leaderboard, about 60 s) may show the entry until its TTL ends.    |
+| `/leaderboard`                         | Excluded; holds no rank. A3 purges no cache: a name-bearing shared cache (today only the leaderboard, 55 s) may show the entry until its TTL ends.          |
 
-No response, page data, OG tag, WebSocket frame, log line, or analytics row
-carries the user id, old email, placeholder email, or old username. X1 sees
+No response, page data, OG tag, log line, or analytics row carries the user
+id, old email, placeholder email, or old username; a WebSocket frame carries
+the old username only in a room already open at the request (§4.3). X1 sees
 a pending session as signed out, so it records no account hash; older
 pseudonymous rows age out in 90 days (P12). Operator tools print no names.
 
@@ -316,8 +319,8 @@ rest in `siteContent.so`.
 `/legal` (`legal.so.ts`): the `akoonka` retention and rights paragraphs drop
 the "no self-service deletion" sentences and state the flow, the 7-day
 window, what is removed and what stays (saved games as "Xubin la tirtiray"
-with their rating events), the 30-day hold, the 90-day analytics window if
-X1 has shipped, and the restore rule.
+with their rating events), the 30-day hold, the 90-day analytics window
+(P12; X1a ships first), and the restore rule.
 
 ## 8. Implementation slices
 
@@ -344,7 +347,7 @@ X1 has shipped, and the restore rule.
 | ------------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M1           | Friendly, A beat B; B finalizes             | A's `/history` row and `/match/<id>` stay, B as the neutral label with no link or avatar. Signed-out viewers, unrelated accounts, and B's new account get the unknown-id 404.                                                                         |
 | M2           | Rated, B resigned in placement; B finalizes | Page, replay, stats, rating status, title, description, OG/Twitter tags, and share text keep the result with B as the neutral label; the old name appears in no HTML or serialized data; A's history agrees.                                          |
-| M10          | B requests after M2, then finalizes         | Every `match` and `match_player` column of M2 is identical before the request, while pending, and after finalization; both M2 events unchanged; an R1 rebuild reproduces both `player_rating` rows with zero drift; B is absent from the leaderboard. |
+| M10          | B requests after M2, then finalizes         | M2 public, B neutral; `/u/B` is 404. Every M2 `match` and `match_player` column is identical before, during, and after deletion; both M2 events unchanged; an R1 rebuild reproduces both `player_rating` rows with zero drift; B off the leaderboard. |
 | M3–M9        | B is the deleted player                     | Only B's label changes; end reasons, rating statuses, skip reasons, and the "not counted" and "rating removed" labels stay; M9 stays private to A; M6 and M7 have no row.                                                                             |
 | Grace game   | B pending; rematch on B's open socket       | Saved; B neutral; rated only with both rated votes; processed like any row.                                                                                                                                                                           |
 | Dropped seat | B pending, play began, B's socket drops     | B cannot reconnect; A's valid claim saves a loss for B (F4).                                                                                                                                                                                          |
@@ -357,7 +360,7 @@ X1 has shipped, and the restore rule.
 | D1    | Migration                                 | Columns, the three forbidden states, both query plans, every `schema.ts` constraint still applied, `schema:check` green.                                                                                                                                                                           |
 | D1    | Request; cancel before, at, and after due | Server-clock times, sessions deleted, same due time on repeat. Cancel 1 ms before due restores id, names, claims, and ledger; at due, after due, and after final it is `tooLateToCancel` with no finalize run.                                                                                     |
 | D1    | Concurrent request, cancel, and finalize  | One outcome at the boundary; a failing statement injected into the finalize batch changes nothing.                                                                                                                                                                                                 |
-| D1    | Finalize and jobs                         | Sessions and provider accounts gone; the user's `link-social` and `value = id` rows deleted; sign-in state rows, other users' rows, and non-JSON values untouched; tombstone exactly as §3.5. Duplicate runs, a stale lease, 26 due accounts over two runs, one failing account blocking no other. |
+| D1    | Finalize and jobs                         | Sessions and provider accounts gone; the user's `link-social` and `value = id` rows deleted; sign-in state rows, other users' rows, and non-JSON values untouched; tombstone exactly as §3.5. Duplicate runs, a stale lease, 26 due accounts in two steps, one failing account blocking no others. |
 | D1    | Hold expiry                               | At `deleted_at + 30 days − 1 ms` names and aliases stay blocked and 404; after the release they are claimable, and a new claim belongs only to the new account.                                                                                                                                    |
 | D1    | New Google sign-in after finalization     | Better Auth's OAuth lookup by provider account id and by email finds nothing; sign-in creates a new user id with no matches, rating, or claims. A session created for a final user is deleted on sight.                                                                                            |
 | D1    | Restore                                   | Export, load a stale copy, replay: every state equals the export, nothing is revived, the hold end is unchanged.                                                                                                                                                                                   |
@@ -377,12 +380,14 @@ Before release: `pnpm lint`, `pnpm typecheck`, `pnpm test`,
 | Environment | Steps                                                                                                                                                                                                                                                                                                   |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | dev         | `wrangler d1 migrations apply shaxda-db --local`; run the jobs with `wrangler dev --test-scheduled` on the wrapped build (proof E3).                                                                                                                                                                    |
-| e2e         | The game launcher applies the migration to the shared directory (§10.4).                                                                                                                                                                                                                                |
+| e2e         | The game launcher applies the migration to the shared directory ([§10.4](v2-contracts.md#104-shared-local-d1-in-e2e)).                                                                                                                                                                                  |
 | preview     | Migration on `shaxda-db-preview`, then the web deploy. Rehearse with test accounts: request and cancel; one request back-dated by a preview-only SQL statement so the 00:15 run finalizes it, then its `deleted_at` back-dated 30 days for the release; one §4.6 restore. Results go in the ops record. |
 | production  | Only after Q1 = yes and activation: migration, then web deploy, with `/legal` and the runbook in the same release. After the first finalization, run `account:ops -- counts` and check one neutral match page.                                                                                          |
 
-- **Deploy order:** migration → web (§10.3); no game Worker deploy (P11).
-- **Kill switch:** none (§10.3). The job runs daily, so a faulty finalizer
+- **Deploy order:** migration → web
+  ([§10.3](v2-contracts.md#103-bindings-flags-and-rollout-by-milestone)); no
+  game Worker deploy (P11).
+- **Kill switch:** none (contracts §10.3). The job runs daily, so a faulty finalizer
   is stopped by a web deploy without it before the next run; request and
   cancel stay, so no pending account is stranded.
 - **Rollback:** never down-migrate, and never roll the web Worker back to a

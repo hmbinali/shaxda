@@ -365,16 +365,16 @@ Workers tests run on Miniflare with an injected clock. The e2e file is
 
 Outcomes follow [§4.3](v2-contracts.md#43-canonical-sample-matches). Quick
 rooms never produce M1, M6, or M9 (F1, account-only queue); M8 and M10 apply
-to quick rows unchanged.
+to quick rows unchanged. Case labels QM1–QM6 are local to this table.
 
 | Case | Setup                                  | Ending                            | Ledger                                                                            | Who can open          | Rating               | Queue counters             |
 | ---- | -------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------- | --------------------- | -------------------- | -------------------------- |
-| Q1   | Both seats connected (like M7)         | Seat A resigns before any action  | none                                                                              | —                     | —                    | paired                     |
-| Q2   | Quick game (like M2, M5)               | Win or draw after play began      | row, `mode = quick`, `rated = 1`, `consent_policy_v` = the entries' `disclosureV` | public                | `processed`          | paired, started, completed |
-| Q3   | The pair's 4th rated game in 24 h (M4) | Normal win                        | row                                                                               | public, "not counted" | `skipped:pairCap`    | paired, started, completed |
-| Q4   | B never connects                       | Cancelled at 45 s                 | none; not a loss                                                                  | —                     | —                    | paired, no_show            |
-| Q5   | Play began (like M3)                   | Idle claim while A owes a capture | row, `resignation`, `idle`                                                        | public                | `processed`, A loses | paired, started, completed |
-| Q6   | After Q2, a friendly rematch vote      | Refused: `ratedOnlyRematch`       | no new row                                                                        | —                     | —                    | none                       |
+| QM1  | Both seats connected (like M7)         | Seat A resigns before any action  | none                                                                              | —                     | —                    | paired                     |
+| QM2  | Quick game (like M2, M5)               | Win or draw after play began      | row, `mode = quick`, `rated = 1`, `consent_policy_v` = the entries' `disclosureV` | public                | `processed`          | paired, started, completed |
+| QM3  | The pair's 4th rated game in 24 h (M4) | Normal win                        | row                                                                               | public, "not counted" | `skipped:pairCap`    | paired, started, completed |
+| QM4  | B never connects                       | Cancelled at 45 s                 | none; not a loss                                                                  | —                     | —                    | paired, no_show            |
+| QM5  | Play began (like M3)                   | Idle claim while A owes a capture | row, `resignation`, `idle`                                                        | public                | `processed`, A loses | paired, started, completed |
+| QM6  | After QM2, a friendly rematch vote     | Refused: `ratedOnlyRematch` (M9)  | no new row                                                                        | —                     | —                    | none                       |
 
 ---
 

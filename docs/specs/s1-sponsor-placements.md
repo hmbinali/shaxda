@@ -58,12 +58,12 @@ networks; money handling (the agreed price is only a record).
 
 ## 2. Decisions and dependencies
 
-| ID  | How S1 applies it                                                                                                                                     |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F3  | Pilot wave only, after the retention waves; no placement without S2-min measurement; a conflict with play is resolved for play.                       |
-| P14 | Inventory, periods, the empty-slot rule, and the ≤ 60 s edge cache exactly as the register row states.                                                |
-| Q2  | Open. S1 implements the recommendation (P14, local result included). An answer without local results removes only the `/local` wiring.                |
-| Q5  | Open. Blocks the first paid booking, not the build: the content policy behind `SPONSOR_POLICY_V`, the quoted currency, and the `/legal` contact line. |
+| ID  | How S1 applies it                                                                                                                                                                                                    |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F3  | Pilot wave only, after the retention waves; no placement without S2-min measurement; a conflict with play is resolved for play.                                                                                      |
+| P14 | Inventory, periods, the empty-slot rule, and the ≤ 60 s edge cache exactly as the register row states.                                                                                                               |
+| Q2  | Open. S1 implements the recommendation (P14, local result included). An answer without local results removes only the `/local` wiring.                                                                               |
+| Q5  | Open. Its answer approves the BRD, which starts this wave (header), and settles what the first paid booking needs: the content policy behind `SPONSOR_POLICY_V`, the quoted currency, and the `/legal` contact line. |
 
 | Dependency | Provides                                                                                                                                                                                             |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -368,8 +368,9 @@ runs `pnpm lint`, `typecheck`, `test`, `test:worker`, `build`, and `test:e2e`.
 
 ## 9. Acceptance tests
 
-S1 shows, counts, rates, replays, and deletes no match, so the M1–M10 sample
-table does not apply. Workers and D1 tests run on Miniflare, locally only.
+S1 shows, counts, rates, replays, and deletes no match, so M1–M10 have no S1
+effect: the `result` card is the same after guest, friendly, rated, local, and
+online games. Workers and D1 tests run on Miniflare, locally only.
 
 | Level                                      | Must pass                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -389,12 +390,12 @@ Bindings and flags are §3.5's. Deploy order
 ([§6.5](v2-contracts.md#65-deploy-order)): S1's migration, S2-min's migration,
 then one web deploy. The migration is additive.
 
-| Environment | D1                                                                    | `SPONSOR_ASSETS` (R2)           | `SPONSORS_ENABLED`                          | `SPONSOR_RATE_LIMIT`                                       | Verification                                                                                                                                                                                                                                                                           |
-| ----------- | --------------------------------------------------------------------- | ------------------------------- | ------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dev         | Miniflare, migrated by tests                                          | local                           | `"true"`, documented in `.dev.vars.example` | optional: only `vite dev` may run without it               | Unit, D1, web, and built-worker cache tests                                                                                                                                                                                                                                            |
-| e2e         | shared local D1 ([§10.4](v2-contracts.md#104-shared-local-d1-in-e2e)) | local, in the e2e state         | `"true"` in `wrangler.e2e.jsonc`            | bound, declared in `wrangler.e2e.jsonc` (local simulation) | Playwright (§9)                                                                                                                                                                                                                                                                        |
-| preview     | `shaxda-db-preview`                                                   | `shaxda-sponsor-assets-preview` | `"true"`                                    | bound                                                      | Confirm a preview-only test booking, check both slots at phone and desktop widths, cancel it, and time its disappearance (≤ 60 s). If the `workers.dev` host does not cache, record that; the built-worker test stays the cache evidence.                                              |
-| production  | `shaxda-db`                                                           | `shaxda-sponsor-assets`         | `"false"` until the first live booking      | bound                                                      | Before selling: `/legal` shipped, empty slots, and two reads within a minute share `generatedAt` while a later one does not. First sale per BRD §5: set the var to `"true"` before the start; the founder spot-checks the start on both slots, online and local, on phone and desktop. |
+| Environment | D1                                                                    | `SPONSOR_ASSETS` (R2)           | `SPONSORS_ENABLED`                          | `SPONSOR_RATE_LIMIT`                                       | Verification                                                                                                                                                                                                                                                                                               |
+| ----------- | --------------------------------------------------------------------- | ------------------------------- | ------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dev         | Miniflare, migrated by tests                                          | local                           | `"true"`, documented in `.dev.vars.example` | optional: only `vite dev` may run without it               | Unit, D1, web, and built-worker cache tests                                                                                                                                                                                                                                                                |
+| e2e         | shared local D1 ([§10.4](v2-contracts.md#104-shared-local-d1-in-e2e)) | local, in the e2e state         | `"true"` in `wrangler.e2e.jsonc`            | bound, declared in `wrangler.e2e.jsonc` (local simulation) | Playwright (§9)                                                                                                                                                                                                                                                                                            |
+| preview     | `shaxda-db-preview`                                                   | `shaxda-sponsor-assets-preview` | `"true"`                                    | bound                                                      | Confirm a preview-only test booking per slot, check both slots at phone and desktop widths, cancel them, and time the disappearance (≤ 60 s). If the `workers.dev` host does not cache, record that; the built-worker test stays the cache evidence.                                                       |
+| production  | `shaxda-db`                                                           | `shaxda-sponsor-assets`         | `"false"` until the first live booking      | bound                                                      | Before selling: `/legal` shipped, empty slots, and two reads within a minute share `generatedAt` while a later one does not. First sale per BRD §5: set the var to `"true"` before the start; the founder spot-checks the start on the booked slot (for `result`, online and local), on phone and desktop. |
 
 **Kill switch.** Any other `SPONSORS_ENABLED` value, set by a configuration
 deploy, hides placements within 60 s; admin and bookings are untouched, and
@@ -403,10 +404,10 @@ booking (BRD §6). **Rollback.** Kill switch first, then a web Worker version
 rollback if code is at fault (older versions have no endpoint, so clients
 render nothing); the tables stay.
 
-**Done when** the ops record shows a real, paid, approved booking displayed
-on `lobby` and `result` (online, and local while online) in production for its
-period and ended without a deploy, with the Somali disclosure, a working `/go`
-link, and a working S2-min report; `/legal` describes placements; and the 60 s
-takedown bound was verified on preview or locally. S1 claims no views or
-clicks; audience figures in a sale come from X1, dated and rounded down
-(BRD §10).
+**Done when** the ops record shows real, paid, approved bookings displayed
+on `lobby` and `result` (online, and local while online) in production for
+their periods and ended without a deploy, with the Somali disclosure, a
+working `/go` link, and a working S2-min report; `/legal` describes
+placements; and the 60 s takedown bound was verified on preview or locally.
+S1 claims no views or clicks; audience figures in a sale come from X1, dated
+and rounded down (BRD §10).

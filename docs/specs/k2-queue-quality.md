@@ -94,9 +94,11 @@ CREATE TABLE IF NOT EXISTS queue_cooldown (
   an internal room → queue call sent like K1's room reports, unreachable
   from any public route or socket and validated with Zod; `occurredAt` (ms)
   is when the room accepted the ending.
-- K1's internal room-status answer at the handoff deadline gains
-  `serverRefused: { A, B }`: the seat's join reached the room and was refused
-  for a server-side reason, not for a bad, expired, or replayed ticket.
+- K1's `quick-resolve` answer at the handoff deadline
+  ([K1 §3.5](k1-quick-match-queue.md#35-internal-handoff-paths)) gains
+  `serverRefused: { A, B }` beside `joined`: the seat's join reached the room
+  and was refused for a server-side reason, not for a bad, expired, or
+  replayed ticket.
 - Game Worker var `QUEUE_COOLDOWN_ENABLED`: `"true"` enables recording and
   enforcement; any other value disables both (§10.3).
 
@@ -123,8 +125,9 @@ The frozen contracts already carry what K2 adds, so K2 changes no contract:
   K2 row (web `QUEUE_PRESENCE` binding, game var `QUEUE_COOLDOWN_ENABLED`,
   queue alarms only, rollout game → web).
 
-Zod strips the unknown `retryAt` for cached clients (§6.2). A test parses a
-`cooldown` frame with K1's merged client schema.
+Zod strips the unknown `retryAt` for cached clients
+([§6.2](v2-contracts.md#62-server-to-client)). A test parses a `cooldown`
+frame with K1's merged client schema.
 
 ## 4. Behaviour and failure handling
 
@@ -267,10 +270,11 @@ incident. If K1 answers with `matched`, K1's rules for a cancel after
 
 ## 7. Somali copy
 
-Keys go in K1's quick-match namespace in `packages/i18n` (`quickMatch.*`)
-plus one `/legal` bullet, all behind `// TODO(translation-review)` until the
-Q4 review. Reused: `onlineGame.form.busy`, `onlineGame.identity.retry`, and
-K1's disclosure line. `{time}` is the local `HH:MM` of `retryAt`.
+Keys go in K1's namespace `onlineGame.quickMatch` in `packages/i18n` (written
+below from `quickMatch`) plus one `/legal` bullet, all behind
+`// TODO(translation-review)` until the Q4 review. Reused:
+`onlineGame.form.busy`, `onlineGame.identity.retry`, and K1's disclosure
+line. `{time}` is the local `HH:MM` of `retryAt`.
 
 | Key                                | Draft                                                                                                                                                                                                                                                                                        |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -347,12 +351,12 @@ shows A waiting within 10 s, a guest sees none; after a quick game both tap
 invite room, while A returns to waiting with its wait kept.
 
 **Sample matches** ([§4.3](v2-contracts.md#43-canonical-sample-matches)):
-M1 and M8 have no K2 effect. M2–M5 as quick games: play began, so never an
-incident; the result offers re-queue and promises no rating change (M4 is
-`pairCap`). M6 and M9 cannot occur in a quick room (account-only,
-rated-only, [§6.3](v2-contracts.md#63-client-to-server)). M7 as a quick
-game: no row (F4, P1), no incident. M10: pending B gets no tickets (P11),
-cannot re-queue, is not counted, and B's rows expire within 24 h.
+M1, M6, and M9 cannot occur in a quick room (rated-only, account-only,
+[§6.3](v2-contracts.md#63-client-to-server)), as in K1, and M8 has no K2
+effect. M2–M5 as quick games: play began, so never an incident; the result
+offers re-queue and promises no rating change (M4 is `pairCap`). M7 as a
+quick game: no row (F4, P1), no incident. M10: pending B gets no tickets
+(P11), cannot re-queue, is not counted, and B's rows expire within 24 h.
 
 ## 10. Rollout and rollback
 

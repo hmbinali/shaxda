@@ -4,7 +4,7 @@
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status     | `revised` (see [README](README.md#spec-index))                                                                                                                                                                                                                                                                                                                                                                                           |
 | Wave       | 4, after R4                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Depends on | [R4](r4-profile-statistics.md), the profile page (README row). R4 already needs [H2](h2-history-match-detail.md), [R1](r1-rating-system.md), and [R3](r3-leaderboard.md); R5 also reads their contracts, and [A3](a3-account-deletion.md)'s, directly (§2).                                                                                                                                                                              |
+| Depends on | [R4](r4-profile-statistics.md) (with [H2](h2-history-match-detail.md), [R1](r1-rating-system.md), [R3](r3-leaderboard.md)); [A3](a3-account-deletion.md) if shipped. R5 reads their contracts directly (§2).                                                                                                                                                                                                                             |
 | Register   | P8 (README row); §2 also cites P2, P4, P5, P9, P18                                                                                                                                                                                                                                                                                                                                                                                       |
 | Contracts  | Consumes [§2.1](v2-contracts.md#21-h1-tables), [§2.3](v2-contracts.md#23-public-match-id), [§2.5](v2-contracts.md#25-r1-extension), [§4.3](v2-contracts.md#43-canonical-sample-matches), [§5](v2-contracts.md#5-access-matrix), [§7.3](v2-contracts.md#73-arithmetic-and-reads), [§7.4](v2-contracts.md#74-corrections), [§8](v2-contracts.md#8-deletion), E6 in [§12](v2-contracts.md#12-evidence). Owns the reads and page data in §3. |
 | Brief      | `docs/shaxda-v2.md` §10 (R5)                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -32,8 +32,8 @@ or 90 days; leaderboard rows show each player's last five rated results.
 2. **Rating-history chart** (§4.2), public, from processed events only (P8):
    7/30/90-day windows ending at one `asOf`, bounds inclusive; a start point;
    at most 100 points; an honest peak; a text alternative; no JavaScript.
-3. **Leaderboard form strip** (§4.3) rendering the `form` R3 returns
-   (`player_rating.form`), in words as well as marks. No projection,
+3. **Leaderboard form strip** (§4.3) rendering `player_rating.form`, which
+   R3's row queries already select, in words as well as marks. No projection,
    migration, or backfill.
 4. Indexed, bounded reads (§3.1, §6) and Somali-only copy (§7).
 
@@ -71,14 +71,14 @@ or 90 days; leaderboard rows show each player's last five rated results.
 | H1        | `match.rated`, `match_player`, the owner index `match_player_owner_idx`, the public match id.                                                                                                                     |
 | R1        | `match_player_rating` (both seats of each processed match), `player_rating` (`rating`, `rd`, `volatility`, `last_rated_at`, `rated_games`, `form`, `peak_rating`, `peak_seq`), `isProvisional`, correction swaps. |
 | H2        | `/match/<id>` access (a participant opens a friendly match), `formatMatchDate`, form chips, outcome words.                                                                                                        |
-| R3        | Leaderboard rows (public and around-you) that already return `form`, on a session-independent, edge-cached page.                                                                                                  |
+| R3        | Leaderboard rows (public and around-you) whose queries already select `form`, on a session-independent, edge-cached page.                                                                                         |
 | R4        | The `/u/<username>` loader, `resolveProfile`'s server-only `userId`, `asOf`, rating rounding, the page's `ratingsUpdating`, its `private, no-store` header, and its challenge link (Should).                      |
 | A3        | Pending and deleted accounts: profile 404, restricted pending session. M10 checks run once A3 is live (Q1).                                                                                                       |
 | E6        | Head-to-head and rating-window plans and rows read at 5,000 matches, recorded before implementation.                                                                                                              |
 
 ## 3. Contracts
 
-R5 owns the reads and page data below and the rendering of R3's `form`. The
+R5 owns the reads and page data below and the `form` field on R3's rows. The
 tables they read are in [v2-contracts §2](v2-contracts.md#2-ledger-schema).
 
 ### 3.1 Reads
@@ -144,8 +144,9 @@ target`) use the rounded values, so the page adds up.
 
 ### 3.3 Leaderboard row
 
-R3's rows (public list and around-you) already return `form`; R5 adds no
-field or statement. It maps the letters to outcomes as R4 does (oldest first,
+R3's row queries (public list and around-you) already select
+`player_rating.form`; R5 adds the `form` field to those rows and no
+statement. It maps the letters to outcomes as R4 does (oldest first,
 at most five); a value not matching `^[WLD]{0,5}$` renders no strip and logs
 a diagnostic without ids.
 
@@ -268,7 +269,7 @@ R5 implements these rows of [v2-contracts §5](v2-contracts.md#5-access-matrix):
 | Card, per view by a signed-in viewer                                            | One batch: the viewer's owner-index walk (a few rows per viewer game, one per shared game) and 2 `player_rating` rows |
 | Chart, per profile view                                                         | One batch: the target's walk from the window start (a few rows per game, friendly included) and 2 primary-key rows    |
 | Window switch                                                                   | One `__data.json` request that reruns the profile load (R4's reads, the card, the chart)                              |
-| Leaderboard strip                                                               | Nothing extra: R3 already reads and returns `form`                                                                    |
+| Leaderboard strip                                                               | Nothing extra: R3's row queries already select `form`                                                                 |
 
 Estimates at up to 4 rows per game walked, until E6 and preview replace
 them: the card reads about 800 rows for a 200-game viewer and 20,000 at 5,000
@@ -388,10 +389,10 @@ slice has logic.
 | M1     | Friendly row: A win                                                     | No point                                      | Unchanged                           |
 | M2     | Rated row: A win                                                        | A up, B down                                  | A gains W, B gains L                |
 | M3     | Rated row: A loss                                                       | A down, B up                                  | A gains L, B gains W                |
-| M4     | Rated row: counted                                                      | No point                                      | Unchanged                           |
+| M4     | Rated row: counted as a game played                                     | No point                                      | Unchanged                           |
 | M5     | Rated row: draw                                                         | A point, B point                              | Both gain D                         |
 | M6, M7 | Nothing (no row)                                                        | Nothing                                       | Nothing                             |
-| M8     | Rated row, before and after the rebuild                                 | A point until the swap; absent after it       | Rebuilt without it                  |
+| M8     | Rated row, before and after the rebuild                                 | One point each until the swap; none after it  | Rebuilt without it                  |
 | M9     | Friendly row                                                            | No point                                      | Unchanged                           |
 | M10    | B's profile 404s: no card for any viewer; B's pending session sees none | A's M2 point unchanged; B's chart unreachable | B off the board; A's form unchanged |
 

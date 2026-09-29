@@ -81,13 +81,13 @@ measured numbers with their definitions.
 
 ### Dependencies
 
-| Dependency                                                    | Provides                                                                                                                                                          | Needed by            |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| [S1](s1-sponsor-placements.md), live in production            | The live inventory (P14, as S1's Q2 confirms), the disclosure string, the presentational sponsor card, placement rules, and `/legal` text that allows sponsorship | S3a                  |
-| [S2](s2-sponsor-measurement-reports.md)-min, live             | The report the process copy promises; the qualified-view term and definition                                                                                      | S3a copy, S3b claims |
-| [BRD](../shaxda_brd.md) approved (Q5)                         | Policy and vetting (§4), fulfilment (§5), the per-period basis (§6), the contact channel; prices and currency (§7) for S3b                                        | S3a, S3b             |
-| A first booking delivered and reported (BRD §8)               | The S3b publication gate                                                                                                                                          | S3b                  |
-| [X1](x1-product-analytics.md), through S1 (≥ 30 days of data) | The 30-day active-browser and active-account gauges on `/admin/stats` ([metrics dictionary](v2-contracts.md#9-metrics-dictionary))                                | S3b claims           |
+| Dependency                                                    | Provides                                                                                                                                                        | Needed by            |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| [S1](s1-sponsor-placements.md), live in production            | The live inventory (P14, as Q2 confirms it), the disclosure string, the presentational sponsor card, placement rules, and `/legal` text that allows sponsorship | S3a                  |
+| [S2](s2-sponsor-measurement-reports.md)-min, live             | The report the process copy promises; the qualified-view term and definition                                                                                    | S3a copy, S3b claims |
+| [BRD](../shaxda_brd.md) approved (Q5)                         | Policy and vetting (§4), fulfilment (§5), the per-period basis (§6), the contact channel; prices and currency (§7) for S3b                                      | S3a, S3b             |
+| A first booking delivered and reported (BRD §8)               | The S3b publication gate                                                                                                                                        | S3b                  |
+| [X1](x1-product-analytics.md), through S1 (≥ 30 days of data) | The 30-day active-browser and active-account gauges on `/admin/stats` ([metrics dictionary](v2-contracts.md#9-metrics-dictionary))                              | S3b claims           |
 
 ## 3. Contracts
 
@@ -310,8 +310,8 @@ and `pnpm build`; slices 4–6 and 9 add `pnpm test:e2e`.
 ## 9. Acceptance tests
 
 S3 adds no Worker, Durable Object, or D1 code, so it has no Workers tests. It
-shows, counts, rates, replays, and deletes no match: the sample matches M1–M10
-do not apply, and S3b publishes no game count.
+shows, counts, rates, replays, and deletes no match, so M1–M10 have no S3
+effect, and S3b publishes no game count.
 
 ### Unit — `packages/shared` and `packages/i18n`
 

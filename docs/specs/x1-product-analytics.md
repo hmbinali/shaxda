@@ -163,14 +163,20 @@ unless both files are listed. Reruns are no-ops; `main` is unchanged; the e2e
 build stays unwrapped because `vite preview` never runs its worker.
 
 **Dispatcher.** `web/src/worker/scheduled.ts`, bundled by Wrangler (workspace
-imports only, no `$lib`), holds `jobs: { name, testCron, due(time),
-run(env, now) }[]`. A job runs when `due(scheduledTime)` holds or
+imports only, no `$lib`), holds `jobs: { name, testCron, due(time, state),
+run(env, now) }[]`. From 00:15 UTC each tick reads the `job_state` rows in
+one statement; a nightly job is due from its start time until its
+`last_success_at` passes that day's start, so an unfinished run resumes on
+the next minute tick, one bounded step per tick
+([§10.1](v2-contracts.md#101-one-cron-one-dispatcher)). A job also runs when
 `controller.cron` equals its `testCron` (only `wrangler dev --test-scheduled`
-sends one), inside `ctx.waitUntil`, with errors in `job_state.last_error`;
-idle minutes do no I/O. X1's entry: `x1.nightly`, due 00:15–00:19 UTC, test
-cron `15 0 * * *`, running `runAnalyticsNightly(env.DB, now)` from
-`@shaxda/db/analytics`. R1, H4, A3, S2, and R6 append theirs; §10.2's
-internal SvelteKit request waits for a job that needs it.
+sends one); runs go in `ctx.waitUntil`, with errors in `job_state.last_error`,
+and the dispatcher reads nothing before 00:15. X1's entry: `x1.nightly`,
+starting 00:15 UTC, test cron `15 0 * * *`, running
+`runAnalyticsNightly(env.DB, now)` from `@shaxda/db/analytics`. R1, H4, A3,
+S2, and R6 append theirs; the internal SvelteKit request of
+[§10.2](v2-contracts.md#102-web-worker-entry-wrapper) waits for a job that
+needs it.
 
 **Lease** (`packages/db/src/jobs/lease.ts`). A run inserts its `job_state`
 row if missing, takes a 5-minute lease with a compare-and-set `UPDATE` that
@@ -224,7 +230,7 @@ the UTC day last recorded, keeping only the newest day's entries (at most 8).
 | --------------------------------------------------------- | -------------------- | ------------------------------------- |
 | SSR, complete account                                     | `account:<username>` | its day is not the client's UTC today |
 | SSR, incomplete account                                   | `account`            | same                                  |
-| SSR, signed out                                           | `guest`              | same                                  |
+| SSR, signed out (or pending deletion, once A3 exists)     | `guest`              | same                                  |
 | `/local`, `/online` (prerendered; the session is unknown) | any                  | no entry has today's day              |
 
 Nothing is sent offline (dropped, not queued; PRD §13) or after a failed try
@@ -303,7 +309,7 @@ column per name, `requireAdmin`, `no-store`, attachment).
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | D1 error in a route                      | `503`; the client stores nothing and does not retry on that page load                                                                               |
 | Scripted requests with a forged `Origin` | can inflate beacon and local counts within the rate limit; both are labelled approximate                                                            |
-| Cron minute skipped                      | due each minute 00:15–00:19; otherwise the next night resumes from the cursor                                                                       |
+| Cron minute skipped                      | the job stays due on later ticks until `last_success_at` passes 00:15, resuming from the cursor                                                     |
 | Overlapping or failed runs               | one lease wins and a stale holder's batch fails the fence; a failed run's lease expires after 5 min and the next due minute resumes from the cursor |
 | X1b write fails, `DB` unbound            | `analyticsCounterFailed` logged and dropped; state, broadcasts, and H1's outbox are untouched                                                       |
 | D1 slow during an X1b write              | the room stays awake until the call settles; use the kill switch; P13's revisit trigger applies                                                     |
@@ -339,7 +345,7 @@ games, 300 online games (100 saved account games), 10 admin loads per day.
 | Nightly job                | ~80k rows read; ~150 upserts, ~1,500 deletes             | the 30-day activity window dominates                       |
 | Admin page                 | ~3k rows read per load                                   | 35 days of `event_daily` plus today's rows                 |
 | Storage                    | `active_user_day` ≈ 15 MB; `event_daily` ≈ 2 MB per year | 91 days × 1,500 rows × ~100 B                              |
-| Requests; DO wake-ups      | +2,500 web, +1,440 scheduled invocations; no wake-ups    | idle minutes do no I/O; X1b writes inside running handlers |
+| Requests; DO wake-ups      | +2,500 web, +1,440 scheduled invocations; no wake-ups    | `job_state` read per tick from 00:15; X1b in live handlers |
 
 All far inside Workers Free (100k requests; D1 5M rows read, 100k written,
 500 MB per database). Revisit near 10k identities a day: move activity to
@@ -399,14 +405,14 @@ X1b
 
 | Layer                                               | Cases                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shared (Vitest)                                     | `analyticsHash` is 43-character base64url, stable for the same salt and input, different for another salt or domain, and throws on a short salt. Schemas reject a wrong `v`, a bad guest id, extra keys, and gauge or P13 names on the event route. X1b: `onlineCounterNameSchema` rejects unknown names and matches the §9 list.                                                                                                                                                                                                                                    |
+| Shared (Vitest)                                     | `analyticsHash` is 43-character base64url, stable for the same salt and input, different for another salt or domain, and throws on a short salt. Schemas reject a wrong `v`, a bad guest id, extra keys, and gauge or P13 names on the event route. X1b: `onlineCounterNameSchema` rejects unknown names and matches the contracts §9 list.                                                                                                                                                                                                                          |
 | D1 schema and lease (Workers pool, real migrations) | Migration applies after existing ones; `CHECK`s reject bad day, kind, `anon_id` length, negative count; each read plan uses its index. A false guard, a missing `job_state` row, and a `NULL` token each stop the whole batch (E1's cases); of two acquirers one wins; a stale holder writes nothing.                                                                                                                                                                                                                                                                |
 | D1 beacon and counters                              | Same identity twice → one row; a signed-in beacon → one `guest` and one `account` row, and a signed-out one later that day → none; a second account on one browser → only its `account` row; no analytics column contains a raw guest id or user id; 50 concurrent increments → 50.                                                                                                                                                                                                                                                                                  |
 | D1 nightly job                                      | 30 identities over 100 days match hand counts per kind; a second run or a cursor reset changes no count; a missed night is caught up (35-day cap); the prune on day N keeps N − 90, deletes N − 91, and runs with the kill switch off; a first claim counts one registration on its day, a rename counts none, and a later rename-back leaves the stored gauge unchanged.                                                                                                                                                                                            |
 | D1 ledger (after H1)                                | The sample matches over six weeks give hand-computed `saved_*`, `week_*`, and cohort gauges; immature cohorts and the open week have no numerator; a late save (higher `seq`, older `ended_at`) counts on the next run.                                                                                                                                                                                                                                                                                                                                              |
 | Web routes and config                               | Every §3.4 guard, including a missing `Origin` and a missing limiter in a non-dev build (`503`); guest, account, and incomplete identities; bound values never hold a raw id; `no-store`. `wrangler.jsonc` and `wrangler.preview.jsonc` declare `ANALYTICS_RATE_LIMIT`, set `ANALYTICS_ENABLED`, and declare only the `* * * * *` cron. The event route accepts client names only and skips `getSession`.                                                                                                                                                            |
 | Web client                                          | Each row of the §4.1 table; offline; one try per page load; a `500` stores nothing; visible after UTC midnight sends. Local controller: started once, not on resume; completed once; a new game fires again.                                                                                                                                                                                                                                                                                                                                                         |
-| Web admin and build                                 | Signed out → `303`; not listed → `403` with forbidden copy; listed → `200`, `no-store`, `noindex`; immature cohorts labelled; raw counts beside every percentage. Wrap script on a fixture output: rename, generated exports, `_redirects` and `_kit_worker.js` on separate `.assetsignore` lines, second run unchanged. Dispatcher: due only 00:15–00:19 UTC or on its test cron; errors recorded. Runbook smoke: after a build, `wrangler dev --test-scheduled` with `cron=15+0+*+*+*` sets `last_success_at`, and `/_worker.js` and `/_kit_worker.js` return 404. |
+| Web admin and build                                 | Signed out → `303`; not listed → `403` with forbidden copy; listed → `200`, `no-store`, `noindex`; immature cohorts labelled; raw counts beside every percentage. Wrap script on a fixture output: rename, generated exports, `_redirects` and `_kit_worker.js` on separate `.assetsignore` lines, second run unchanged. Dispatcher: due each minute from 00:15 UTC until success; errors recorded. Runbook smoke: after a build, `wrangler dev --test-scheduled` with `cron=15+0+*+*+*` sets `last_success_at`, and `/_worker.js` and `/_kit_worker.js` return 404. |
 | Game Worker (X1b, Miniflare)                        | Creation counts `created_guest` or `created_account`; the second seat counts `joined` once, not on reconnect; the first placement counts `started`; win, resignation, or claim counts `completed` once; a pre-play resignation counts neither; a rematch counts both again. With `DB.prepare` throwing, state, broadcasts, and H1's outbox equal a run without X1b, one `analyticsCounterFailed` is logged, nothing retries. Kill switch off → no rows. `pnpm check:hibernation` passes.                                                                             |
 | E2E (existing harness)                              | `/` sends one active beacon and a reload none; finishing a local game sends one `local_completed`; `/admin/stats` is `403` for the signed-in fixture.                                                                                                                                                                                                                                                                                                                                                                                                                |
 

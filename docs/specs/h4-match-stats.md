@@ -1,14 +1,14 @@
 # H4 — Match Statistics (Spec)
 
-| Field      | Value                                                                                                                                                                                                                                                                                                                    |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Status     | `revised` (see [README](README.md#spec-index))                                                                                                                                                                                                                                                                           |
-| Wave       | 4; may start any time after wave 1                                                                                                                                                                                                                                                                                       |
-| Depends on | H1, H2; X1a for the nightly backfill (§4.2)                                                                                                                                                                                                                                                                              |
-| Register   | F7, P21                                                                                                                                                                                                                                                                                                                  |
-| Contracts  | Owns §3 below. Consumes [§2.1](v2-contracts.md#21-h1-tables), [§2.2](v2-contracts.md#22-writer-invariants-and-the-payload), [§2.4](v2-contracts.md#24-compact-replay), [§3.4](v2-contracts.md#34-game-rules-inside-the-room), [§4.3](v2-contracts.md#43-canonical-sample-matches), [§5](v2-contracts.md#5-access-matrix) |
-| Brief      | [`docs/shaxda-v2.md`](../shaxda-v2.md) §9 (H4), §7.2                                                                                                                                                                                                                                                                     |
-| Touches    | `packages/shared` (stats module, fixtures), `worker/` (game over), `packages/db` (backfill core), H1's `match:ops` CLI, `packages/i18n`, `web/` (match loader and panel), `docs/ops/`                                                                                                                                    |
+| Field      | Value                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status     | `revised` (see [README](README.md#spec-index))                                                                                                                                                                                                                                                                                                                                 |
+| Wave       | 4; may start any time after wave 1                                                                                                                                                                                                                                                                                                                                             |
+| Depends on | H1, H2; X1a for the nightly backfill (§4.2)                                                                                                                                                                                                                                                                                                                                    |
+| Register   | F7, P21                                                                                                                                                                                                                                                                                                                                                                        |
+| Contracts  | Owns §3 below. Consumes [§2.1](v2-contracts.md#21-h1-tables), [§2.2](v2-contracts.md#22-writer-invariants-and-the-payload), [§2.4](v2-contracts.md#24-compact-replay), [§3.4](v2-contracts.md#34-game-rules-inside-the-room), [§4.3](v2-contracts.md#43-canonical-sample-matches), [§5](v2-contracts.md#5-access-matrix), [§10.1](v2-contracts.md#101-one-cron-one-dispatcher) |
+| Brief      | [`docs/shaxda-v2.md`](../shaxda-v2.md) §9 (H4), §7.2                                                                                                                                                                                                                                                                                                                           |
+| Touches    | `packages/shared` (stats module, fixtures), `worker/` (game over), `packages/db` (backfill core), H1's `match:ops` CLI, `packages/i18n`, `web/` (match loader and panel), `docs/ops/`                                                                                                                                                                                          |
 
 H4 derives Shaxda statistics from a saved match's replay with one pure
 function, stores them on the `match` row, fills older or failed rows with a
@@ -227,9 +227,10 @@ One core, a function over `D1Database` in `packages/db` tested on Miniflare
 D1, runs in two places:
 
 - **Nightly**, in the web Worker's cron dispatcher at 00:15 UTC
-  ([§10.1](v2-contracts.md#101-one-cron-one-dispatcher)): a `job_state`
-  lease, a resumable `seq` cursor, and a bounded number of windows per run,
-  so every `error` row is retried without an operator (P21). The game Worker
+  ([§10.1](v2-contracts.md#101-one-cron-one-dispatcher)): the `h4.statsBackfill` lease in X1's `job_state` with the `job_fence`
+  guard on every write batch, a
+  resumable `seq` cursor, and a bounded number of windows per run, so every
+  `error` row is retried without an operator (P21). The game Worker
   never runs it: it reads nothing but its own insert result (P13).
 - **On demand**, through
   `pnpm match:ops -- stats-backfill --database <env> [--apply] [--from-seq <n>]`,

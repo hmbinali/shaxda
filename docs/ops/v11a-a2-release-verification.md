@@ -1,10 +1,25 @@
 # V1.1-A / V1.1-A2 Release Verification Record
 
 Dated record of what was actually executed and observed while taking the merged
-V1.1-A and V1.1-A2 work to production. "Merged" and "production-verified" are
-different states; this file tracks the second one.
+V1.1-A and V1.1-A2 work to production. "Merged", "deployed", and
+"production-verified" are different states; this file tracks the last two and
+never marks a check verified from reading source.
 
 Account: `Techwithmahamed@gmail.com's Account` (`68aa1bfc1a838ad45891d614ddd9381a`).
+
+## Status at a glance (reconciled 2026-09-29)
+
+| Item                                                       | Deployed                                            | Production-verified                                                                                                          |
+| ---------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `0000_accounts.sql` on `shaxda-db`                         | yes                                                 | yes — tables and `user_username_unique` confirmed remotely                                                                   |
+| Web Worker `shaxda-web` (accounts, `/api/auth/*`, tickets) | yes, version `9ad0eade-8837-41cc-b46a-19a89d2e4a09` | **partly** — HTTP probes only (routes, signed-out session, identity status, cross-origin refusals, Google authorization URL) |
+| Game Worker `shaxda-worker` (ticket verification)          | yes, version `8e51f9a4-d3cf-447b-9087-67a1efb5335c` | **partly** — health, Turnstile refusals, forged ticket → `401 identityInvalid`                                               |
+| Browser flows (sign-in to presence privacy)                | —                                                   | **open** — see [Remaining browser-only checks](#remaining-browser-only-checks-on-production)                                 |
+| Online-identity secret rotation                            | —                                                   | **not run in production** — drilled on preview only                                                                          |
+| Retained identity data matches the runbook                 | —                                                   | **open** — a source review found a gap; see [Open findings](#open-findings-from-source-review-2026-09-29)                    |
+
+V1.1-A and V1.1-A2 are therefore **deployed**, not production-verified, until the
+open rows are closed with dated observations in this file.
 
 ## 2026-08-05 — starting production state
 
@@ -218,16 +233,36 @@ re-run without it.
 
 Everything below needs a real Google account and a browser, and none of it can be
 scripted because the production Turnstile secret makes room creation require a
-real widget token:
+real widget token. Each stays **open** until it is run on `https://shaxda.app` and
+recorded here with a date; the preview pass does not close it.
 
-- Google sign-in, consent, and callback;
-- registration and username confirmation;
-- the account page showing the private email and next eligible change date;
-- public profile hiding email and Google full name;
-- username change and alias redirect;
-- guest create/join;
-- registered create/join;
-- registered reconnect and second-tab takeover;
-- a presence frame carrying no account id, email, Google full name, or token.
+| Check                                                                   | Preview                                                                   | Production |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------- |
+| Google sign-in, consent, and callback                                   | passed                                                                    | open       |
+| Registration and username confirmation                                  | passed                                                                    | open       |
+| Account page shows the private email and next eligible change date      | passed                                                                    | open       |
+| Public profile hides email and Google full name                         | passed                                                                    | open       |
+| Username change and alias redirect                                      | covered by D1 and authenticated application tests; not run in the browser | open       |
+| Guest create/join                                                       | passed                                                                    | open       |
+| Registered create/join                                                  | passed                                                                    | open       |
+| Registered reconnect and second-tab takeover                            | passed                                                                    | open       |
+| Presence frame carries no account id, email, Google full name, or token | passed                                                                    | open       |
 
-The equivalents all passed on preview against the same code.
+The preview results are from the "Preview browser smoke test and rotation drill"
+section above, against the same code.
+
+## Open findings from source review (2026-09-29)
+
+Found by reading the code while revising the V2 specs. Not observed in
+production data; recorded so the verified status above is not overstated.
+
+- **Provider tokens on returning sign-in.** `web/src/lib/server/auth/options.ts`
+  sets provider tokens to `null` only in the `account` **create** hook. Better
+  Auth 1.6.25 updates the linked `account` row on every later sign-in unless
+  `account.updateAccountOnSignIn` is `false`, writing the fresh encrypted access
+  token and the plaintext Google ID token (a JWT that carries the Google name,
+  email, and picture). So for any returning user the "Retained identity data"
+  statements in `v11a-accounts-runbook.md` (tokens set to null; Google full name
+  scrubbed) may not hold. Status: open. The fix (disable the update, add an
+  update hook, test it) and a reviewed production cleanup of existing rows are a
+  separate task; the `/legal` copy was written so it stays true either way.

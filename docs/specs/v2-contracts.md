@@ -34,11 +34,8 @@ this file, the register, and every consuming spec together.
 | Neutral label     | The one Somali label for a pending-deletion or deleted account (draft: `Xubin la tirtiray`). No link, avatar, or old name.                                  |
 | Effective RD      | The RD of a stored rating after applying the empty-period growth up to a given `asOf` instant (§7.3). Never written back.                                   |
 
-Retired terms (must not appear in revised specs except in the README change
-log): `competition_status`, `aborted`, `competitive` as a status,
-`username_snapshot`, `matchSaved`, `replay_json`, `starting_player`,
-`first_advantage_how`, `pieces_a`, `captured_a`, `dailyCap`, `lateLedgerEvent`,
-"rated by default".
+Terms retired by the revision are listed in the
+[README](README.md#retired-terms); they must not appear in any spec.
 
 ---
 
@@ -96,7 +93,7 @@ CREATE TABLE match_player (
   seat        TEXT    NOT NULL CHECK (seat IN ('A','B')),
   user_id     TEXT    NOT NULL,                           -- private; no FK to user (deletion-safe)
   result      TEXT    NOT NULL CHECK (result IN ('win','loss','draw')),
-  pieces_left INTEGER NOT NULL CHECK (pieces_left BETWEEN 0 AND 12),
+  pieces_left INTEGER NOT NULL CHECK (pieces_left BETWEEN 0 AND 12),  -- on the board at game over
   captured    INTEGER NOT NULL CHECK (captured BETWEEN 0 AND 12),
   ended_at    INTEGER NOT NULL,                           -- denormalised for the owner index
   PRIMARY KEY (match_id, seat),
@@ -110,6 +107,8 @@ CREATE INDEX match_rated_ended_idx  ON match (rated, ended_at);
 There is no username, avatar, email, or display snapshot anywhere in the
 ledger (P5). Readers join the current account row (§5). The game Worker
 writes these two tables and nothing else, apart from the P13 counters (§9).
+After insert, only the three stats columns ever change, filled by H4's
+backfill (§10.1); every other ledger column is immutable.
 
 ### 2.2 Writer invariants and the payload
 
@@ -153,8 +152,10 @@ type MatchPlayerPayload = {
 ```
 
 - `payload_hash` is the lowercase hex SHA-256 of the canonical JSON of the
-  payload: keys in the order above, `players` ordered A then B, no
-  whitespace. `saved_at` and `seq` are not part of it.
+  payload **without** `statsV`, `statsStatus`, and `statsJson`: keys in the
+  order above, `players` ordered A then B, no whitespace. `saved_at`, `seq`,
+  and the stats fields are not part of it, so it describes only immutable
+  ledger facts, and H4's later fill of the stats columns never changes it.
 - One D1 batch inserts the `match` row and exactly two `match_player` rows
   with distinct account ids and results consistent with `winner_seat` (win /
   loss, or draw for both).
@@ -374,13 +375,16 @@ discard --database <env>`, which calls an internal game-Worker route guarded
 
 The processor decides each row once, in `seq` order (P4):
 
-1. **Validate** structure: two seats with distinct account ids, results
+1. An R6 invalidation exists for the match → `skipped:invalidated`. An
+   operator's decision comes first, so it also resolves a row that would
+   otherwise be `held`.
+2. **Validate** structure: two seats with distinct account ids, results
    consistent with `winner_seat`, `mode`/`rated`/`consent_policy_v`
    consistent, supported `replay_v` and `rules_v`. A failure marks the row
    `held` and alerts. A held row has no rating effect and **never blocks**
-   later rows; resolving it is an R6 correction (§7.4).
-2. `rated = 0` → `skipped:friendly`.
-3. An R6 invalidation exists for the match → `skipped:invalidated`.
+   later rows; an operator resolves it by invalidating it, or by fixing the
+   validator and rebuilding (§7.4).
+3. `rated = 0` → `skipped:friendly`.
 4. Pair cap (P7): count this unordered pair's earlier-`seq` **processed**
    events whose `ended_at` is in `(candidate.ended_at − 24 h,
 candidate.ended_at]`; if the count is already 3 → `skipped:pairCap`. A
@@ -419,16 +423,16 @@ Every loader and data path, not just pages. Unauthorized access to a private
 match is indistinguishable from an unknown id; tests request each data path
 with a guessed id, signed out and as an unrelated account.
 
-| Surface                                                         | Signed out / unrelated     | Participant                              | Notes                                                                                                      |
-| --------------------------------------------------------------- | -------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `/match/<id>`, its replay data, stats, rating status — rated    | full                       | full                                     | Public OG with current names and result. Indexable.                                                        |
-| `/match/<id>`, its replay data, stats, rating status — friendly | same 404 as an unknown id  | full                                     | `no-store`, `noindex`, generic non-identifying OG, never in a sitemap or the PWA cache.                    |
-| `/history`                                                      | redirect to login          | own saved games, all labelled            | `no-store`, `noindex`. Owner key from the session only.                                                    |
-| `/u/<username>` numbers (rating, rank, W/L/D, form, stats)      | public record (P8)         | same                                     | The owner additionally sees a `/history` link.                                                             |
-| `/u/<username>` match list                                      | rated matches only         | same; friendly games stay in `/history`  | Pending, cap-skipped, and invalidated rated matches are listed with their label and excluded from numbers. |
-| Head-to-head card                                               | hidden                     | viewer vs target, all shared saved games | Private, `no-store`.                                                                                       |
-| `/leaderboard`                                                  | public list, edge-cached   | + private rank context (`no-store`)      | Page HTML must be session-independent before shared caching.                                               |
-| Pending/deleted account                                         | neutral label; profile 404 | neutral label                            | Excluded from leaderboard and public profile reads.                                                        |
+| Surface                                                         | Signed out / unrelated     | Participant                              | Notes                                                                                                            |
+| --------------------------------------------------------------- | -------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `/match/<id>`, its replay data, stats, rating status — rated    | full                       | full                                     | Public OG with current names and result. Indexable.                                                              |
+| `/match/<id>`, its replay data, stats, rating status — friendly | same 404 as an unknown id  | full                                     | `no-store`, `noindex`, generic non-identifying OG, never in a sitemap or the PWA cache.                          |
+| `/history`                                                      | redirect to login          | own saved games, all labelled            | `no-store`, `noindex`. Owner key from the session only.                                                          |
+| `/u/<username>` numbers (rating, rank, W/L/D, form, stats)      | public record (P8)         | same                                     | The owner additionally sees a `/history` link.                                                                   |
+| `/u/<username>` match list                                      | rated matches only         | same; friendly games stay in `/history`  | Pending, held, cap-skipped, and invalidated rated matches are listed with their label and excluded from numbers. |
+| Head-to-head card                                               | hidden                     | viewer vs target, all shared saved games | Private, `no-store`.                                                                                             |
+| `/leaderboard`                                                  | public list, edge-cached   | + private rank context (`no-store`)      | Page HTML must be session-independent before shared caching.                                                     |
+| Pending/deleted account                                         | neutral label; profile 404 | neutral label                            | Excluded from leaderboard and public profile reads.                                                              |
 
 Participants are the two `match_player.user_id` values, compared on the
 server with the session's user id. No loader returns a user id, email, room
@@ -453,21 +457,25 @@ All additive to protocol `v: 1`.
 boolean | null, B: boolean | null }`, `rated: boolean | null` (null until
   play begins), and `save: { matchNumber, status: "pending" | "saved" |
 "stalled", matchId? }` for the most recently completed persistable match.
-  `save` is required behaviour in H1; it replaces the proposed `matchSaved`
-  message, which would crash cached clients (a new server message **type**
-  fails `serverMessageSchema.parse`; an unknown **key** is stripped).
+  `save` is required behaviour in H1; it replaces the separate "match saved"
+  server message proposed earlier, which would crash cached clients (a new
+  server message **type** fails `serverMessageSchema.parse`; an unknown
+  **key** is stripped).
 - `rematchStatus` gains optional `ratedVotes: { A: boolean | null, B:
 boolean | null }`.
 - Errors reuse the existing `error { code, message }` frame. New codes:
   `staleMatch`, `consentClosed`, `consentUnavailable`, `disclosureOutdated`,
-  `savingEarlierGames`, `ratedOnlyRematch`, `ratedPlayDisabled`.
+  `savingEarlierGames`, `ratedOnlyRematch`, `ratedPlayDisabled`, and
+  `quickCancelled` (K1: a quick room closed before play began because a
+  player never arrived).
 
 ### 6.3 Client to server
 
 - New `rateConsent { roomCode, matchNumber, accept: boolean, disclosureV:
-number }`. Valid only while the room requests rated play, both seats are
-  complete accounts, and play has not begun (else `consentUnavailable` or
-  `consentClosed`). `disclosureV` must equal the server's current
+number }`. Valid only for the **first match of an invite room** that
+  requests rated play, while both seats are complete accounts and play has
+  not begun (else `consentUnavailable` or `consentClosed`). A rematch's
+  consent is its rated vote; a quick room's comes from `joinQueue`. `disclosureV` must equal the server's current
   `RATED_DISCLOSURE_V` (else `disclosureOutdated`; the client asks for a
   reload). The accepted version becomes `consent_policy_v`.
 - `rematch` gains optional `rated: boolean` and `disclosureV: number`. A
@@ -485,8 +493,11 @@ K1 owns the queue protocol.
 
 The queue uses its own WebSocket and schema family: `joinQueue {
 identityTicket, disclosureV }` as the first frame (entering is consent,
-P3), `cancelQueue`, `queueStatus`, `matched`, `queueError`. Tickets never
-appear in URLs. The queue creates quick rooms through an internal
+P3), `cancelQueue`, `queueStatus`, `matched`, `queueError`, and a `ping` /
+`pong` pair answered without waking the Durable Object. K1 defines every field and error code.
+`queueError.code` is a bounded string, and a client shows a generic message
+for a code it does not know. Reserved for K2: code `cooldown` with `retryAt`
+(server ms), present only with that code; K1 never sends it. Tickets never appear in URLs. The queue creates quick rooms through an internal
 coordinator path with `ratedRequest = true` and both seats' consent
 recorded from their `joinQueue`.
 
@@ -538,7 +549,7 @@ the constraint names `rating_fence_guard` or `rating_fence.ok`, never by the
 full message text.
 
 Proof E1 (§12) showed why this form: the plain `INSERT … SELECT … FROM
-rating_processor_state` form aborted stale, expired, and wrong-cursor batches
+rating_processor_state` form stopped stale, expired, and wrong-cursor batches
 but **passed** — applying the writes — when the state row was missing or a
 token, expiry, or bound value was `NULL`, because SQLite `CHECK` constraints
 pass on `NULL`. Zero-row conditional updates alone are not a guard either.
@@ -555,9 +566,10 @@ min(350/173.7178, sqrt(φ² + nσ²))`). Late events therefore apply none.
   means effective RD > 110. Leaderboard, profile, and rank reads capture one
   `asOf` per response.
 - `eligible_until` is written in the same event batch: the earlier of
-  `last_rated_at + 90 days` and the first day boundary at which effective RD
-  exceeds 110 (equal to `last_rated_at` when the post-event RD already
-  exceeds 110). P19 eligibility at `asOf` is then `eligible_until > asOf AND
+  `last_rated_at + 90 days` (a game exactly 90 days old no longer counts,
+  like the pair cap's exact 24 h) and the first day boundary at which
+  effective RD exceeds 110 (equal to `last_rated_at` when the post-event RD
+  already exceeds 110). P19 eligibility at `asOf` is then `eligible_until > asOf AND
 rated_games >= 10 AND excluded = 0` plus a current, non-deleted username —
   no per-row inactivity arithmetic in the leaderboard query.
 - The first processed event creates the row from 1500/350/0.06 and assigns
@@ -575,8 +587,12 @@ Used for R6 invalidation or rescission and for a policy or algorithm change.
 4. Swap in **one** batch: fence (operator token, `maintenance = 1`); for
    each of `match_rating`, `match_player_rating`, and `player_rating`,
    `DELETE FROM t` then `INSERT INTO t SELECT * FROM t_next`; set
-   `cursor_seq` to the high-water mark; clear `maintenance`; delete the
-   fence.
+   `cursor_seq` to the high-water mark; when the rebuild used a new policy
+   or algorithm version, set `policy_v` and `algorithm_v` too; clear
+   `maintenance`; delete the fence. A rebuilt `match_rating` row keeps its
+   `decided_at` when its decision is unchanged and takes the swap time
+   otherwise; the processor refuses to run while the state row's versions
+   differ from the deployed ones.
 5. Empty the `*_next` tables. Rows above the high-water mark are then
    processed normally.
 
@@ -585,9 +601,11 @@ updating" note. Proof E1 sized the swap on narrow rows: about 0.16 s at
 25,000 matches and about 2 s at 250,000 locally, atomic in both, well inside
 D1's documented 30-second limit for a batch. The whole database waits for the
 swap, and one swap at 1× writes about 125,000 rows, so corrections are rare,
-deliberate operations. **Scale trigger:** if a preview rehearsal at 10×
-projected data approaches the 30-second batch limit, move to generation-keyed
-tables with an active-generation pointer.
+deliberate operations; a full correction at 1× writes about 200,000 rows
+including the shadow tables, which the paid plan's included writes cover and
+the free plan's daily limit does not. **Scale trigger:** if a preview
+rehearsal at 10× projected data approaches the 30-second batch limit, move
+to generation-keyed tables with an active-generation pointer.
 
 ### 7.5 Exclusion projection
 
@@ -615,8 +633,10 @@ A3 owns deletion; every reader obeys it.
   removed; username claims are held 30 days (F5), then released. Ledger rows
   and rating events are untouched (M10). Because of P5 there is nothing in
   the ledger to scrub.
-- A restored backup reapplies deletion records before serving. A reclaimed
-  username never inherits old match links: links resolve by stable id.
+- A restored backup reapplies deletion records in the same operator command
+  that restores it (A3's `account:ops`), before the environment is treated as
+  restored. A reclaimed username never inherits old match links: links
+  resolve by stable id.
 - Analytics: the account's pseudonymous rows age out under P12; aggregates
   remain.
 
@@ -628,7 +648,7 @@ X1 owns these definitions.
 
 | Name                                          | Definition                                                                                                                               | Source                     | Exactness                               |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------- |
-| Active browsers (day / 7 d / 30 d)            | Distinct keyed hashes of the guest id that sent the daily beacon                                                                         | Client beacon              | Approximate; not people                 |
+| Active browsers (day / 7 d / 30 d)            | Distinct keyed hashes of the guest id that sent the daily beacon, signed in or not                                                       | Client beacon              | Approximate; not people                 |
 | Active accounts (day / 7 d / 30 d)            | Distinct keyed hashes of the account id that sent the beacon while signed in                                                             | Client beacon              | Approximate; not additive with browsers |
 | Registrations                                 | Accounts whose first `username_claim.claimed_at` falls on the day                                                                        | D1, nightly rollup         | Exact                                   |
 | Online games created/joined/started/completed | By mode and guest/account                                                                                                                | Game Worker counters (P13) | Near-exact (best-effort write)          |
@@ -642,14 +662,16 @@ The P13 allowlist is a fixed enum in `packages/shared`: `online_room_created_{gu
 `online_room_joined_{guest,account}`, `online_started_{invite,quick}_{guest,account}`,
 `online_completed_{invite,quick}_{guest,account}`, and the K1 `queue_*` names
 (`queue_joined`, `queue_paired`, `queue_started`, `queue_completed`,
-`queue_no_show`, `queue_wait_<bucket>`). "account" means both seats are
-accounts. The game Worker upserts `event_daily` with `count = count + 1`
+`queue_no_show`, `queue_wait_<bucket>`), and K2's `queue_cooldown_started`. `online_room_created_*` takes the
+creator's kind, since only one seat exists; for the other names "account"
+means both seats are accounts. The game Worker upserts `event_daily` with `count = count + 1`
 after broadcasting; a failed write is logged and dropped, never retried into
 the game path.
 
-Removed claims: "guest → account conversion", "exact DAU/MAU of people",
-"no PII because hashed". Every admin view shows raw counts beside
-percentages, the instrumentation start date, freshness, and cohort maturity.
+Removed claims: a conversion ratio from guests to accounts, exact counts of
+daily or monthly people, and "no personal data because hashed". Every admin
+view shows raw counts beside percentages, the instrumentation start date,
+freshness, and cohort maturity.
 
 ---
 
@@ -658,10 +680,13 @@ percentages, the instrumentation start date, freshness, and cohort maturity.
 ### 10.1 One cron, one dispatcher
 
 One web-Worker cron trigger, `* * * * *`, with a dispatcher: the rating sweep
-every minute (R1); at 00:15 UTC the X1 rollup and prune, A3 finalization,
-and the S2 rollup; later the R6 detectors nightly. Each non-rating job takes
+every minute (R1); at 00:15 UTC the X1 rollup and prune, the H4 stats
+backfill (bounded pages of `none` and `error` rows), A3 finalization, and the
+S2 rollup; later the R6 detectors nightly. Each non-rating job takes
 a named lease in `job_state` with the same fence pattern (`job_fence`) and
-resumes from a cursor, so a missed or duplicate run is harmless.
+resumes from a cursor, so a missed or duplicate run is harmless. A nightly
+job that has not finished resumes on the next minute tick, one bounded step
+per tick, until it completes.
 
 ### 10.2 Web Worker entry wrapper
 
@@ -688,19 +713,26 @@ milestones add jobs and entrypoints to it.
 
 ### 10.3 Bindings, flags, and rollout by milestone
 
-| Milestone | New bindings (dev / e2e / preview / production)                                                                                    | Jobs                            | Kill switch                                                             | Rollout                |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------- | ---------------------- |
-| H1        | Game Worker `DB` → the same D1 as the web Worker in each environment; e2e shares one local D1 (§10.4)                              | —                               | none: saving is not optional                                            | migration → game → web |
-| X1a       | Web: `ANALYTICS_SALT` and `ADMIN_USER_IDS` secrets, `ANALYTICS_RATE_LIMIT` rate-limit binding, the wrapper entry, `* * * * *` cron | rollup + prune 00:15            | web var `ANALYTICS_ENABLED`                                             | migration → web        |
-| X1b       | Game Worker writes P13 counters through its `DB` binding                                                                           | —                               | game var `ANALYTICS_ENABLED`                                            | game                   |
-| R2 + R1   | Game Worker service binding `RATINGS` → web `RatingsEntrypoint`                                                                    | rating sweep every minute       | game var `RATED_PLAY_ENABLED` (refuse consent); processor `maintenance` | migration → game → web |
-| R6-core   | none (operator CLI through Wrangler D1 access)                                                                                     | —                               | —                                                                       | migration → CLI        |
-| A3        | none                                                                                                                               | finalize + release claims 00:15 | —                                                                       | migration → web        |
-| K1        | Game Worker `MATCH_QUEUE` DO (SQLite class migration), production route `/queue/*`                                                 | queue alarms only               | game + web var `QUICK_MATCH_ENABLED`                                    | migration → game → web |
-| S1 + S2   | Web: R2 bucket `SPONSOR_ASSETS` per environment, `SPONSOR_RATE_LIMIT`                                                              | S2 rollup 00:15                 | web var `SPONSORS_ENABLED`                                              | migration → web        |
+| Milestone | New bindings (dev / e2e / preview / production)                                                                                                                                                                                    | Jobs                                         | Kill switch                                                             | Rollout                                                                                                 |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| H1        | Game Worker `DB` → the same D1 as the web Worker in each environment; e2e shares one local D1 (§10.4); `MATCH_OPS_TOKEN` secret (a tracked dev value locally), `MATCH_OPS_RATE_LIMIT` binding, production route `shaxda.app/ops/*` | —                                            | none: saving is not optional                                            | migration → game → web                                                                                  |
+| X1a       | Web: `ANALYTICS_SALT` and `ADMIN_USER_IDS` secrets, `ANALYTICS_RATE_LIMIT` rate-limit binding, the wrapper entry, `* * * * *` cron                                                                                                 | rollup + prune 00:15                         | web var `ANALYTICS_ENABLED`                                             | migration → web                                                                                         |
+| X1b       | Game Worker writes P13 counters through its `DB` binding                                                                                                                                                                           | —                                            | game var `ANALYTICS_ENABLED`                                            | game                                                                                                    |
+| H4        | none (the web Worker's existing `DB`)                                                                                                                                                                                              | stats backfill 00:15                         | —                                                                       | web                                                                                                     |
+| R2 + R1   | Game Worker service binding `RATINGS` → web `RatingsEntrypoint`                                                                                                                                                                    | rating sweep every minute                    | game var `RATED_PLAY_ENABLED` (refuse consent); processor `maintenance` | migration → game → web                                                                                  |
+| R6-core   | none (operator CLI through Wrangler D1 access)                                                                                                                                                                                     | —                                            | —                                                                       | migration before R1's processor → R1 → CLI; the "rating corrected" label ships in the wave-2 web deploy |
+| A3        | none                                                                                                                                                                                                                               | finalize + release claims 00:15              | —                                                                       | migration → web                                                                                         |
+| K1        | Game Worker `MATCH_QUEUE` DO (SQLite class migration), production route `/queue/*`                                                                                                                                                 | queue alarms only                            | game + web var `QUICK_MATCH_ENABLED`                                    | migration → game → web                                                                                  |
+| K2        | Web `QUEUE_PRESENCE` service binding → the game Worker's `QueuePresenceEntrypoint`                                                                                                                                                 | queue alarms only, including incident expiry | game var `QUEUE_COOLDOWN_ENABLED`                                       | game → web                                                                                              |
+| S1 + S2   | Web: R2 bucket `SPONSOR_ASSETS` per environment, `SPONSOR_RATE_LIMIT`                                                                                                                                                              | S2 rollup 00:15                              | web var `SPONSORS_ENABLED`                                              | migration → web                                                                                         |
 
 Kill switches are independent Worker variables changed by a configuration
-deploy. Local and guest play survive all of them. Environments are: dev
+deploy. Local and guest play survive all of them. `RATED_PLAY_ENABLED` off
+refuses **new** consent — `rateConsent`, rated rematch votes, and quick-match
+entry (K1 refuses to queue while it is off, because a quick room must be
+rated) — while consent already recorded stands, so a room already agreed may
+still start rated until it idles out; the processor's `maintenance` flag
+pauses rating decisions immediately. Environments are: dev
 (local `wrangler dev` / `vite dev`, Miniflare D1), e2e (tracked e2e configs,
 §10.4), preview (`*-preview` Workers, `shaxda-db-preview`), and production.
 
@@ -721,9 +753,9 @@ env files.
 
 ## 11. Migration ownership
 
-Numbers are assigned at merge, never reserved in a spec. Owners: H1 ledger;
+Numbers are assigned at merge, never reserved in a spec. Owners: H1 ledger and `match_ops_audit`;
 X1 analytics (`active_*` tables, `event_daily`, `job_state`, `job_fence`);
-R1 rating columns and tables; R6 corrections, exclusions, flags, and audit;
+R1 rating tables; R6 corrections, exclusions, flags, and audit;
 A3 user deletion columns; S1 sponsor; S2 sponsor stats. Each milestone adds
 the indexes its reads need in the same migration and records `EXPLAIN QUERY
 PLAN` evidence.
@@ -756,7 +788,7 @@ Run in Miniflare D1 from a Node script.
 | Swap (one batch; a false fence as the last statement leaves everything unchanged) | Matches / seats / players  | Median time (local)   |
 | --------------------------------------------------------------------------------- | -------------------------- | --------------------- |
 | Narrow rows (the §2.5 design)                                                     | 25,000 / 50,000 / 5,000    | 157 ms                |
-| Narrow rows                                                                       | 250,000 / 500,000 / 50,000 | 1,975 ms              |
+| Narrow rows                                                                       | 250,000 / 500,000 / 50,000 | 1,987 ms              |
 | Rating columns on `match` rows carrying a 1 KiB replay                            | 250,000 / 500,000 / 50,000 | 3,572 ms              |
 | Rating columns on `match` rows carrying a 2 KiB replay                            | 250,000 / 500,000 / 50,000 | 6,863 ms, ≈ 1 GiB WAL |
 
@@ -809,17 +841,17 @@ Result: **pass** with the §10.2 wrapper.
 Result: **pass**; the numbers now fix H1's size rule and H3's frame
 strategy.
 
-| Question                             | Result                                                                                                                                                                                                                                       |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Engine facts used                    | 12 pieces each; 24 placements; 2 initial removals; draw at 80 quiet turns; a jare move enters capture without a clock tick; a capture resets clock and repetition; threefold repetition draws; game ends when a side has fewer than 3 pieces |
-| Maximum captures                     | 17 (8 per side without ending, plus the final one); at most 9 by one seat                                                                                                                                                                    |
-| Longest legal game (analytic bound)  | 1,403 actions; canonical compact JSON 13,922 bytes (14,051 if every code were a move)                                                                                                                                                        |
-| Longest generated game               | exactly 1,403 actions and 13,922 bytes, replayed through the real engine and decoded from its JSON; 97.4 % of 2,135 searches reached the bound                                                                                               |
-| 10,000 random playouts (fuzz policy) | p50 152 / p95 286 / p99 353 / max 503 actions; 1.4 / 2.8 / 3.4 / 4.9 KB                                                                                                                                                                      |
-| All 1,404 frames of the longest game | ≈ 1.07 MB V8 heap (≈ 762 B per frame); ≈ 6.7 MB if frames lose shared shapes after a JSON round trip; built in ≈ 14 ms (Node 24, Apple Silicon)                                                                                              |
-| SQLite-backed Durable Object storage | key and value combined ≤ 2 MB; string/BLOB/row ≤ 2 MB; 10 GB per object ([limits](https://developers.cloudflare.com/durable-objects/platform/limits/), fetched 2026-09-29)                                                                   |
-| "128 KiB"                            | the value limit of the older key-value storage backend only; it does not apply to Shaxda's SQLite-backed objects                                                                                                                             |
-| D1                                   | string/BLOB/row ≤ 2,000,000 bytes; SQL statement ≤ 100 KB ([limits](https://developers.cloudflare.com/d1/platform/limits/), fetched 2026-09-29)                                                                                              |
+| Question                                    | Result                                                                                                                                                                                                                                       |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine facts used                           | 12 pieces each; 24 placements; 2 initial removals; draw at 80 quiet turns; a jare move enters capture without a clock tick; a capture resets clock and repetition; threefold repetition draws; game ends when a side has fewer than 3 pieces |
+| Maximum captures                            | 17 (8 per side without ending, plus the final one); at most 9 by one seat                                                                                                                                                                    |
+| Longest legal game (analytic bound)         | 1,403 actions; canonical compact JSON 13,922 bytes (14,051 if every code were a move)                                                                                                                                                        |
+| Longest generated game                      | exactly 1,403 actions and 13,922 bytes, replayed through the real engine and decoded from its JSON; 97.4 % of 2,135 searches reached the bound                                                                                               |
+| 10,000 random playouts (fuzz policy)        | p50 152 / p95 286 / p99 353 / max 503 actions; 1.4 / 2.8 / 3.4 / 4.9 KB                                                                                                                                                                      |
+| All 1,404 frames of the longest game        | ≈ 1.07 MB V8 heap (≈ 762 B per frame); ≈ 6.7 MB if frames lose shared shapes after a JSON round trip; built in ≈ 14 ms (Node 24, Apple Silicon)                                                                                              |
+| SQLite-backed Durable Object storage        | key and value combined ≤ 2 MB; string/BLOB/row ≤ 2 MB; 10 GB per object ([limits](https://developers.cloudflare.com/durable-objects/platform/limits/), fetched 2026-09-29)                                                                   |
+| The 131,072-byte figure the old specs cited | the value limit of the older key-value storage backend only; it does not apply to Shaxda's SQLite-backed objects                                                                                                                             |
+| D1                                          | string/BLOB/row ≤ 2,000,000 bytes; SQL statement ≤ 100 KB ([limits](https://developers.cloudflare.com/d1/platform/limits/), fetched 2026-09-29)                                                                                              |
 
 Consequences: H1 validates `actionCount ≤ 1,403` and the encoded replay ≤
 16,384 bytes; H3 keeps every frame in memory, rebuilt from the compact
@@ -846,9 +878,16 @@ P18 and P19 stand unless the report contradicts them.
 
 Status: pending.
 
-Runs before H2, R4, and R5 implementation. Pass: every plan for the history
-page, summary, head-to-head, rating window, and public record uses the owner
-index or a primary key; rows read are recorded.
+Runs before H2, R3, R4, and R5 implementation. Pass: every plan for the
+history page, summary, head-to-head, rating window, public record, and
+leaderboard page and rank uses the owner index, the leaderboard index, or key
+lookups (primary keys and unique keys such as `match.id`); rows
+read are recorded. Known risk: R4's lifetime
+Shaxda aggregates walk the owner's whole index and parse each match's stored
+statistics (about 25,000 rows read at 5,000 saved games). If E6 or the
+preview measurement misses R4's budget, the fix is a contract change — for
+example a session-independent public statistics endpoint with edge caching,
+or an aggregate projection — made before R4 ships.
 
 ---
 

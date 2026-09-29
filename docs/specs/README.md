@@ -31,25 +31,25 @@ starts only when the spec is frozen **and** its milestone is activated
 Register IDs are defined in the tables below. "Wave" is the build wave in
 `docs/specs-revision-plan.md` §12.
 
-| ID  | Spec                                                                           | Status | Wave  | Depends on                               | Register IDs                       |
-| --- | ------------------------------------------------------------------------------ | ------ | ----- | ---------------------------------------- | ---------------------------------- |
-| H1  | [Match persistence](h1-match-persistence.md)                                   | draft  | 1     | V1.1-A2                                  | F1 F4 F8 P1 P2 P3 P4 P5 P6 P17 P21 |
-| H2  | [History and match detail](h2-history-match-detail.md)                         | draft  | 1     | H1                                       | F2 F8 P2 P5 P8                     |
-| X1  | [Product analytics](x1-product-analytics.md) (X1a wave 1, X1b wave 2)          | draft  | 1, 2  | X1a: none. X1b: H1                       | P12 P13                            |
-| R2  | [Rated play rules](r2-ranked-play-rules.md)                                    | draft  | 2     | H1, R1 (activated together)              | F1 F2 F4 P1 P2 P3 P7 P10           |
-| R1  | [Rating system](r1-rating-system.md)                                           | draft  | 2     | H1, R2 (activated together)              | F4 P4 P9 P18 P20                   |
-| R6  | [Ranking integrity](r6-ranking-integrity.md) (R6-core wave 2, R6-detect later) | draft  | 2, L  | R1, R2                                   | P4 P7 P8 P10                       |
-| A3  | [Account deletion](a3-account-deletion.md)                                     | draft  | 2     | H1; R1 if shipped; Q1                    | F5 P5 P11 Q1                       |
-| K1  | [Quick-match queue](k1-quick-match-queue.md)                                   | draft  | 3     | H1, R1, R2, X1b                          | F1 F6 P1 P3 P13 P15                |
-| H3  | [Replay viewer](h3-replay-viewer.md)                                           | draft  | 4     | H1, H2                                   | F2 P2                              |
-| H4  | [Match statistics](h4-match-stats.md)                                          | draft  | 4     | H1, H2                                   | F7 P21                             |
-| R3  | [Leaderboard](r3-leaderboard.md)                                               | draft  | 4     | R1, R2, R6-core                          | P8 P18 P19 P20                     |
-| R4  | [Profile statistics](r4-profile-statistics.md)                                 | draft  | 4     | H2, H4, R1, R3                           | P8 P9                              |
-| R5  | [Head-to-head and rating history](r5-head-to-head-rating-history.md)           | draft  | 4     | R4                                       | P8                                 |
-| S1  | [Sponsor placements](s1-sponsor-placements.md)                                 | draft  | Pilot | X1 (≥ 30 days of data), BRD, S2-min      | F3 P14 Q2 Q5                       |
-| S2  | [Sponsor measurement](s2-sponsor-measurement-reports.md) (S2-min with S1)      | draft  | Pilot | S1, X1                                   | F3 P12 P14                         |
-| S3  | [Sponsor page](s3-sponsor-page.md) (S3a pilot page, S3b rate card)             | draft  | Pilot | S1, S2-min; S3b after a delivered report | F3 P14 Q3 Q5                       |
-| K2  | [Queue quality](k2-queue-quality.md)                                           | draft  | L     | K1                                       | P13 P15 P16                        |
+| ID  | Spec                                                                           | Status | Wave  | Depends on                                                            | Register IDs                       |
+| --- | ------------------------------------------------------------------------------ | ------ | ----- | --------------------------------------------------------------------- | ---------------------------------- |
+| H1  | [Match persistence](h1-match-persistence.md)                                   | draft  | 1     | V1.1-A2                                                               | F1 F4 F8 P1 P2 P3 P4 P5 P6 P17 P21 |
+| H2  | [History and match detail](h2-history-match-detail.md)                         | draft  | 1     | H1                                                                    | F2 F8 P2 P5 P8                     |
+| X1  | [Product analytics](x1-product-analytics.md) (X1a wave 1, X1b wave 2)          | draft  | 1, 2  | X1a: none (its ledger step needs H1's migration). X1b: H1             | P12 P13                            |
+| R2  | [Rated play rules](r2-ranked-play-rules.md)                                    | draft  | 2     | H1, R1 (activated together)                                           | F1 F2 F4 P1 P2 P3 P7 P10           |
+| R1  | [Rating system](r1-rating-system.md)                                           | draft  | 2     | H1, X1a, R2 (activated together), R6-core's migration                 | F4 P4 P9 P18 P20                   |
+| R6  | [Ranking integrity](r6-ranking-integrity.md) (R6-core wave 2, R6-detect later) | draft  | 2, L  | R1, R2 (R6-core's migration lands inside R1's slices); R6-detect: X1a | P4 P7 P8 P10                       |
+| A3  | [Account deletion](a3-account-deletion.md)                                     | draft  | 2     | H1, X1a; R1 if shipped; Q1                                            | F5 P5 P11 Q1                       |
+| K1  | [Quick-match queue](k1-quick-match-queue.md)                                   | draft  | 3     | H1, R1, R2, X1b                                                       | F1 F6 P1 P3 P13 P15                |
+| H3  | [Replay viewer](h3-replay-viewer.md)                                           | draft  | 4     | H1, H2                                                                | F2 P2                              |
+| H4  | [Match statistics](h4-match-stats.md)                                          | draft  | 4     | H1, H2; X1a for the nightly backfill                                  | F7 P21                             |
+| R3  | [Leaderboard](r3-leaderboard.md)                                               | draft  | 4     | R1, R2, R6-core; A3 if shipped                                        | P8 P18 P19 P20                     |
+| R4  | [Profile statistics](r4-profile-statistics.md)                                 | draft  | 4     | H2, H4, R1, R3; A3 if shipped                                         | P8 P9                              |
+| R5  | [Head-to-head and rating history](r5-head-to-head-rating-history.md)           | draft  | 4     | R4 (with H2, R1, R3); A3 if shipped                                   | P8                                 |
+| S1  | [Sponsor placements](s1-sponsor-placements.md)                                 | draft  | Pilot | X1 (≥ 30 days of data), BRD, S2-min                                   | F3 P14 Q2 Q5                       |
+| S2  | [Sponsor measurement](s2-sponsor-measurement-reports.md) (S2-min with S1)      | draft  | Pilot | S1, X1                                                                | F3 P12 P14                         |
+| S3  | [Sponsor page](s3-sponsor-page.md) (S3a pilot page, S3b rate card)             | draft  | Pilot | S1, S2-min; S3b after a delivered report                              | F3 P14 Q3 Q5                       |
+| K2  | [Queue quality](k2-queue-quality.md)                                           | draft  | L     | K1                                                                    | P13 P15 P16                        |
 
 Wave `L` is "later in V2": it ships only with evidence that it is needed.
 
@@ -80,7 +80,7 @@ freeze or ship without the row.
 | ID  | Default                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Why                                                                                                                                           | Blocks                |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | P1  | **Play begins at the first accepted non-terminal action** (`place`, `removeInitial`, `move`, `capture`). Any ending before it (resign, claim, cleanup) writes no row. Every persisted match is therefore a played result.                                                                                                                                                                                                                                                          | Applies F4 with one rule; removes R2's `competition_status`/`aborted` class and H1's special cases.                                           | Freeze (H1, R2)       |
-| P2  | **Visibility is derived from the agreed `rated` flag**: rated → public, friendly → participants only. No separate visibility column. A cap-skipped or invalidated rated match stays public with "rating not counted".                                                                                                                                                                                                                                                              | Applies F2 with no second source of truth; visibility can never disagree with consent.                                                        | Freeze                |
+| P2  | **Visibility is derived from the agreed `rated` flag**: rated → public, friendly → participants only. No separate visibility column. A cap-skipped or invalidated rated match stays public, labelled "rating not counted" (pair cap) or "rating removed" (invalidation).                                                                                                                                                                                                           | Applies F2 with no second source of truth; visibility can never disagree with consent.                                                        | Freeze                |
 | P3  | **Consent handshake**: the creator may request rated at creation; the joiner accepts or declines before the first action (decline → friendly). A rematch inherits the request, and each player's rematch vote on a clearly labelled rated rematch is that player's re-consent. Entering the quick-match queue is consent. Old cached clients cannot send consent, so their games stay friendly. Consequently a rematch is rated only when both rematch votes are rated votes (M9). | Applies F1 without a new negotiation screen; safe for cached PWA clients.                                                                     | Freeze (H1, R2, K1)   |
 | P4  | **Ratings are processed in ledger ingestion order** (`match.seq`, assigned by D1 at insert), not `ended_at`. Inactivity uses `ended_at` gaps clamped at zero.                                                                                                                                                                                                                                                                                                                      | A late save lands at the tail by construction, so R1's late-event pause/rebuild path and generation machinery for normal operation disappear. | Freeze (R1)           |
 | P5  | **No username snapshots in the ledger.** Readers resolve the current username/avatar from the account row; pending/deleted accounts render one neutral Somali label.                                                                                                                                                                                                                                                                                                               | Rename and deletion need no scrub, no trigger, and no late-write guard.                                                                       | Freeze (H1, H2, A3)   |
@@ -117,21 +117,50 @@ Drafts collected from the specs for one native review. Every string that uses
 them stays behind the repository's `TODO(translation-review)` marker until
 that review. Keep `shaxda`, `jare`, and `irmaan` unchanged.
 
-| Term               | Draft Somali           | Where it appears                     |
-| ------------------ | ---------------------- | ------------------------------------ |
-| rated (game)       | Tartan                 | Lobby, result, history, match page   |
-| friendly (game)    | Saaxiibtinimo          | Lobby, result, history, match page   |
-| quick match        | Kulan degdeg ah        | `/online`, queue, history mode label |
-| leaderboard        | Miiska darajada        | `/leaderboard`, navigation           |
-| rating             | Darajo                 | Result, profile, leaderboard         |
-| rank               | Kaalin                 | Leaderboard, profile                 |
-| history            | Ciyaarahayga           | Navigation, `/history`               |
-| replay             | Dib u daawo            | Match page viewer                    |
-| pending            | Waa la xisaabinayaa    | Result, history, match page          |
-| rating not counted | Darajo laguma xisaabin | Match page, history, result          |
-| deleted member     | Xubin la tirtiray      | Every place a deleted player appears |
-| sponsored (label)  | Waxaa kafaala qaaday   | Every sponsor placement              |
-| sponsor (noun)     | Kafaala-qaade          | Admin copy, `/sponsor`               |
+| Term                 | Draft Somali                                             | Where it appears                              |
+| -------------------- | -------------------------------------------------------- | --------------------------------------------- |
+| rated (game)         | Tartan                                                   | Lobby, result, history, match page            |
+| friendly (game)      | Saaxiibtinimo                                            | Lobby, result, history, match page            |
+| quick match          | Kulan degdeg ah                                          | `/online`, queue, history mode label          |
+| leaderboard          | Miiska darajada                                          | `/leaderboard`, navigation                    |
+| rating               | Darajo                                                   | Result, profile, leaderboard                  |
+| rank                 | Kaalin                                                   | Leaderboard, profile                          |
+| history              | Ciyaarahayga                                             | Navigation, `/history`                        |
+| replay               | Dib u daawo                                              | Match page viewer                             |
+| pending              | Waa la xisaabinayaa                                      | Result, history, match page                   |
+| rating not counted   | Darajo laguma xisaabin                                   | Match page, history, result                   |
+| rating removed       | Darajada waa laga saaray                                 | Match page, history, result (R6 invalidation) |
+| being checked (held) | Waa la hubinayaa                                         | Result, history, match page, profile          |
+| rating corrected     | Darajada waa la saxay                                    | Rated match surfaces (R6)                     |
+| ratings updating     | Darajooyinka waa la cusboonaysiinayaa                    | Leaderboard, profile, result (maintenance)    |
+| provisional rating   | Darajo ku meel gaar ah                                   | Profile, leaderboard, player cards            |
+| no rating yet        | Weli darajo ma laha                                      | Profile, player cards                         |
+| win / loss / draw    | Guul / Guuldarro / Barbaro; verbs Guuleystay / Khasaaray | History, leaderboard, head-to-head            |
+| match statistics     | Tirakoobka ciyaarta                                      | Match page (H4)                               |
+| comeback             | Soo kabasho                                              | Match statistics (H4)                         |
+| qualified views      | Muuqaallo la tiriyay                                     | Sponsor report (S2)                           |
+| deleted member       | Xubin la tirtiray                                        | Every place a deleted player appears          |
+| sponsored (label)    | Waxaa kafaala qaaday                                     | Every sponsor placement                       |
+| sponsor (noun)       | Kafaala-qaade                                            | Admin copy, `/sponsor`                        |
+
+## Retired terms
+
+These names and phrases left the specs in the 2026-09-29 revision. The
+consistency gates fail if any spec, the V2 brief, or the BRD uses them.
+
+| Retired                                                    | Use instead                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `competition_status`, `aborted`, `competitive` as a status | P1: a match either began (it has a row) or did not (no row)                    |
+| `username_snapshot`                                        | P5: the current account row, or the neutral label                              |
+| `matchSaved` message                                       | `matchStatus.save` (contracts §6.2)                                            |
+| `replay_json`, `starting_player`, `first_advantage_how`    | `replay`, `starting_seat`, `first_advantage_by` (contracts §2.1)               |
+| `pieces_a`, `captured_a` and their seat-B twins on `match` | `match_player.pieces_left` and `captured`                                      |
+| `dailyCap`                                                 | no per-account daily cap at launch (P7)                                        |
+| `lateLedgerEvent`                                          | nothing: ratings follow ingestion order, so a late save is the next event (P4) |
+| "rated by default"                                         | friendly by default; rated by mutual consent (F1, P3)                          |
+| "128 KiB" as the Durable Object value limit                | 2 MB for SQLite-backed objects (proof E4)                                      |
+| "guest → account conversion", "exact DAU", "exact MAU"     | the metrics dictionary (contracts §9)                                          |
+| "calendar month" as a sponsor period                       | 30 days (P14)                                                                  |
 
 ## Contract changes after the freeze
 
@@ -142,11 +171,12 @@ additive for cached PWA clients (`v2-contracts.md` §6).
 
 ## Change log
 
-| Date       | Commit    | Change                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ---------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-09-25 | `e7ea9fb` | V2 brief and 17 milestone spec drafts added.                                                                                                                                                                                                                                                                                                                                                                    |
-| 2026-09-29 | `33df8b9` | Spec revision plan rewritten (`docs/specs-revision-plan.md`).                                                                                                                                                                                                                                                                                                                                                   |
-| 2026-09-29 | `c701d7b` | Spec drafts formatted with Prettier.                                                                                                                                                                                                                                                                                                                                                                            |
-| 2026-09-29 | `caf614e` | `/legal` describes the live accounts and D1 storage (revision step 1).                                                                                                                                                                                                                                                                                                                                          |
-| 2026-09-29 | —         | This index and register created (step 2). P3 states the rematch rule it implies (M9).                                                                                                                                                                                                                                                                                                                           |
-| 2026-09-29 | —         | `v2-contracts.md` added (step 5) with proofs E1–E4. Refinements (contracts §13): `rateConsent.disclosureV`; rated rematch votes; hardened fence; narrow `match_rating`/`match_player_rating` tables; validation first with non-blocking `held`; the public record and `eligible_until` on `player_rating`; game→web hint; generated web entry wrapper; one owner for the shared e2e D1; stricter ledger checks. |
+| Date       | Commit    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-25 | `e7ea9fb` | V2 brief and 17 milestone spec drafts added.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 2026-09-29 | `33df8b9` | Spec revision plan rewritten (`docs/specs-revision-plan.md`).                                                                                                                                                                                                                                                                                                                                                                                               |
+| 2026-09-29 | `c701d7b` | Spec drafts formatted with Prettier.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2026-09-29 | `caf614e` | `/legal` describes the live accounts and D1 storage (revision step 1).                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-09-29 | `92b4179` | This index and register created (step 2). P3 states the rematch rule it implies (M9).                                                                                                                                                                                                                                                                                                                                                                       |
+| 2026-09-29 | `cd85b1c` | `v2-contracts.md` added (step 5) with proofs E1–E4. Refinements (contracts §13): `rateConsent.disclosureV`; rated rematch votes; hardened fence; narrow `match_rating`/`match_player_rating` tables; validation first with non-blocking `held`; the public record and `eligible_until` on `player_rating`; game→web hint; generated web entry wrapper; one owner for the shared e2e D1; stricter ledger checks.                                             |
+| 2026-09-29 | —         | Contracts tightened after the spec revisions: invalidation first in the decision order; `payload_hash` excludes the stats fields; H4's nightly stats backfill; `eligible_until` excludes exactly 90 days; kill-switch semantics; active browsers count every browser; K2's cooldown code, counter, and presence binding reserved; H1's ops token, limiter, route, and audit table. Retired terms, glossary drafts, and dependencies moved into this README. |

@@ -31,25 +31,25 @@ starts only when the spec is frozen **and** its milestone is activated
 Register IDs are defined in the tables below. "Wave" is the build wave in
 `docs/specs-revision-plan.md` §12.
 
-| ID  | Spec                                                                           | Status | Wave  | Depends on                                                            | Register IDs                       |
-| --- | ------------------------------------------------------------------------------ | ------ | ----- | --------------------------------------------------------------------- | ---------------------------------- |
-| H1  | [Match persistence](h1-match-persistence.md)                                   | draft  | 1     | V1.1-A2                                                               | F1 F4 F8 P1 P2 P3 P4 P5 P6 P17 P21 |
-| H2  | [History and match detail](h2-history-match-detail.md)                         | draft  | 1     | H1                                                                    | F2 F8 P2 P5 P8                     |
-| X1  | [Product analytics](x1-product-analytics.md) (X1a wave 1, X1b wave 2)          | draft  | 1, 2  | X1a: none (its ledger step needs H1's migration). X1b: H1             | P12 P13                            |
-| R2  | [Rated play rules](r2-ranked-play-rules.md)                                    | draft  | 2     | H1, R1 (activated together)                                           | F1 F2 F4 P1 P2 P3 P7 P10           |
-| R1  | [Rating system](r1-rating-system.md)                                           | draft  | 2     | H1, X1a, R2 (activated together), R6-core's migration                 | F4 P4 P9 P18 P20                   |
-| R6  | [Ranking integrity](r6-ranking-integrity.md) (R6-core wave 2, R6-detect later) | draft  | 2, L  | R1, R2 (R6-core's migration lands inside R1's slices); R6-detect: X1a | P4 P7 P8 P10                       |
-| A3  | [Account deletion](a3-account-deletion.md)                                     | draft  | 2     | H1, X1a; R1 if shipped; Q1                                            | F5 P5 P11 Q1                       |
-| K1  | [Quick-match queue](k1-quick-match-queue.md)                                   | draft  | 3     | H1, R1, R2, X1b                                                       | F1 F6 P1 P3 P13 P15                |
-| H3  | [Replay viewer](h3-replay-viewer.md)                                           | draft  | 4     | H1, H2                                                                | F2 P2                              |
-| H4  | [Match statistics](h4-match-stats.md)                                          | draft  | 4     | H1, H2; X1a for the nightly backfill                                  | F7 P21                             |
-| R3  | [Leaderboard](r3-leaderboard.md)                                               | draft  | 4     | R1, R2, R6-core; A3 if shipped                                        | P8 P18 P19 P20                     |
-| R4  | [Profile statistics](r4-profile-statistics.md)                                 | draft  | 4     | H2, H4, R1, R3; A3 if shipped                                         | P8 P9                              |
-| R5  | [Head-to-head and rating history](r5-head-to-head-rating-history.md)           | draft  | 4     | R4 (with H2, R1, R3); A3 if shipped                                   | P8                                 |
-| S1  | [Sponsor placements](s1-sponsor-placements.md)                                 | draft  | Pilot | X1 (≥ 30 days of data), BRD, S2-min                                   | F3 P14 Q2 Q5                       |
-| S2  | [Sponsor measurement](s2-sponsor-measurement-reports.md) (S2-min with S1)      | draft  | Pilot | S1, X1                                                                | F3 P12 P14                         |
-| S3  | [Sponsor page](s3-sponsor-page.md) (S3a pilot page, S3b rate card)             | draft  | Pilot | S1, S2-min; S3b after a delivered report                              | F3 P14 Q3 Q5                       |
-| K2  | [Queue quality](k2-queue-quality.md)                                           | draft  | L     | K1                                                                    | P13 P15 P16                        |
+| ID  | Spec                                                                           | Status  | Wave  | Depends on                                                            | Register IDs                       |
+| --- | ------------------------------------------------------------------------------ | ------- | ----- | --------------------------------------------------------------------- | ---------------------------------- |
+| H1  | [Match persistence](h1-match-persistence.md)                                   | revised | 1     | V1.1-A2                                                               | F1 F4 F8 P1 P2 P3 P4 P5 P6 P17 P21 |
+| H2  | [History and match detail](h2-history-match-detail.md)                         | draft   | 1     | H1                                                                    | F2 F8 P2 P5 P8                     |
+| X1  | [Product analytics](x1-product-analytics.md) (X1a wave 1, X1b wave 2)          | draft   | 1, 2  | X1a: none (its ledger step needs H1's migration). X1b: H1             | P12 P13                            |
+| R2  | [Rated play rules](r2-ranked-play-rules.md)                                    | draft   | 2     | H1, R1 (activated together)                                           | F1 F2 F4 P1 P2 P3 P7 P10           |
+| R1  | [Rating system](r1-rating-system.md)                                           | draft   | 2     | H1, X1a, R2 (activated together), R6-core's migration                 | F4 P4 P9 P18 P20                   |
+| R6  | [Ranking integrity](r6-ranking-integrity.md) (R6-core wave 2, R6-detect later) | draft   | 2, L  | R1, R2 (R6-core's migration lands inside R1's slices); R6-detect: X1a | P4 P7 P8 P10                       |
+| A3  | [Account deletion](a3-account-deletion.md)                                     | draft   | 2     | H1, X1a; R1 if shipped; Q1                                            | F5 P5 P11 Q1                       |
+| K1  | [Quick-match queue](k1-quick-match-queue.md)                                   | draft   | 3     | H1, R1, R2, X1b                                                       | F1 F6 P1 P3 P13 P15                |
+| H3  | [Replay viewer](h3-replay-viewer.md)                                           | draft   | 4     | H1, H2                                                                | F2 P2                              |
+| H4  | [Match statistics](h4-match-stats.md)                                          | draft   | 4     | H1, H2; X1a for the nightly backfill                                  | F7 P21                             |
+| R3  | [Leaderboard](r3-leaderboard.md)                                               | draft   | 4     | R1, R2, R6-core; A3 if shipped                                        | P8 P18 P19 P20                     |
+| R4  | [Profile statistics](r4-profile-statistics.md)                                 | draft   | 4     | H2, H4, R1, R3; A3 if shipped                                         | P8 P9                              |
+| R5  | [Head-to-head and rating history](r5-head-to-head-rating-history.md)           | draft   | 4     | R4 (with H2, R1, R3); A3 if shipped                                   | P8                                 |
+| S1  | [Sponsor placements](s1-sponsor-placements.md)                                 | draft   | Pilot | X1 (≥ 30 days of data), BRD, S2-min                                   | F3 P14 Q2 Q5                       |
+| S2  | [Sponsor measurement](s2-sponsor-measurement-reports.md) (S2-min with S1)      | draft   | Pilot | S1, X1                                                                | F3 P12 P14                         |
+| S3  | [Sponsor page](s3-sponsor-page.md) (S3a pilot page, S3b rate card)             | draft   | Pilot | S1, S2-min; S3b after a delivered report                              | F3 P14 Q3 Q5                       |
+| K2  | [Queue quality](k2-queue-quality.md)                                           | draft   | L     | K1                                                                    | P13 P15 P16                        |
 
 Wave `L` is "later in V2": it ships only with evidence that it is needed.
 

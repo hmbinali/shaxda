@@ -2,7 +2,7 @@
 
 | Field      | Value                                                                                                                                                                                                         |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status     | `revised` (see [README](README.md#spec-index))                                                                                                                                                                |
+| Status     | `frozen@5c6d76a` (see [README](README.md#spec-index))                                                                                                                                                         |
 | Wave       | Pilot: S3a once S1 and S2-min are live; S3b after a first booking is delivered and reported ([BRD §8](../shaxda_brd.md#8-evidence-gates)). The PDF is Later.                                                  |
 | Depends on | S1, S2-min; S3b after a delivered report                                                                                                                                                                      |
 | Register   | F3, P14, Q3, Q5 ([register](README.md#decision-register))                                                                                                                                                     |

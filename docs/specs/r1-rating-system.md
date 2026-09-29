@@ -2,7 +2,7 @@
 
 | Field      | Value                                                                                                                                               |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status     | `revised` (see [README](README.md#spec-index))                                                                                                      |
+| Status     | `frozen@5c6d76a` (see [README](README.md#spec-index))                                                                                               |
 | Wave       | 2, activated together with R2                                                                                                                       |
 | Depends on | H1, X1a (web entry wrapper and cron), R2 (activated together), R6-core's migration (§2)                                                             |
 | Register   | F4, P4, P9, P18, P20 (also cites P8, P19)                                                                                                           |

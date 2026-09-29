@@ -47,12 +47,12 @@ production browser checks are tracked in
 ratings, leaderboard, and sponsorship stay out of scope until the V2 milestone
 that covers them is activated. Full English/i18n is not part of V2.
 
-**V2** (`docs/shaxda-v2.md`, specs in `docs/specs/`) is being specified, not
-built. No V2 implementation starts before its spec is `frozen` in
-`docs/specs/README.md` **and** its milestone is activated. Do not pre-apply the
-V2 §6 rule changes; each lands in the first commit of the milestone that needs
-it. Precedence between the PRD and the V2 documents is set in
-`docs/shaxda_prd.md` §27.
+**V2** (`docs/shaxda-v2.md`, specs in `docs/specs/`) is specified and frozen,
+not built: no V2 milestone is activated yet. No V2 implementation starts
+before its spec is `frozen` in `docs/specs/README.md` **and** its milestone is
+activated. Do not pre-apply the V2 §6 rule changes; each lands in the first
+commit of the milestone that needs it. Precedence between the PRD and the V2
+documents is set in `docs/shaxda_prd.md` §27.
 
 ## Source-of-Truth Documents
 

@@ -2,7 +2,7 @@
 
 | Field     | Value                                                                                     |
 | --------- | ----------------------------------------------------------------------------------------- |
-| Status    | `revised` — freezes with the specs (see [README](README.md))                              |
+| Status    | `frozen@5c6d76a`, with the specs (see [README](README.md#spec-index))                     |
 | Source    | `docs/specs-revision-plan.md` §4, refined by the proofs in §12 and the notes in §13       |
 | Register  | F, P, and Q IDs are defined in [README](README.md#decision-register)                      |
 | Consumers | Every V2 spec. Specs link here and never restate competing SQL, enums, or message shapes. |

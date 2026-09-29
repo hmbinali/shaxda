@@ -3,8 +3,11 @@
 ## 1. Purpose
 
 This document is the technical and product source of truth for Shaxda. V1.0 and
-V1.1-A have launched; **V1.1-A2 — Authenticated Online Identity Integration is
-the active fast-follow milestone**.
+V1.1-A have launched. **V1.1-A2 — Authenticated Online Identity Integration is
+deployed to production**; its remaining production browser checks are tracked in
+`docs/ops/v11a-a2-release-verification.md`. The work after V1.1-A2 is V2
+(`docs/shaxda-v2.md`), specified in `docs/specs/` and not yet activated. §27 sets
+how this PRD and the V2 documents relate.
 
 It combines the product scope, final tech stack, infrastructure rules, build workflow, and milestone roadmap into one concise file for Codex, Claude, and future developers.
 
@@ -38,6 +41,9 @@ The product should feel like a modern Somali wooden board game: warm wood, carve
 ---
 
 ## 3. V1.0 Launch Scope
+
+_Historical record of the V1.0 launch. Accounts, Google login, and account
+usernames shipped in V1.1-A; everything later is governed as §27 describes._
 
 ### Included in V1.0
 
@@ -104,10 +110,11 @@ V1.0 has launched. V1.1 is split into ordered milestones so identity can ship
 without coupling it to game persistence:
 
 1. V1.1-A accounts and identity — shipped;
-2. V1.1-A2 authenticated online identity integration — active;
-3. V1.1-B logged-in matches, history, and replay;
-4. V1.1-C leaderboard and profile statistics;
-5. V1.1-D English and full i18n.
+2. V1.1-A2 authenticated online identity integration — deployed; production
+   browser checks open;
+3. V1.1-B logged-in matches, history, and replay — superseded by the V2 H track;
+4. V1.1-C leaderboard and profile statistics — superseded by the V2 R track;
+5. V1.1-D English and full i18n — not part of V2; reconsidered after V2.
 
 V1.1-A established permanent Google-backed identity, a required public username,
 privacy-first avatars, public profiles, account settings, and session-aware
@@ -1372,7 +1379,9 @@ Architecture and privacy constraints:
 
 ### V1.1-A2 — Authenticated Online Identity Integration
 
-Status: **active**. Depends on V1.1-A.
+Status: **deployed** to production (release record dated 2026-08-05); the
+remaining production browser checks are open in
+`docs/ops/v11a-a2-release-verification.md`. Depends on V1.1-A.
 
 Includes:
 
@@ -1407,6 +1416,8 @@ Constraints:
 
 ### V1.1-B — Persistence, History, Replay
 
+Status: superseded by the V2 H track (`docs/shaxda-v2.md`). Kept as history.
+
 Includes:
 
 - matches table;
@@ -1418,6 +1429,8 @@ Includes:
 
 ### V1.1-C — Leaderboard and Stats
 
+Status: superseded by the V2 R track (`docs/shaxda-v2.md`). Kept as history.
+
 Includes:
 
 - leaderboard schema;
@@ -1427,6 +1440,8 @@ Includes:
 - abuse-resistant ranking logic.
 
 ### V1.1-D — English and Full i18n
+
+Status: not part of V2 (`docs/shaxda-v2.md` §5); reconsidered after V2.
 
 Includes:
 
@@ -1462,6 +1477,10 @@ Do not build these in V1.0:
 
 An interactive tutorial may become more valuable than AI after launch because first advantage and placement strategy are hard for new players.
 
+V2 takes up direct sponsorship as a measured pilot under its own rules
+(`docs/shaxda-v2.md` §6). Every other item above stays out of V2 unless the V2
+brief says otherwise.
+
 ---
 
 ## 27. Final Rule
@@ -1469,6 +1488,16 @@ An interactive tutorial may become more valuable than AI after launch because fi
 If there is a conflict between documents:
 
 1. `docs/shaxda_game.md` wins for game rules.
-2. `docs/shaxda_prd.md` wins for product, tech, architecture, infrastructure, and roadmap.
-3. Agent/config files should reference these two files and not create new product rules.
-4. Proposal files such as separate roadmap drafts are not source of truth after this PRD is updated.
+2. `docs/shaxda_prd.md` wins for V1 product scope, tech stack,
+   architecture, infrastructure, and the V1 roadmap.
+3. `docs/shaxda-v2.md` and the frozen specs in `docs/specs/` govern V2 scope
+   and order. The PRD governs stack and infrastructure for V2 as well, except
+   where `docs/shaxda-v2.md` §6 amends a rule explicitly; each amendment is
+   applied to this PRD and `AGENTS.md` in the first commit of the milestone
+   that needs it. Until then the rule here stands.
+4. `docs/shaxda_brd.md` governs business strategy, sponsor policy, and pricing.
+   It cannot add product scope that this PRD or the V2 brief excludes.
+5. Agent/config files should reference these files and not create new product
+   rules.
+6. Proposal and plan files, such as `docs/specs-revision-plan.md` and roadmap
+   drafts, are working documents, not sources of truth.

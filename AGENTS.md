@@ -40,10 +40,19 @@ V1.0 does **not** include:
 - app-store wrapper.
 
 V1.0 and **V1.1-A — Accounts and Identity have launched**. **V1.1-A2 —
-Authenticated Online Identity Integration is active** and may connect complete
-accounts to online-room seats through short-lived signed tickets. Match
-persistence, history, replay, leaderboard, and full English/i18n remain out of
-scope until their later V1.1 milestones are deliberately activated.
+Authenticated Online Identity Integration is deployed** and connects complete
+accounts to online-room seats through short-lived signed tickets; its remaining
+production browser checks are tracked in
+`docs/ops/v11a-a2-release-verification.md`. Match persistence, history, replay,
+ratings, leaderboard, and sponsorship stay out of scope until the V2 milestone
+that covers them is activated. Full English/i18n is not part of V2.
+
+**V2** (`docs/shaxda-v2.md`, specs in `docs/specs/`) is being specified, not
+built. No V2 implementation starts before its spec is `frozen` in
+`docs/specs/README.md` **and** its milestone is activated. Do not pre-apply the
+V2 §6 rule changes; each lands in the first commit of the milestone that needs
+it. Precedence between the PRD and the V2 documents is set in
+`docs/shaxda_prd.md` §27.
 
 ## Source-of-Truth Documents
 
@@ -84,9 +93,10 @@ Read these before relevant work:
 Better Auth and Google OAuth belong to the shipped V1.1-A account milestone and
 must live in the SvelteKit web Worker. V1.1-A2 permits the game Worker to verify
 short-lived HMAC identity tickets only; it must not gain Better Auth, D1, or
-session-cookie access. Do not introduce Paraglide/Inlang, English routes/content,
-match persistence, history, replays, or leaderboard work until the corresponding
-PRD milestone is active.
+session-cookie access. Do not introduce Paraglide/Inlang or English
+routes/content (not part of V2), and do not start match persistence, history,
+replays, ratings, or leaderboard work until the V2 milestone that covers it is
+activated.
 
 ## Build Principles
 
@@ -249,7 +259,8 @@ Phase 1: A2/A3 engine, B1 board UI, C1 content, D1 DO spike, E1 assets
 Phase 2: L1 local game, then L2/L3/L4 polish/sound/PWA
 Phase 3: O1/O2/O3 guest online play/resilience/hardening
 Phase 4: Q1 QA, BETA1 community beta, P1 launch
-V1.1: A accounts (shipped) -> A2 online identity (active) -> B history/replay -> C leaderboard -> D English
+V1.1: A accounts (shipped) -> A2 online identity (deployed; production checks open)
+V1.1-B/C: superseded by V2 (docs/shaxda-v2.md); V1.1-D English: not in V2
 ```
 
 F1 contracts are the parallelism gate for A2, A3, B1, and O1. C1, D1, and E1 may run earlier only if they do not define or consume game state/action contracts.

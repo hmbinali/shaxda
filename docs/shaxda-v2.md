@@ -3,24 +3,29 @@
 ## 1. Purpose
 
 This document defines **V2 of Shaxda**: everything the product builds after
-V1.0, V1.1-A, and V1.1-A2 shipped. It is the source of truth for V2 scope,
-milestone order, and the constraints each milestone must respect.
+V1.0, V1.1-A, and V1.1-A2. Together with the frozen specs in `docs/specs/`, it
+governs V2 scope and milestone order.
 
-It is deliberately a **brief per milestone, not an implementation spec**. Each
-milestone below has enough detail to write its own detailed spec plan when it
-becomes active. That spec is written later, one milestone at a time, and must
-not widen the milestone's scope without updating this file first.
+It is a **brief per milestone, not an implementation spec**. Each milestone has
+its own spec in `docs/specs/`; the index and decision register are in
+`docs/specs/README.md`. A spec may refine this brief; it may not widen a
+milestone's scope without updating this file first.
 
-Precedence stays as the PRD defines it:
+Precedence, as `docs/shaxda_prd.md` §27 sets it:
 
 1. `docs/shaxda_game.md` wins for game rules.
-2. `docs/shaxda_prd.md` wins for tech stack, infrastructure, and V1 architecture.
-3. `docs/shaxda-v2.md` (this file) wins for V2 scope, order, and V2-specific
-   architecture changes. Where it changes a V1 rule, it says so explicitly in
-   §6 and the change is applied to `AGENTS.md` and the PRD in the first commit
-   of the milestone that needs it.
+2. `docs/shaxda_prd.md` wins for V1 product scope, tech stack,
+   architecture, infrastructure, and the V1 roadmap.
+3. This file and the frozen specs in `docs/specs/` govern V2 scope and order.
+   The PRD governs stack and infrastructure for V2 as well, except where §6
+   amends a rule explicitly; each amendment is applied to the PRD and
+   `AGENTS.md` in the first commit of the milestone that needs it.
+4. `docs/shaxda_brd.md` governs business strategy, sponsor policy, and
+   pricing. It cannot add scope that the PRD or this file excludes.
 
-Read this fully before starting any V2 milestone.
+No V2 milestone is active until its spec is `frozen` in `docs/specs/README.md`
+**and** the milestone is activated. Read this fully before starting any V2
+milestone.
 
 ---
 

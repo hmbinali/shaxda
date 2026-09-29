@@ -1,368 +1,496 @@
-# R6 — Ranking Integrity and Tools (Spec)
+# R6 — Ranking Integrity (Spec)
 
-| Field                    | Value                                                                                                                                      |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Status                   | Draft; specification only. R6 is not active or shipped.                                                                                    |
-| Brief                    | `docs/shaxda-v2.md` §6.2, §7.2, §10 (R6), §14                                                                                              |
-| Depends on               | Merged H1 ledger, R1 rebuild/processor, R2 rating policy, R3 leaderboard and its derived projections                                       |
-| Workspace                | `r6-ranking-integrity`                                                                                                                     |
-| Touches when implemented | `packages/db`, web Worker scheduled handler, repo admin scripts, rating rebuild, public read projections, tests; optionally `/admin/flags` |
+| Field      | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | `revised` (see [README](README.md#spec-index))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Wave       | R6-core: 2, with R1/R2; required before rated public play. R6-detect: L (later in V2, only with evidence that it is needed)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Depends on | R1, R2; R6-core's migration merges between R1's slices 4 and 5 (§3.1); R6-detect also needs X1a                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Register   | P4, P7, P8, P10; also cites P2 and P17 ([register](README.md#decision-register))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Contracts  | Owns the R6 tables and the plan/apply contract (§3), including `rating_account_exclusion` ([§7.5](v2-contracts.md#75-exclusion-projection)). Consumes [§2.1](v2-contracts.md#21-h1-tables), [§2.4](v2-contracts.md#24-compact-replay), [§2.5](v2-contracts.md#25-r1-extension), [§4.2](v2-contracts.md#42-rating-decision), [§4.3](v2-contracts.md#43-canonical-sample-matches), [§5](v2-contracts.md#5-access-matrix), [§7.2](v2-contracts.md#72-the-fence), [§7.4](v2-contracts.md#74-corrections), [§8](v2-contracts.md#8-deletion), [§10.1](v2-contracts.md#101-one-cron-one-dispatcher), [§11](v2-contracts.md#11-migration-ownership), [§12 E1](v2-contracts.md#12-evidence) |
+| Brief      | [`docs/shaxda-v2.md`](../shaxda-v2.md) §6.2, §7.2, §10 (R6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Touches    | `packages/db` (migrations, `@shaxda/db/rating-admin` statements), `packages/rating` (correction diff and digest; R6-detect rules), `scripts/rating-admin/` and the root `rating:admin` script, `web/` (the "rating corrected" label; R6-detect job and `/admin/flags`), `packages/i18n`                                                                                                                                                                                                                                                                                                                                                                                            |
 
-This refines the V2 R6 brief without activating it. The V2 brief controls scope,
-the PRD controls the stack, and `docs/shaxda_game.md` controls game rules. The
-H1 and R1–R5 specs in this checkout are drafts, while the current codebase has
-not yet added the H1 match ledger. Reconcile table names, rating policy
-versions, projections, and operator access with the merged implementation
-before writing a migration or running a remote command. R6 must not change a
-game result or silently rewrite a rating.
+R6 keeps public ratings honest without a moderation product. **R6-core** is
+the founder's toolset: inspect and verify any saved match, prove that stored
+ratings equal a fresh rebuild, take a reviewed match out of the ratings or an
+account off the public ranking, and undo either. Every change is planned,
+applied in one atomic batch, and audited. **R6-detect** adds advisory flags
+later, only with evidence that they are needed. R6 never changes a game
+result or a ledger row. It leaves the arithmetic and the correction procedure
+to R1, the decision policy and rated labels to R2, their rendering to H2 and
+R4, stalled saves to H1's `match:ops`, and leaderboard eligibility to R3.
 
----
+## 1. Outcome and non-goals
 
-## 1. Outcome and scope
+### 1.1 R6-core (wave 2)
 
-An operator can find plausible ranking abuse, inspect the underlying games,
-remove a reviewed match from rating calculations, or remove an account from
-the public leaderboard. Every correction is attributable, reversible only by
-an explicit subsequent operation where supported, and verifiable by a full
-ledger rebuild. A detection result is a **lead for review**, not proof of
-misconduct.
+**Outcome.** Before rated play is public, every correction the ratings may
+need exists as a rehearsed, reviewable, reversible operator command.
 
-### Must
+**Must**
 
-1. Run four bounded, deterministic detection jobs in the web Worker: pair win
-   trading, repeated instant resignations, one-way feeding, and abnormal
-   rated-game rate. They create or update flags only. They never invalidate a
-   match, exclude a player, ban an account, or change a rating.
-2. Persist `rating_flag` records with a reason code, rule version, subject,
-   window, evidence match ids, and review state. A flag must be inspectable
-   without storing email, provider identity, IP, or the room's private ticket.
-3. Supply a repo admin CLI for `inspect-match`, `verify-replay`,
-   `inspect-rating`, `flags`, `invalidate-match`, `exclude-account`,
-   `include-account`, `rebuild-ratings`, and `check-consistency`. It runs
-   against an explicitly selected local, preview, or production D1 database
-   through Wrangler. Mutating commands use plan/apply and audit every attempt.
-4. Record every manual correction in an append-only D1 audit table. The
-   immutable H1 result, seats, replay, and timestamps are never edited.
-5. Make invalidation an explicit ledger exclusion. Recompute all affected
-   rating statuses, events, current ratings, R3 form/count/rank projection,
-   and any R5 derived form projection through R1's guarded rebuild path. A
-   stored rating must match a fresh rebuild after publication resumes.
-6. Keep R3's `player_rating.excluded` flag independent of rating arithmetic.
-   Store the operator's exclusion decision separately so a rebuild cannot
-   erase it when an account has zero remaining rated games. Exclusion removes
-   only public rank/leaderboard placement; inclusion restores eligibility
-   subject to R3's normal RD, game-count, activity, and profile rules. Neither
-   action hides a profile nor changes a game result.
+1. `pnpm rating:admin -- <command> --database <local|preview|production>`
+   with the commands of §4.1; no environment default, no arbitrary SQL,
+   every input validated before a query.
+2. Plan/apply for every mutation (§3.2): the plan records a digest and the
+   ledger high-water `seq`; apply rejects if either changed.
+3. The §3.1 tables, migrated after R1's.
+4. Invalidate, rescind, and rebuild publish through R1's correction procedure
+   ([§7.4](v2-contracts.md#74-corrections)): a full rebuild in `seq` order
+   under the recorded versions, swapped in one batch with R6's rows (§4.2).
+5. "Rating corrected" on each match whose decision or displayed values a
+   correction changed; nothing public names a reason, actor, or detector.
+6. Exclusion changes only public ranking and survives every rebuild (§4.3).
+7. Remote mutations: a restore point first and a preview rehearsal before a
+   command's first production use; only the founder runs them, never tests,
+   CI, or deploy hooks.
 
-### Should
+**Should:** `inspect-match` lists either seat's rated games that overlap it
+in time (the P10 signal); one neutral sentence each on `/learn#tartan` and
+`/legal` (§7).
 
-- `/admin/flags` can show a bounded, admin-only review list linked to the CLI
-  inspection output. It performs no correction in this milestone.
+### 1.2 R6-detect (wave L)
 
-### Out of scope
+**Outcome.** A nightly job raises advisory flags for four patterns; the
+founder reviews them on `/admin/flags` and acts, if at all, through R6-core.
+A flag is a lead for review, not proof of misconduct.
 
-- Automated punishment, account suspension, bans, appeals, player reports,
-  public accusation labels, new identity/device tracking, and matchmaking
-  penalties.
-- Changing R1 Glicko-2 arithmetic, R2's normal eligibility or pair/daily cap
-  policy, game rules, or the game Worker's write boundary.
-- Deleting match rows, replay data, account records, or history. No per-move
-  database rows and no new Durable Object lifecycle behavior.
+**Must**
 
----
+1. Four pure `rule_v = 1` detectors (§4.4) with threshold, just-below,
+   window, and small-community false-positive fixtures.
+2. `rating_flag` (§3.3): one open flag per rule, version, and subject.
+3. A nightly dispatcher job
+   ([§10.1](v2-contracts.md#101-one-cron-one-dispatcher)) with a `job_state`
+   lease and cursor, behind the kill switch `RATING_FLAGS_ENABLED`.
+4. Read-only `/admin/flags` (admin allowlist, `no-store`, `noindex`); CLI
+   `flags`, `review-flag` (plan/apply), and `detect` (read-only).
+5. Detectors never write ratings, invalidations, or exclusions.
 
-## 2. Source of truth and correction semantics
+### 1.3 Not in R6
 
-The authoritative input is the H1 `match` row and its two `match_player`
-rows. A match's recorded result and replay are immutable historical facts.
-R1 `rating_status`, skip reason, before/after/delta, `player_rating`, and R3/R5
-rating-related projections are derived and may be replaced only by the
-guarded rebuild. An R6 invalidation is a separate operator decision keyed to
-the opaque `match.id`; it does not pretend that the game never happened.
+Automated punishment, bans, suspensions, appeals, player reports, public
+accusation labels, device or IP tracking, matchmaking penalties; editing or
+deleting ledger rows, replays, or accounts; any public mutation route; rating
+arithmetic, policy, or version changes (R1, R2); a cross-room active-game
+registry (P10); stalled-save recovery (H1, P17); leaderboard eligibility (R3).
 
-The rebuild considers an invalidation **before** applying R2's rating policy.
-It records the invalidated match as `rating_status = skipped` with a new,
-versioned `rating_skip_reason = invalidated`; both seat rating-event fields
-are null. This is an explicit R1/R2 contract change, to be committed with
-reader updates and a policy version bump when R6 is implemented. An
-invalidated match does not consume a pair or daily rated-game cap slot. Every
-later ledger row is reevaluated in `(ended_at, match.id)` order: a formerly
-cap-skipped match may become rated, and the rating changes can propagate to
-players who never met the invalidated pair. The safe default is a **full**
-rebuild, not an isolated edit of the two players' current ratings.
+## 2. Decisions and dependencies
 
-`rated` remains the room's original intent. `competition_status` and the
-persisted win/loss/draw remain as recorded. Public history and match detail
-must distinguish “played result” from “rating removed”; they never show the
-old delta as confirmed. R4/R5 all-game W/L/D, head-to-head, streak, and
-Shaxda aggregates continue to include the played result when it otherwise
-meets their normal competitive-game rules. This is the draft choice in §10;
-all pages must use the same treatment. R3 rated-only W/L/D, form, and rank
-always exclude the invalidated event because it has no processed rating
-event. A leaderboard-excluded account's already valid rating events remain
-in the ledger and continue to affect its opponents' ratings.
+| ID  | How R6 applies it                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P4  | Corrections rebuild in `seq` order. A late save is simply the next event, never a correction. Detectors judge behaviour in `ended_at` windows and never reorder ratings.             |
+| P7  | A rebuild re-applies the pair cap under the recorded policy version: an invalidated event frees its slot, so a later cap-skipped event can become processed; rescinding reverses it. |
+| P8  | Invalidated events are not processed, so public numbers drop them with no special case; public match lists keep them, labelled.                                                      |
+| P10 | R6 does not prevent concurrent rated games; `inspect-match` and flags are the evidence that would reopen P10.                                                                        |
+| P2  | An invalidated rated match stays public (M8). A friendly match cannot be invalidated: it has no rating effect.                                                                       |
+| P17 | Stalled saves belong to H1's `match:ops`. R6 keeps the same rule for its own changes: nothing on a timer, every corrective step explicit and audited.                                |
 
-R1's normal processor stops accepting new events while a correction is being
-planned or applied. A pending or late H1 row discovered during the operation
-is included in the planned rebuild, or the plan is rejected as stale and
-recomputed. Readers may show the last confirmed state with a neutral
-maintenance/pending message; they must not combine new current ratings with
-old match events or claim a fresh rank from a partial rebuild.
+| Dependency | What it provides                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1         | Ledger rows ([§2.1](v2-contracts.md#21-h1-tables)), the compact replay and decoder ([§2.4](v2-contracts.md#24-compact-replay)), `rules_v`, `replay_v`.                                                                                                                                                                                                                                                                            |
+| R1         | `packages/rating` and `pnpm rating:rebuild` (dry run, `--apply`, `--resume`), whose rebuild takes the invalidation set as an input so R6 can pass a proposed change before its log row exists; `match_rating`, `match_player_rating`, `player_rating`, `rating_processor_state`, the fence, the `*_next` tables and swap ([§2.5](v2-contracts.md#25-r1-extension), [§7.4](v2-contracts.md#74-corrections)); whole-number display. |
+| R2         | `ratingSkipReason` and `writesLedgerRow` (`@shaxda/shared/rated-play`), `RATING_POLICY_V`, and the rated label mapping, including the removal label.                                                                                                                                                                                                                                                                              |
+| H2, R4     | The match page, `/history`, and the public profile list, where the labels render.                                                                                                                                                                                                                                                                                                                                                 |
+| X1a        | R6-detect only: the dispatcher, `job_state` and `job_fence`, `requireAdmin` with `ADMIN_USER_IDS`.                                                                                                                                                                                                                                                                                                                                |
+| A3         | Pending and deleted states; the neutral label everywhere outside the operator's terminal ([§8](v2-contracts.md#8-deletion)).                                                                                                                                                                                                                                                                                                      |
+| Consumers  | R1's processor and rebuild read the invalidation set (decision step 1) and the exclusion source; R3 reads `player_rating.excluded` for P19.                                                                                                                                                                                                                                                                                       |
 
----
+## 3. Contracts
 
-## 3. Detection rules
+### 3.1 R6-core tables
 
-Run on confirmed `rating_status = processed` events that are not invalidated.
-Join the two seats by opaque account id, never by username snapshot. An
-R2-aborted, friendly, pending, cap-skipped, or guest-involved game is not
-evidence of **rated** abuse. The scheduled job uses an indexed, bounded lookback
-and a persisted cursor; it catches up in chunks after missed runs. A nightly
-run is sufficient for advisory flags. No scan or replay verification runs on a
-normal leaderboard or profile request.
+One hand-written migration, numbered at merge after R1's
+([§11](v2-contracts.md#11-migration-ownership)). R1's fold reads the view and
+the exclusion source from its first decision (R1 slice 5), so this migration
+merges between R1's slices 4 and 5 and ships in the same wave-2 migration
+window.
 
-The cursor is only an optimization. If H1 inserts a late historical match or
-an R6 rebuild changes which old matches are `processed`, rewind affected
-rule windows and rerun them before declaring detection current. Reprocessing
-must not create duplicate flags. A deliberate, bounded historical backfill is
-available for the initial rollout; it is not part of each nightly job.
+```sql
+CREATE TABLE rating_admin_audit (                  -- append-only
+  id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL,
+  environment    TEXT NOT NULL CHECK (environment IN ('local','preview','production')),
+  actor          TEXT NOT NULL,                    -- §3.2
+  command        TEXT NOT NULL,                    -- no CHECK: R6-detect adds commands
+  target         TEXT,                             -- match, user, or flag id; NULL for rebuild-ratings
+  reason         TEXT NOT NULL CHECK (length(reason) BETWEEN 3 AND 500),
+  outcome        TEXT NOT NULL CHECK (outcome IN ('planned','applied','noop','rejected','failed')),
+  plan_digest    TEXT NOT NULL, high_water_seq INTEGER NOT NULL,
+  detail         TEXT NOT NULL DEFAULT '{}'        -- JSON: counts, rejection cause, restore point
+);
+CREATE INDEX rating_admin_audit_target_idx ON rating_admin_audit (target, id DESC);
+CREATE INDEX rating_admin_audit_digest_idx ON rating_admin_audit (plan_digest, outcome);
 
-Each rule operates on a sliding time window over `(ended_at, match.id)` and
-stores the **minimal match ids needed to satisfy it**, plus computed counts
-and durations. Initial thresholds are conservative review triggers, not
-claims of fraud. Store `rule_v = 1`; threshold or window changes require a
-version increment and fixture review before running on historical data.
+CREATE TABLE rating_invalidation_log (             -- append-only
+  id INTEGER PRIMARY KEY AUTOINCREMENT, match_id TEXT NOT NULL REFERENCES match(id),
+  action   TEXT NOT NULL CHECK (action IN ('invalidate','rescind')),
+  reason   TEXT NOT NULL CHECK (length(reason) BETWEEN 3 AND 500),
+  actor    TEXT NOT NULL, audit_id INTEGER NOT NULL REFERENCES rating_admin_audit(id),
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX rating_invalidation_log_match_idx ON rating_invalidation_log (match_id, id DESC);
+CREATE VIEW rating_invalidation_current AS         -- v2-contracts §4.2 step 1
+  SELECT l.match_id FROM rating_invalidation_log l WHERE l.action = 'invalidate'
+     AND l.id = (SELECT MAX(m.id) FROM rating_invalidation_log m WHERE m.match_id = l.match_id);
 
-| Reason code           | Version 1 candidate condition                                                                                                                                                                                                                     | Evidence                                                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `winTrading`          | Same pair has at least four rated games in a rolling 7 days, with winners alternating for four consecutive games, and at least three of those four games last at most 5 minutes. Draws break the run.                                             | Four ordered ids, winner seats mapped to account ids, and durations.                                                        |
-| `instantResignations` | One account manually resigns in at least three rated games in a rolling 24 hours, each within 60 seconds and no more than two accepted actions. A claim-win's synthetic resign does not count.                                                    | Three ids, durations, action counts, and `online_end_reason = NULL`.                                                        |
-| `oneWayFeeding`       | Same pair has at least five rated games in a rolling 7 days; one account loses at least four, and at least three of those losses are manual resignations or end within 5 minutes.                                                                 | Five ordered ids, loss direction, reasons, and durations.                                                                   |
-| `abnormalRate`        | One account completes at least 20 rated games in a rolling 24 hours against at least three distinct opponents. If R2's optional daily cap makes this unreachable, lower the trigger only through a rule-version change grounded in measured data. | First and last qualifying ids, total count, distinct-opponent count, and an indexed way to inspect the full bounded window. |
+CREATE TABLE rating_account_exclusion (            -- source of player_rating.excluded (§7.5)
+  user_id  TEXT PRIMARY KEY,                       -- private; no FK to user, like the ledger
+  excluded INTEGER NOT NULL CHECK (excluded IN (0,1)),
+  reason   TEXT NOT NULL CHECK (length(reason) BETWEEN 3 AND 500),
+  audit_id INTEGER NOT NULL REFERENCES rating_admin_audit(id), changed_at INTEGER NOT NULL
+);
 
-Duration is `max(0, ended_at - started_at)` from the stored server
-timestamps. A negative or missing duration is a ledger consistency error,
-not a short game. Use the R2-confirmed result and H1 terminal reason; do not
-infer a manual resign from a replay code alone. The rate rule is account
-scoped; pair rules use a canonical sorted pair of private ids so seat swaps
-and username changes cannot evade or duplicate a flag.
+CREATE TABLE rating_rebuild (                      -- append-only; one row per published correction
+  id INTEGER PRIMARY KEY AUTOINCREMENT, published_at INTEGER NOT NULL,
+  audit_id INTEGER NOT NULL UNIQUE REFERENCES rating_admin_audit(id),
+  reason TEXT NOT NULL, high_water_seq INTEGER NOT NULL,
+  policy_v INTEGER NOT NULL, algorithm_v INTEGER NOT NULL,
+  changed_events INTEGER NOT NULL CHECK (changed_events >= 0),
+  marked_events  INTEGER NOT NULL CHECK (marked_events BETWEEN 0 AND changed_events)
+);
 
-One active flag per `(reason code, rule_v, canonical subject)` is updated with
-new qualifying evidence rather than duplicating a flag every cron run.
-Evidence is capped to a bounded list in the row; the window/count and indexed
-ledger query reproduce the full candidate set. A dismissed flag remains in
-the audit history. A later qualifying window creates a new flag only when it
-contains a match newer than the dismissal; no cron run silently reopens the
-same evidence. An invalidation may make old evidence stale: inspection checks
-current statuses and marks the flag `stale` for review, without erasing it.
+CREATE TABLE rating_correction_mark (              -- public: "rating corrected"
+  match_id   TEXT PRIMARY KEY REFERENCES match(id),
+  rebuild_id INTEGER NOT NULL REFERENCES rating_rebuild(id)
+);
+```
 
----
+| Rule                 | Detail                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Append-only          | `BEFORE UPDATE` and `BEFORE DELETE` triggers `RAISE(ABORT, 'append-only')`. Time columns hold D1's clock in milliseconds, set by the writing statement.                                                                                                                                                                                                                         |
+| Invalidation set     | `invalidate` is appended only for a `rated = 1` match whose latest action is not `invalidate`; `rescind` only when it is. The processor checks a match with one indexed lookup on the view; a rebuild reads the view once.                                                                                                                                                      |
+| Exclusion projection | `player_rating.excluded` always equals `COALESCE(excluded, 0)` from the source. R1 writes it only when creating a `player_rating` or `player_rating_next` row, reading the source then; R6's exclusion batch updates the source and the projection together.                                                                                                                    |
+| Correction mark      | Exists when a published rebuild changed the match's `match_rating` status or skip reason, or either seat's `rating_before` or `rating_after` as displayed (R1's whole numbers). `rebuild_id` is the latest such rebuild; marks are never deleted. `changed_events` counts matches whose rating rows differ in any compared column (§3.2); `marked_events` counts marks written. |
+| Exposure, retention  | Only a mark's existence reaches a public loader; everything else here is operator-only (§5). Retention is indefinite, like the ledger.                                                                                                                                                                                                                                          |
 
-## 4. Data model and indexes
+### 3.2 Plan and apply
 
-Write a hand-authored migration numbered after the merged R1/R3 migrations,
-with matching Drizzle schema. The exact SQL names must be reconciled at
-implementation. Keep these logical records and invariants:
+Every mutating command runs twice with the same arguments: as a plan, then
+with `--apply <digest>`.
 
-| Record                     | Required fields and constraint                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rating_flag`              | Opaque id; reason code; rule version; subject type and canonical private subject key; first/last evidence times; bounded JSON array of match ids and numeric evidence; `open`/`dismissed`/`stale`/`actioned` review state; created/updated times. A manual invalidation also writes a `manualInvalidation` flag tied to one match and its stated reason, satisfying the V2 `rating_flag` contract. |
-| `rating_invalidation`      | `match_id` primary key; linked manual flag id; reason text/code; actor id; created time. Its existence is the authoritative exclusion input to the rating rebuild. It is append-only in R6; no implicit un-invalidate command.                                                                                                                                                                     |
-| `rating_account_exclusion` | `user_id` primary key; current excluded boolean, reason, actor id, and change time. This is the administrative source for R3's `player_rating.excluded` projection and survives even if a rebuild removes the player's last rated event.                                                                                                                                                           |
-| `rating_admin_audit`       | Monotonic id; actor id; environment; operation; target id; UTC time; reason; plan/diff digest; prior and resulting state; outcome (`planned`, `applied`, `failed`). Append, never update or delete. No password, token, email, or copied replay.                                                                                                                                                   |
-| Detection cursor           | Rule version and last `(ended_at, match.id)` examined, plus updated time. It is operational state only; rerunning a chunk is safe.                                                                                                                                                                                                                                                                 |
+| Term              | Rule                                                                                                                                                                                                                                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| High-water mark   | `H = cursor_seq` at plan time: the last decided ledger row, as R1's correction uses it. Rows above `H` are pending; after the swap the processor decides them on the corrected state with the log in force, so invalidating a pending match takes effect when it is decided.                                                    |
+| Plan              | Read-only apart from one `planned` audit row; prints environment, database, `H`, counts, up to 20 sample changes, and the digest. No change → `noop`, nothing to apply. `rebuild-ratings` without `--reason` is a dry run that writes nothing.                                                                                  |
+| Verification diff | Published rows against the rebuilt `*_next` rows: `match_rating` status, skip reason, and versions in `seq` order; both `match_player_rating` rows per match at full precision; `player_rating` rows by user id; for an exclusion, the source row and the projection. Wall-clock columns such as `decided_at` are not compared. |
+| Digest            | Lowercase hex SHA-256 of canonical JSON (fixed key order, no whitespace, shortest round-trip numbers) of `{ command, target, reason, environment, databaseId, highWaterSeq, policyV, algorithmV, invalidationLogHead, diff }`.                                                                                                  |
+| Apply             | Finds the `planned` row for this digest, environment, command, and target; recomputes; rejects with an audited cause (§4.2). An applied digest is `noop`. Success writes `applied` inside the publishing batch.                                                                                                                 |
+| Why `H` is fixed  | A row decided after the plan was decided on the uncorrected state, so it must be part of the reviewed rebuild. Exclusions do not depend on `H`; the rule is uniform, and a rejection costs a re-plan.                                                                                                                           |
+| Actor             | The identity `wrangler whoami` reports (login email, or token type and account id) plus `git config user.name` and `user.email`. Single-operator attribution, not strong identity: anyone with the founder's Wrangler login and a checkout can assert it. A remote command without a `whoami` identity exits before any read.   |
+| Production        | Applies also need `--confirm-database shaxda-db`.                                                                                                                                                                                                                                                                               |
 
-Add indexes for: rated events in `(ended_at, id)` order; player event windows
-through `match_player(user_id, ended_at, match_id)`; pair windows via the two
-player rows; flags by `(state, created_at DESC)` and subject; invalidation by
-`match_id`; account exclusion by its primary key; audit by
-`(target_id, id DESC)`. Reuse an existing index where
-`EXPLAIN QUERY PLAN` proves the same bounded path. Neither the detector nor
-routine CLI inspection uses a full-table scan; an **explicit full rebuild or
-full consistency check** is expected to read the whole ledger. Retention is
-indefinite for correction and audit records while the match ledger exists.
+### 3.3 R6-detect table
 
-Only the web Worker and the admin CLI read or write these R6 tables. The game
-Worker still writes only H1 `match` and `match_player`; it receives no auth
-table access, R6 D1 query, or detection timer.
-The manual flag, invalidation, and applied audit record must be committed as
-one guarded correction, never as independent writes.
+R6-detect's own migration, later; `rating_admin_audit` needs no change.
 
----
+```sql
+CREATE TABLE rating_flag (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rule   TEXT NOT NULL CHECK (rule IN ('winTrading','instantResignations','oneWayFeeding','abnormalRate')),
+  rule_v INTEGER NOT NULL,
+  subject_key TEXT NOT NULL,                       -- user id, or "<lower id>|<higher id>" for a pair; private
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','dismissed','actioned')),
+  window_start INTEGER NOT NULL, window_end INTEGER NOT NULL,   -- ended_at of first and last evidence
+  evidence TEXT NOT NULL,                          -- JSON, ≤ 20 matches: id, duration, actions, reasons, results
+  evidence_max_seq INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+  review_audit_id INTEGER REFERENCES rating_admin_audit(id),
+  CHECK ((status = 'open') = (review_audit_id IS NULL))
+);
+CREATE UNIQUE INDEX rating_flag_open_idx ON rating_flag (rule, rule_v, subject_key) WHERE status = 'open';
+CREATE INDEX rating_flag_list_idx ON rating_flag (status, updated_at DESC, id DESC);
+CREATE INDEX rating_flag_subject_idx ON rating_flag (rule, rule_v, subject_key, id DESC);
+```
 
-## 5. Admin CLI and access
+## 4. Behaviour and failure handling
 
-Provide a repository script such as `pnpm rating:admin -- <command> ...`.
-Every invocation requires `--database local|preview|production` and prints
-the resolved Wrangler config, D1 binding/database identifier, and mode before
-running. There is no environment default and no arbitrary SQL argument.
-Local uses Miniflare D1. Preview and production require explicitly selected
-Wrangler environment/config and the operator's Cloudflare credentials. Use
-Wrangler's D1 access rather than a public mutation HTTP route. Scripts must
-avoid shell interpolation of user input; validate opaque ids, reason codes,
-limits, and flags before preparing any query.
+### 4.1 R6-core — the CLI
 
-| Command                                         | Output or effect                                                                                                                                                                                                             |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `flags`                                         | Paginated open/stale/recent flags with reason, subject, time window, and evidence ids; no private identity export by default.                                                                                                |
-| `inspect-match <id>`                            | Immutable row, both seats, replay version, room mode, stored result/reasons, rating status and both current event rows, invalidation and audit links. Private ids are shown only to the operator.                            |
-| `verify-replay <id>`                            | Decode/replay through the frozen H1 engine, compare final state/result/starting seat and relevant stored counts; nonzero exit on unsupported or divergent replay. No mutation.                                               |
-| `inspect-rating <id>`                           | Show R1/R2 policy and algorithm versions, ordered prior states, cap decision, computed simultaneous event, stored before/after/delta, and first divergence. Accept a match id; account lookup is an optional bounded filter. |
-| `check-consistency`                             | Bounded or explicit full check of stored result versus replay, seat results, processed/skipped fields, rating events and projections; report first mismatch and exit nonzero. It does not repair.                            |
-| `invalidate-match <id>`                         | Require a nonempty operator reason. Plan the new invalidation, full rebuild, changed statuses and ratings, then apply only the reviewed plan. Repeating an identical applied request is a no-op; a conflicting reason fails. |
-| `exclude-account <id>` / `include-account <id>` | Require a reason and show the before/after public eligibility. Change only R3 exclusion metadata and refresh/invalidate leaderboard cache or snapshot. Repeated same-state requests are no-ops, still audited as attempts.   |
-| `rebuild-ratings`                               | Dry-run/diff by default using R1's exact oracle. Explicit apply follows the guarded procedure below; no deploy hook or test invokes remote apply.                                                                            |
+| Rule        | Detail                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Code        | `scripts/rating-admin/` holds the entry; D1 statements live in `@shaxda/db/rating-admin` and pure logic in `packages/rating`, so Vitest and the Workers pool test them without the CLI.                                                                                                                                                                                                                                                                                         |
+| Environment | `--database` is required; a missing or unknown value exits 2 before any I/O. The CLI first prints the environment, config path, database name and id, and mode (read, plan, or apply).                                                                                                                                                                                                                                                                                          |
+| Access path | Only Wrangler: `getPlatformProxy` over tracked, D1-only configs in `scripts/rating-admin/` (`local`: the web Worker's Miniflare database; `preview`, `production`: the remote database through Wrangler's remote bindings and the founder's `wrangler login`), with an empty env-file list, so `.dev.vars`, `.env`, and `.env.production` are never read. Every mutation is one `db.batch()`; separate Wrangler commands are never one atomic step. Times come from D1's clock. |
+| Inputs      | Zod before any query: match ids by the [§2.3](v2-contracts.md#23-public-match-id) pattern, `--username` or `--user-id`, `--reason` of 3–500 printable characters, known flags only. Bound parameters only; child processes (`wrangler whoami`, `wrangler d1 time-travel info`, `git config`) get argument arrays, never a shell string.                                                                                                                                         |
+| Output      | English operator text on the terminal. Private ids and current usernames appear only there; emails, provider ids, sessions, and tickets never. Exit 0 clean, 1 on a finding or rejection, 2 on usage or environment errors. Read-only commands write nothing.                                                                                                                                                                                                                   |
 
-The operator must identify themself through the established admin allowlist
-or an equally strong non-user service identity. A Cloudflare API token by
-itself is not the human actor id recorded in audit. Remote mutation fails
-closed if actor identity, audit append, backup, plan verification, or database
-binding cannot be proven. The CLI must not print secrets or private user data
-to CI logs. Keep detector flags and correction reasons out of public DTOs,
-Open Graph metadata, and shared caches. If `/admin/flags` ships, it uses the
-existing web-Worker session allowlist, `no-store`, and bounded indexed reads;
-the CLI remains the only mutation surface.
+| Command                                                 | Output or effect                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `inspect-match <matchId>`                               | Every ledger column except the raw replay (size and versions instead); both seats with private ids and current username or deletion state; the `match_rating` row (or "pending") and both `match_player_rating` rows at full precision; invalidation history, mark, audit trail; overlapping rated games (Should).                     |
+| `verify-replay <matchId>`                               | Decodes and replays with the engine for its `rules_v`; compares starting seat, action count, first advantage, winner, end reason, online end reason (only with a final `R:` of the losing seat), and each seat's result, pieces left, and captures. Exit 1 on a difference or unsupported version.                                     |
+| `inspect-rating <matchId>`                              | The decision trace: step 1 checks, then the `ratingSkipReason` inputs (rated, invalidated, the counted earlier-`seq` pair games). When processed, the event recomputed from the stored pre-event values and from each seat's previous processed event, against the stored values; first divergence. `--full` rebuilds up to its `seq`. |
+| `check-consistency [--no-replays]`                      | Full read: `writesLedgerRow` holds for every row; replays verify; a fresh rebuild up to `cursor_seq` equals the stored rating rows (zero drift); the view and `skipped:invalidated` rows agree (held rows excepted); `excluded` equals the source; maintenance is off and `*_next` empty. First offending id per check.                |
+| `rebuild-ratings [--reason <text>] [--apply <digest>]`  | The audited form of R1's `pnpm rating:rebuild`. Dry run by default: counts, first differences, and digest. With a reason it is a plan; `--apply` hands the approved plan to R1's swap (§4.2) under the current versions. For a version change, R1 names the new versions and this command publishes that rebuild the same way.         |
+| `invalidate-match <matchId> --reason <text>`            | Plan or apply (§4.2). Refused for a friendly match; `noop` when already invalidated.                                                                                                                                                                                                                                                   |
+| `rescind-invalidation <matchId> --reason <text>`        | Plan or apply (§4.2); `noop` unless the latest action is `invalidate`.                                                                                                                                                                                                                                                                 |
+| `exclude-account`, `include-account` (user, `--reason`) | Plan or apply (§4.3); `noop` when already in that state.                                                                                                                                                                                                                                                                               |
+| `resume-ratings --reason <text>`                        | Plan or apply: the audited form of R1's `rating:rebuild --resume`, abandoning a correction left open by a failed apply (§4.2).                                                                                                                                                                                                         |
 
-### Guarded apply
+### 4.2 R6-core — corrections
 
-1. Acquire R1's singleton processor lock/lease and stop normal event
-   publication. Export a recoverable D1 backup before a remote write. Record
-   the current ledger high-water mark, policy/algorithm versions, relevant
-   row counts, and a digest of the proposed diff.
-2. Run a read-only plan against the exact ledger and invalidation set,
-   including the requested change. Verify every affected match and both
-   player rows, all `player_rating` values, R3/R5 projections, cap decisions,
-   and exclusions that must be preserved. The plan reports changed-row
-   counts and a small sample without dumping private data.
-3. Apply only with an explicit plan digest and target environment. Reject if
-   the ledger high-water mark, lock version, policy version, or plan digest
-   changed. Write the invalidation/exclusion and audit entry, rebuild into
-   shadow state, compare it to the plan, then publish derived state and cursor
-   using the R1 guarded swap. A partial write never becomes a published
-   rating generation.
-4. Run full `check-consistency` and R1 dry-run/diff (zero drift), refresh
-   public ranking caches/snapshots, append the applied audit outcome, then
-   resume processing. On failure, keep publication gated, append a failed
-   audit outcome if D1 is available, and recover from backup or rerun the
-   guarded plan before opening reads.
+Invalidate, rescind, and rebuild apply run R1's correction (R1 §4.3,
+[§7.4](v2-contracts.md#74-corrections)) and add R6's checks and rows. The
+rebuild is a pure function of the ledger up to `H`, the invalidation set (with
+the proposed log row), the exclusion source, and the recorded `policy_v` and
+`algorithm_v`. R6 never changes a version, so every cap decision is
+re-evaluated deterministically under the original policy.
 
-The concrete shadow/swap mechanism must be proven against the merged R1
-processor and D1 behavior in local Miniflare before remote apply is enabled.
-The CLI must not claim atomic publication merely because several Wrangler
-commands ran successfully. Preview is the required rehearsal for the same
-operation planned in production.
+| Step | Apply does                                                                                                                                                                                                                                                                                                                               | Else                             |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 1    | Finds the `planned` row for the digest.                                                                                                                                                                                                                                                                                                  | `unknownPlan`; `noop` if applied |
+| 2    | Preview and production: records a D1 Time Travel restore point (`wrangler d1 time-travel info`) in the audit detail.                                                                                                                                                                                                                     | `restorePointUnavailable`        |
+| 3    | R1's stop: the operator lease and `maintenance = 1`, retried for two minutes while the processor holds the lease.                                                                                                                                                                                                                        | `maintenanceBusy`                |
+| 4    | Checks `cursor_seq = H`.                                                                                                                                                                                                                                                                                                                 | `staleHighWater`                 |
+| 5    | R1's rebuild up to `H` into `*_next`, in bounded, resumable chunks.                                                                                                                                                                                                                                                                      | `failed`                         |
+| 6    | R1's verify, then the verification diff (§3.2), whose digest must equal the plan's; the marked set comes from the same diff.                                                                                                                                                                                                             | `digestMismatch`                 |
+| 7    | R1's one-batch swap, given the approved plan; after its fence, R6's log row, `rating_rebuild` row, marks (upserted from JSON lists of match ids, at most 1 MB each), and `applied` audit row. D1 serialises queries, so every request waits for it (about 0.16 s at 25,000 matches locally, E1): production applies run at a quiet hour. | `failed`; nothing changes        |
+| 8    | R1's finish (empty `*_next`), then `check-consistency --no-replays`, which must show zero drift.                                                                                                                                                                                                                                         | exit 1; stop and inspect         |
 
----
+Consequences, all visible in the plan: the invalidated match's `match_rating`
+becomes `skipped:invalidated` and its `match_player_rating` rows disappear; a
+later cap-skipped game of the pair can become processed; every later event of
+both players, and of anyone they later played, is recomputed. `match` and
+`match_player` never change. A rescission returns every rating row to the
+state it would have had without the invalidation.
 
-## 6. Public behavior
+**Failures.** Nothing published changes before step 7, and a failed fence
+(`rating_fence_guard`) or statement rolls the whole swap back. The CLI then
+releases maintenance and empties `*_next` with its token and appends
+`rejected` or `failed`. If it cannot (crash, lost network), maintenance stays
+on: ratings pause behind R1's "updating" note while saves continue, until the
+operator re-runs the same apply (it takes over the lapsed operator lease, as
+in R1) or runs `resume-ratings`. Restoring the Time Travel point is a last
+resort: it rewinds every table, including matches and accounts written
+since. The ledger is never touched, so a correct re-run is the normal repair.
 
-An invalidation takes effect only after the rebuild is published. R1 result
-overlays, H2 match detail/history, R4 profile, and R5 chart show the current
-confirmed rating event or a truthful pending/removed state. None may keep a
-cached old delta after invalidation. Public copy is Somali and neutral: it
-states that a game no longer affects rating, without naming a detector,
-reason, actor, or suspected player. A flagged but uncorrected game looks
-unchanged to the public.
+### 4.3 R6-core — exclusion, held rows, public behaviour
 
-R3 leaderboard and profile rank use one published rating generation.
-`excluded = true` removes the player from ranks and neighbor strips after
-cache/snapshot refresh. The account's own unranked state can use R3's neutral
-“not currently listed” wording. A public profile and existing match pages
-remain accessible; no flag, private id, operator reason, or audit text leaks
-through their loaders. Inclusion reapplies normal R3 eligibility and does
-not guarantee a rank.
+| Topic              | Rule                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Exclusion batch    | A fence row requiring `maintenance = 0`, the source upsert, `UPDATE player_rating SET excluded = ?` for the account (if it has a row), and the `applied` audit row. During a correction it fails with `maintenanceBusy`, so `player_rating_next` cannot go stale.                                                                                                                                                                |
+| Exclusion effect   | Ratings, rating events, ledger rows, profiles, and opponents' ratings never change. R3 applies P19 (`excluded = 0`) at its next uncached read; inclusion restores eligibility, not a rank. A3's pending and deleted states hide accounts independently.                                                                                                                                                                          |
+| Exclusion survives | Every new `player_rating` row and every rebuild read the source, so an exclusion survives a rebuild that removes the account's last processed event and applies again when the account next plays rated.                                                                                                                                                                                                                         |
+| Held rows          | `inspect-rating` names the failed step 1 check. Missing support for a `rules_v` or `replay_v`: deploy it, then `rebuild-ratings` apply decides the row in `seq` order and marks the later events it changes. A self-contradictory row stays `held`: no rating effect, listed by `check-consistency`, never edited; invalidating it records the decision, but validation runs first ([§4.2](v2-contracts.md#42-rating-decision)). |
+| Removal label      | Invalidated matches show R2's `skipped:invalidated` label (M8's "rating removed") on every rated surface; P8 keeps them out of public numbers.                                                                                                                                                                                                                                                                                   |
+| "Rating corrected" | Shown beside a marked match's other labels, except when invalidated, where the removal label already says so. R6-core adds it to R2's label mapping; H2's and R4's readers add one primary-key lookup on `rating_correction_mark`.                                                                                                                                                                                               |
+| During an apply    | Readers show the last published state with R1's note.                                                                                                                                                                                                                                                                                                                                                                            |
+| Never public       | Flags, and whether an account is excluded: the profile shows no rank, like any ineligible account, and only the account's own rank context uses R3's neutral wording.                                                                                                                                                                                                                                                            |
 
----
+### 4.4 R6-detect — rules (`rule_v = 1`)
 
-## 7. Verification and rollout
+Input is processed rated matches only (`match_rating.rating_status =
+'processed'`). Duration `d = ended_at − started_at`; short means `d ≤ 5 min`.
+A manual resignation by X is `end_reason = 'resignation'`, `online_end_reason
+IS NULL`, and X lost; claim-win losses never count. Every window is
+half-open, `(last.ended_at − W, last.ended_at]`, as in the pair cap. Matches
+order by `ended_at`, then `seq`. A pair's key is its two sorted account ids,
+so seat swaps and renames change nothing.
 
-### Tests
+| Rule                  | Subject | Qualifies                                                                                                                              |
+| --------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `winTrading`          | pair    | 4 consecutive processed games of the pair within 7 days, winners alternating, no draw among them, at least 3 of the 4 short            |
+| `instantResignations` | account | ≥ 3 manual resignations by the account within 24 h, each with `d ≤ 60 s` and `action_count ≤ 3` (at most two actions before resigning) |
+| `oneWayFeeding`       | pair    | ≥ 5 processed games of the pair within 7 days, one account lost ≥ 4 of them, and ≥ 3 of those losses were manual resignations or short |
+| `abnormalRate`        | account | ≥ 20 processed rated games within 24 h (under P7 that already means at least 7 opponents)                                              |
 
-- Synthetic ledgers for each detector: exact threshold and just-below cases,
-  sliding-window boundaries, seat swaps, equal timestamps, rematches, draws,
-  manual versus claim-win resignation, R2 caps, invalidated evidence, and
-  repeated cron runs. Flags are deduplicated; detectors never mutate ratings
-  or exclusion state.
-- Replay/result consistency: valid H1 fixtures pass; altered action/result,
-  unsupported replay version, missing seat, and contradictory outcome fail
-  closed with the offending match id.
-- Correction: invalidate a middle event, rebuild in global order, reassign
-  pair/daily cap slots, verify both players and downstream opponents, R3
-  W/L/D/streak/rank, R5 form, and zero final diff. Repeated apply is
-  idempotent; stale plan or changed ledger rejects without partial publication.
-- Exclude/include: rating and history are unchanged; public rank disappears
-  and returns only when R3 eligibility passes; no private moderation reason
-  appears in HTML, route data, cache, or metadata.
-- Operations: wrong environment, missing operator id/reason, failed backup,
-  expired lock, concurrent processor, failed shadow validation, and failed
-  audit append prevent mutation or publication. Audit is append-only and
-  records every attempted manual correction.
+Repeat opponents and short games are normal in a small community, so each
+rule pairs a pattern (alternation, one-sidedness, resignation speed, volume)
+with a threshold the §9.2 false-positive fixtures stay below. A threshold or
+window change is a new `rule_v`, with fixture review and a `detect` dry run
+before it runs.
 
-When implemented, run `pnpm lint`, `pnpm typecheck`, `pnpm test`,
-`pnpm test:worker`, `pnpm build`, and relevant `pnpm test:e2e` cases.
-`pnpm check:hibernation` and `pnpm check:e2e-isolation` must remain green.
-The spec-only change needs document/link and formatting checks; it does not
-claim application verification. Local tests use Miniflare D1, with separate
-preview rehearsal before any production mutation.
+### 4.5 R6-detect — nightly job and review
 
-### Release gate
+| Topic          | Rule                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schedule       | The dispatcher starts a run once a day from 00:30 UTC while `RATING_FLAGS_ENABLED = true`, under the `ratingFlags` lease in `job_state` with the `job_fence` pattern.                                                                                                                                                                                                                         |
+| Range          | Processed rated matches with `ended_at` in `[max(cursor, start − 30 d) − 7 d, start)` via `match_rated_ended_idx` in keyset pages; evaluated in memory; then `cursor = start` (first run: `start − 1 d`). A missed night falls in the next range; a duplicate run rewrites the same flags.                                                                                                    |
+| Scale trigger  | A range above 20,000 matches stops with `ratingFlagsRangeTooLarge`; the job then moves to per-subject chunks.                                                                                                                                                                                                                                                                                 |
+| Upsert         | An open flag for the rule, version, and subject takes the latest qualifying window. After review, a new flag opens only for a window holding a match with `seq > evidence_max_seq` of the reviewed one.                                                                                                                                                                                       |
+| Not rescanned  | Saves retried later than the range and matches promoted by a correction outside it; `detect` covers any range on demand. The job writes only `rating_flag` and its `job_state` row.                                                                                                                                                                                                           |
+| `/admin/flags` | SSR, `requireAdmin`, `no-store`, `noindex`, never in a sitemap or the PWA cache, read-only. Open flags first, then newest `updated_at`, 25 a page (keyset). Rows show rule, version, subject as current usernames (the neutral label for pending or deleted), window, review state, and evidence links with each match's current rating status; Should: the `inspect-match` commands to copy. |
+| CLI            | `flags [--status <state>]` lists; `review-flag <flagId> --outcome dismissed\|actioned --reason <text>` is plan/apply and sets `review_audit_id`; `detect --from <YYYY-MM-DD> --to <YYYY-MM-DD>` prints what `rule_v = 1` would flag and writes nothing.                                                                                                                                       |
 
-1. Reconcile the merged H1/R1/R2/R3/R5 schema and settle the founder choice
-   in §10. Add the invalidated skip reason as an explicit contract change
-   with all readers and fixtures updated.
-2. Apply the additive migration in preview. Seed clean and suspicious
-   ledgers; run detectors, CLI inspection, dry-run rebuild, an invalidation,
-   exclusion/inclusion, audit inspection, and a zero-drift consistency check.
-3. Verify preview public pages before and after cache expiry, including a
-   downstream player's changed rating and a cap-skipped event promoted to
-   rated. Exercise a failed apply and recovery without publishing mixed
-   generations.
-4. Migrate production without making a correction. Run read-only detection,
-   replay spot checks, and a dry-run rebuild first. Enable scheduled flags
-   only after job cost and false-positive volume are measured. Keep manual
-   correction commands gated until the preview rehearsal is documented.
+## 5. Privacy and access
 
-R6 is done when each pattern produces an explainable review flag, an operator
-can verify a match and rating calculation, a reviewed invalidation rebuilds
-the published state with zero drift, exclusion/inclusion changes only public
-ranking, and every mutation is auditable. A draft spec or synthetic test
-alone does not mark R6 shipped.
+Rows of the [access matrix](v2-contracts.md#5-access-matrix) that R6 touches:
 
----
+| §5 row                                   | R6 behaviour                                                                                                    |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `/match/<id>` … rating status — rated    | Public removal label (R2) and "rating corrected"; nothing else from R6.                                         |
+| `/match/<id>` … rating status — friendly | No R6 state can exist; access is unchanged.                                                                     |
+| `/history`                               | The owner sees the same labels on their rated games.                                                            |
+| `/u/<username>` numbers and match list   | Numbers are processed events only (P8); invalidated rated matches are listed, labelled; exclusion is not shown. |
+| `/leaderboard`                           | R3 omits excluded accounts with no reason given.                                                                |
+| Pending/deleted account                  | `/admin/flags` shows the neutral label; R6 rows keep only the opaque id after finalization, like the ledger.    |
+
+Operator-only: the log, audit, exclusion rows, reasons, actors, flags, rules,
+and evidence. None reaches a public loader, Open Graph metadata, a shared
+cache, analytics, or logs. Reasons are operator notes and must not contain
+emails, tickets, or personal data beyond the ids these tables hold. CLI output
+stays on the operator's terminal; tests use fixture ids only.
+
+## 6. Resource budget
+
+`N` = saved matches up to `H`; `P` = rated players; E1's 1× projection is
+25,000 matches and 5,000 players.
+
+| Operation                          | D1 rows read                                                                        | D1 rows written                                                              |
+| ---------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Match page, history, profile list  | + 1 primary-key lookup on `rating_correction_mark` per match shown                  | —                                                                            |
+| Processor, per decided row         | + 1 indexed view lookup; + 1 key read of the source per new `player_rating` row     | — (inside R1's and R2's budgets)                                             |
+| `inspect-*`, `verify-replay`       | A few rows per match; `inspect-rating` also reads each seat's history (owner index) | 0; replay CPU in Node, ≤ 1,403 actions (E4)                                  |
+| Dry run, plan, `check-consistency` | The ledger and rating tables: about 6N + P (≈ 155,000 at 1×)                        | 1 audit row for a plan                                                       |
+| Correction apply                   | As a plan                                                                           | `*_next` ≈ 3N + P in chunks, the swap (≈ 125,000 at 1×, §7.4), marks, 3 rows |
+| Exclusion apply                    | ≈ 3                                                                                 | ≈ 3                                                                          |
+| R6-detect nightly run              | ≈ 3 × rated matches in the range (normally 8 days)                                  | Flags raised or updated; `job_state`                                         |
+| `/admin/flags` page                | ≤ 25 flags + ≤ 20 evidence status reads each                                        | 0                                                                            |
+
+No Durable Object wakes for R6 and no row is written per move. A correction
+at 1× writes about 205,000 rows, above D1's Free-plan allowance of 100,000
+rows written a day, so production corrections at that size need the Workers
+Paid plan (Q3's budget input). Storage: a few audit rows per operation and
+one mark per corrected match.
+
+## 7. Somali copy
+
+Drafts behind `TODO(translation-review)`, reusing the README glossary. The
+removal label belongs to R2's rated label mapping; R6 does not redefine it.
+
+| Key                          | Draft                                                                                                                                                                            | Where                                |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `ratingStatus.corrected`     | Darajada waa la saxay                                                                                                                                                            | Match page, `/history`, profile list |
+| `ratingStatus.correctedHelp` | Tirooyinka darajada ee ciyaartan waa la beddelay markii darajooyinka dib loo xisaabiyey.                                                                                         | Match page                           |
+| `/learn#tartan` (Should)     | Shaxda waxay dib u eegi kartaa ciyaaraha Tartanka. Ciyaar darajadeeda waa laga saari karaa, ciyaaryahanna waa laga reebi karaa Miiska darajada; natiijada ciyaarta lama beddelo. | R2's section                         |
+| `/legal` (Should)            | Maamulka Shaxda wuxuu kaydin karaa qoraallo gudaha ah oo ku saabsan dib-u-eegista ciyaaraha Tartanka iyo akoonnada; qoraalladaas lama soo bandhigo.                              | Section `xogta`                      |
+
+R6-detect admin copy (`adminFlags.*`): `title` "Calaamadaha dib-u-eegista
+darajada"; `advisory` "Calaamaddu waa tilmaan dib-u-eegis, ma aha caddayn.";
+`empty` "Ma jirto calaamad furan."; `status.open` / `dismissed` / `actioned`
+"Furan" / "Waa la iska dhaafay" / "Tallaabo ayaa la qaaday"; rules
+`winTrading` / `instantResignations` / `oneWayFeeding` / `abnormalRate`
+"Guulo la is-dhaafsaday" / "Is dhiib degdeg ah" / "Guulo hal dhinac ah" /
+"Ciyaaro aad u badan". The CLI prints English operator text.
 
 ## 8. Implementation slices
 
-1. Add migration, indexed flag/audit queries, and bounded detector fixtures.
-2. Add read-only CLI inspection and consistency commands; prove environment
-   selection and replay/rating verification against local D1.
-3. Integrate invalidation with R1's guarded rebuild, projection swap, and
-   audit; test failure recovery and public readers.
-4. Add exclusion/inclusion and cache refresh; optionally add the flags page.
-5. Rehearse preview, review costs and false positives, then enable in
-   production. Use one logical Conventional Commit per slice.
+### 8.1 R6-core (wave 2)
 
----
+1. `test(db): cover R6-core tables, triggers, and the invalidation view`
+2. `feat(db): add R6-core correction and audit tables` — merges between R1's slices 4 and 5 (§3.1); query plans recorded
+3. `feat(ops): add read-only rating:admin commands` — also proves on local
+   that a failed fence through the access path changes zero rows
+4. `feat(rating): add the correction diff, marks, and plan digest`
+5. `feat(ops): add plan/apply, restore points, and the audit trail`
+6. `feat(ops): add invalidate-match and rescind-invalidation`
+7. `feat(ops): add exclude-account and include-account`
+8. `feat(web): show "rating corrected" on rated match surfaces`
+9. `feat(i18n): mention rating reviews on /learn and /legal` (Should)
+10. `docs(ops): record the R6-core preview rehearsal`
 
-## 9. Decisions recorded by this draft
+### 8.2 R6-detect (wave L)
 
-| ID    | Draft decision                                                                                        | Reason                                                          |
-| ----- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| R6-D1 | Fixed, conservative, versioned detection thresholds; flags are review-only.                           | Avoid automatic penalties and keep false positives inspectable. |
-| R6-D2 | `rating_invalidation` is the rebuild input; the H1 match result/replay stays immutable.               | A correction must remain traceable and reproducible.            |
-| R6-D3 | Full rebuild after invalidation; preserve separate leaderboard exclusion metadata.                    | Pair caps and later opponents can change beyond the two seats.  |
-| R6-D4 | Remote writes require explicit environment, actor, plan digest, backup, audit, and preview rehearsal. | Prevent applying a stale correction or publishing mixed state.  |
+11. `test(rating): add detector fixtures with small-community false positives`
+12. `feat(rating): add rule_v 1 rating detectors`
+13. `feat(db): add rating_flag`
+14. `feat(web): run the rating detectors in the nightly dispatcher`
+15. `feat(ops): add flags, review-flag, and detect commands`
+16. `feat(web): add /admin/flags`
 
-## 10. Founder choices to confirm
+## 9. Acceptance tests
 
-The draft uses these defaults while founder answers are pending:
+### 9.1 R6-core
 
-1. Keep an invalidated match's public match/replay page visible with a
-   neutral “rating removed” label. Hiding it would change V2's public-history
-   decision (§16 D8) and needs an explicit brief update.
-2. Keep its played result in R4/R5 **all-game** records when it otherwise
-   qualifies under their competitive-game rules. R3 **rated-only** records
-   exclude it. A different choice needs one consistent H2/R4/R5 rule and
-   updated tests before implementation.
-3. Use the conservative, fixed version 1 detection thresholds in §3 and
-   manual review before every correction. Any later threshold change gets a
-   new rule version and fixture review.
+Workers and D1 cases run on Miniflare in `packages/db` (`test:worker`).
+
+| Level | Case                  | Expected                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit  | Digest                | Equal inputs, equal digest; a changed reason, `H`, log head, or last bit of one value changes it; `decided_at` does not.                                                                                                                                                                                                                                                                                                                                                                                          |
+| Unit  | Mark rule             | A decision change marks; 1512.4 → 1512.3 counts in `changed_events` without a mark; 1512.4 → 1512.6 marks.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Unit  | Guards                | Missing or unknown `--database`, malformed ids, reasons outside 3–500 characters, and a production apply without `--confirm-database` exit 2 with no I/O; a remote command without a `whoami` identity exits before reading; with hostile `.dev.vars` and `.env` present, nothing from them is read.                                                                                                                                                                                                              |
+| D1    | Migration             | View, indexes, and foreign keys exist; `UPDATE` and `DELETE` on the audit, log, and rebuild tables fail with `append-only`.                                                                                                                                                                                                                                                                                                                                                                                       |
+| D1    | Invalidate the middle | Fixture in `seq` order: A–B ×4 within 24 h (the fourth `skipped:pairCap`, M4), then B–C, then C–D. Invalidating the second A–B (M8) gives `skipped:invalidated` with no `match_player_rating` rows; the fourth is promoted; the third, B–C, and C–D events change, so D, who never met A or B, moves; `player_rating` equals a fresh rebuild; zero drift; marks follow the rule; `rating_rebuild` counts and `planned`/`applied` audit rows are right; every `match` and `match_player` column is byte-identical. |
+| D1    | Rescind               | Every `match_rating`, `match_player_rating`, and `player_rating` row (`board_key` included) equals the pre-invalidation snapshot at full precision; marks point at the second rebuild; the log has two rows.                                                                                                                                                                                                                                                                                                      |
+| D1    | Mixed runtimes        | After an apply the processor (workerd) decides two new matches; the Node dry run still shows zero drift.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| D1    | Stale plans           | A match decided after the plan → `staleHighWater`; another correction in between → `digestMismatch`; an unrecorded digest → `unknownPlan`; a second apply → `noop`. Each publishes nothing, releases maintenance, and appends one audit row. A match still pending at the plan is invalidated when the processor decides it after the swap.                                                                                                                                                                       |
+| D1    | Concurrency, crashes  | A processor holding the lease → `maintenanceBusy`; a swap whose fence or any statement fails changes zero rows; an apply stopped after step 5 leaves maintenance on and the published state unchanged, and a re-run finishes it or `resume-ratings` restores processing.                                                                                                                                                                                                                                          |
+| D1    | Exclusion             | Excluding E changes only the source and `excluded`; invalidating E's only processed match removes E's `player_rating` row but not the source; E's next processed match recreates it with `excluded = 1`; include → 0; repeats → `noop`; exclusion during maintenance fails; an event batch for E at the same time keeps E excluded.                                                                                                                                                                               |
+| D1    | Consistency, replay   | `check-consistency` exits 1 with the id for an altered replay, value drift, projection drift, a processed row in the view, and maintenance left on; the clean fixture exits 0. `verify-replay` passes M2, M3 (final `R:A`, `idle`), and M5, and fails an altered action, an altered result, and an unsupported `replay_v` or `rules_v`.                                                                                                                                                                           |
+| D1    | Held rows             | A row with an unsupported `rules_v` stays held while later rows process; with support added, `rebuild-ratings` apply decides it and marks the later events it changes.                                                                                                                                                                                                                                                                                                                                            |
+| D1    | Query plans           | The view lookup, the mark lookup, and audit by target use their indexes (`EXPLAIN QUERY PLAN`).                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Web   | Labels                | A marked rated match shows "rating corrected" on the match page and `/history`; M8 shows the removal label only; M1 and M9 never show either; no reason, actor, rule, or log text in HTML, route data, Open Graph metadata, or cache headers.                                                                                                                                                                                                                                                                     |
+| E2E   | Real game             | After a real rated game on the shared e2e D1 ([§10.4](v2-contracts.md#104-shared-local-d1-in-e2e)), an invalidation applied through the CLI's modules shows the removal label, and the players' public numbers drop the game.                                                                                                                                                                                                                                                                                     |
+
+### 9.2 R6-detect
+
+| Case            | Expected                                                                                                                                                                                                                                                                                                                                     |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Thresholds      | Each rule at its threshold raises one flag; just below raises none (3 alternating games, 2 quick resignations, 3 of 5 lost, 19 games); a last match exactly `W` after the first raises none.                                                                                                                                                 |
+| Small community | No flag for: two even friends playing three rated games every evening for a week in 12–25 minute games; a strong regular beating a newer friend five times in a week in full games; two quick resignations in one evening; three idle-claim losses in 24 h; a 19-game marathon against eight opponents; many short games with mixed winners. |
+| Identity, order | Seat swaps and renames keep one pair key; equal `ended_at` values order by `seq`; a draw breaks a trading run; friendly, cap-skipped, invalidated, held, and pending matches are ignored.                                                                                                                                                    |
+| Job             | A duplicate run leaves the same flags; a missed night is covered; a reviewed flag is not reopened by its own evidence, but a newer match opens a new one; every table except `rating_flag` and `job_state` is byte-identical after a run; `RATING_FLAGS_ENABLED = false` skips it.                                                           |
+| Surfaces        | `/admin/flags`: signed out → login redirect; non-admin → 403; admin → 200 with `no-store` and `noindex`; a deleted subject shows the neutral label. `review-flag` is plan/apply and audited; `detect` writes nothing.                                                                                                                        |
+
+### 9.3 Sample matches
+
+| ID     | What R6 tools show                                                     | R6 actions                                                         | Public after R6                                    |
+| ------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------- |
+| M1, M9 | `rated = 0`, `skipped:friendly`                                        | `invalidate-match` refused: no rating effect                       | Unchanged; private to A and B                      |
+| M2     | Processed; both events; the decision trace                             | Invalidate: later events of both players rebuilt                   | Removal label; out of P8 numbers                   |
+| M3     | Processed; `verify-replay` confirms the final `R:A` and `idle`         | As M2; never a manual resignation for `instantResignations`        | As M2 when invalidated                             |
+| M4     | `skipped:pairCap` with the three counted earlier-`seq` ids             | Promoted when a counted game is invalidated; demoted on rescission | "Rating corrected" when promoted                   |
+| M5     | Processed draw                                                         | As M2; a draw breaks a `winTrading` run                            | As M2 when invalidated                             |
+| M6, M7 | No row: unknown match id                                               | None                                                               | —                                                  |
+| M8     | `skipped:invalidated` with log and audit history; ledger row unchanged | Rescind restores the pre-invalidation state                        | Public (P2), "rating removed", out of numbers (P8) |
+| M10    | B's private id and deletion state; B's M2 event unchanged              | Exclusion and flags keep only the opaque id                        | B shows the neutral label                          |
+
+## 10. Rollout and rollback
+
+### 10.1 R6-core
+
+| Environment | Steps                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dev         | Local migrations apply R1's, then R6-core's; the CLI runs with `--database local`.                                                                                                                                                                                                                                                                                                                                         |
+| e2e         | The game launcher applies every migration to the shared D1 (§10.4); tests call the CLI's modules against it.                                                                                                                                                                                                                                                                                                               |
+| preview     | The founder applies both migrations before the wave-2 web deploy, then rehearses with real rated games between test accounts, a capped fourth game included: invalidate a middle game and check downstream changes, the promoted game, and both labels on preview pages; rescind; exclude and include; force a stale plan; stop an apply midway and recover; record the swap time in the wave-2 ops record in `docs/ops/`. |
+| production  | Same migration window; then `check-consistency` and a zero-drift dry run. The first apply of each command follows its preview rehearsal.                                                                                                                                                                                                                                                                                   |
+
+Founder-run steps (operational; never in tests, CI, or deploy hooks):
+
+```sh
+pnpm --filter @shaxda/web exec wrangler d1 migrations apply shaxda-db-preview --config wrangler.preview.jsonc --remote
+pnpm rating:admin -- invalidate-match <id> --reason "<text>" --database preview                 # plan
+pnpm rating:admin -- invalidate-match <id> --reason "<text>" --database preview --apply <digest>
+```
+
+Deploy order ([§6.5](v2-contracts.md#65-deploy-order)): R1's migration →
+R6-core's migration → game Worker → web Worker, which carries the "rating
+corrected" label. The CLI needs no deploy. R6-core has no kill switch
+([§10.3](v2-contracts.md#103-bindings-flags-and-rollout-by-milestone));
+nothing runs unless the founder runs it. R2's `RATED_PLAY_ENABLED` stays off
+in production until the preview rehearsal is recorded.
+
+**Rollback.** An applied correction is undone by its inverse (rescind or
+include), planned and applied the same way; the restore point is a last
+resort (§4.2). The migration is additive, and a web rollback removes only the
+label; the tables stay while R1's processor reads them.
+
+**Done when:** on preview, a middle invalidation rebuilds with downstream
+changes and a promoted cap-skipped game, the labels show, a rescission
+restores the original values, exclusion changes only ranking, stale plans are
+rejected, every attempt is audited, and `check-consistency` shows zero drift;
+production has the migration and a clean dry run. This is the wave-2 gate
+"invalidate/rescind rehearsed on preview".
+
+### 10.2 R6-detect
+
+Activation needs recorded evidence that manual inspection no longer suffices,
+such as a confirmed farming case or a leaderboard complaint. Order: migration
+→ web deploy with `RATING_FLAGS_ENABLED = false` → `detect` over production
+history to measure false positives and cost → enable on preview, then
+production. Turning the switch off stops the job; flags remain, and nothing
+depends on them.
+
+**Done when:** the fixtures pass, a `detect` run over production history
+shows a false-positive volume the founder accepts, the nightly job stays
+within the §6 budget, `/admin/flags` lists and links flags, and no detector
+run has changed a rating, invalidation, or exclusion.

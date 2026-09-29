@@ -4,6 +4,7 @@ const sectionIds = [
   "guudmar",
   "xogta",
   "kaydka-qalabka",
+  "akoonka",
   "ciyaarta-martida",
   "cabbiraadda",
   "ilaalinta",

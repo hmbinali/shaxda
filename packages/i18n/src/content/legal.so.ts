@@ -2,6 +2,7 @@ export const legalSectionIds = [
   "guudmar",
   "xogta",
   "kaydka-qalabka",
+  "akoonka",
   "ciyaarta-martida",
   "cabbiraadda",
   "ilaalinta",
@@ -47,11 +48,16 @@ export interface LegalPageContent {
   sections: readonly LegalSection[];
 }
 
+// TODO(translation-review): The account, D1, and online-seat copy added for
+// V1.1-A/A2 (sections guudmar, xogta, kaydka-qalabka, akoonka,
+// ciyaarta-martida, adeegyada, carruurta, xuquuqda, shuruudaha, and
+// isticmaal-fiican) must be verified by a native/fluent Somali reviewer before
+// release. It describes only what is live; it must not promise later features.
 export const legalContentSo = {
   path: "/legal",
   title: "Sharciga iyo asturnaanta",
   description:
-    "Akhri sida Shaxda u kaydiso una isticmaasho xogta, iyo shuruudaha lagu isticmaalo bogga iyo ciyaarta martida.",
+    "Akhri sida Shaxda u kaydiso una isticmaasho xogta, iyo shuruudaha lagu isticmaalo bogga, akoonka, iyo ciyaarta.",
   hero: {
     eyebrow: "Asturnaanta iyo shuruudaha isticmaalka",
     heading: "Sharciga iyo asturnaanta",
@@ -67,8 +73,8 @@ export const legalContentSo = {
       id: "guudmar",
       heading: "Waxa boggani daboolayo",
       paragraphs: [
-        "Shaxda waa adeeg bilaash ah oo lagu barto laguna ciyaaro ciyaarta dhaqameed ee shaxda. [MAGACA MULKIILAHA] ayaa maamula bogga iyo adeegga ciyaarta martida.",
-        "Qaybaha asturnaantu waxay sharxayaan xogta ku jirta qalabkaaga, xogta loo diro adeegga marka aad khadka ku ciyaarto, iyo adeegyada Cloudflare ee boggu adeegsado. Qaybaha shuruuduhu waxay qeexayaan sida adeegga loo isticmaali karo.",
+        "Shaxda waa adeeg bilaash ah oo lagu barto laguna ciyaaro ciyaarta dhaqameed ee shaxda. [MAGACA MULKIILAHA] ayaa maamula bogga, akoonka Shaxda, iyo adeegga ciyaarta khadka.",
+        "Qaybaha asturnaantu waxay sharxayaan xogta ku jirta qalabkaaga, xogta akoonka haddii aad Google ku gasho, xogta loo diro adeegga marka aad khadka ku ciyaarto, iyo adeegyada Cloudflare iyo Google ee boggu adeegsado. Qaybaha shuruuduhu waxay qeexayaan sida adeegga loo isticmaali karo.",
       ],
       bullets: [],
       details: [],
@@ -80,12 +86,13 @@ export const legalContentSo = {
       id: "xogta",
       heading: "Xogta Shaxda isticmaasho",
       paragraphs: [
-        "Shaxda ma laha akoon, galitaan Google, magac joogto ah, taariikh ciyaareed joogto ah, ama miis darajo. Martidu waxay doorataa magac bandhig, qalabkuna wuxuu samaystaa aqoonsi marti oo aan kala sooc lahayn.",
-        "Ma jiro kayd D1 ah oo ku xiran adeegga. Ciyaaraha martida wax joogto ah laguma qoro kayd xogeed marka ay dhammaadaan.",
+        "Akoonku waa ikhtiyaari. Waxaad ku ciyaari kartaa marti ahaan adigoon akoon samaysan: martidu waxay doorataa magac bandhig, qalabkuna wuxuu samaystaa aqoonsi marti oo aan kala sooc lahayn. Haddii aad Google ku gasho, waxaad yeelanaysaa akoon leh magac dadweyne oo joogto ah iyo bog dadweyne.",
+        "Xogta akoonka waxaa lagu kaydiyaa Cloudflare D1, oo ah kayd xogeed. Shaxda ma kaydiso taariikh ciyaareed, natiijooyin, dib-u-ciyaar, ama miis darajo. Ciyaaraha martida iyo ciyaaraha akoonkaba wax joogto ah laguma qoro kayd xogeed marka ay dhammaadaan.",
       ],
       bullets: [
         "Xogta qalabka: ciyaarta maxalliga ah, aqoonsiga martida, magaca bandhigga, dookha codka, iyo xusuusta diidmada rakibidda.",
-        "Xogta qolka: aqoonsiyada martida, magacyada bandhigga, koodhka qolka, xaaladda ciyaarta, iyo waqtiyada hawsha.",
+        "Xogta akoonka: iimaylka Google ee la xaqiijiyay, aqoonsiga Google iyo xogta gelitaanka ee Google soo diro, magaca dadweynaha iyo magacyadii hore, dookha sawirka, iyo diiwaanka fadhiyada gelitaanka.",
+        "Xogta qolka: aqoonsiyada martida ama akoonka, magacyada bandhigga ama magacyada dadweynaha, koodhka qolka, xaaladda ciyaarta, iyo waqtiyada hawsha.",
         "Xogta ilaalinta: cinwaanka IP-ga, waqtiyada isku dayga qol-samaynta, iyo calaamadaha biraawsarka ama qalabka ee Turnstile.",
         "Xogta cabbirka: jidka bogga, halka booqashadu ka timid, waddanka, biraawsarka, nidaamka qalabka, iyo nooca qalabka.",
       ],
@@ -96,7 +103,7 @@ export const legalContentSo = {
       id: "kaydka-qalabka",
       heading: "Waxa ku kaydsan qalabkaaga",
       paragraphs: [
-        "Shaxda waxay isticmaashaa localStorage si ay qalabkaaga ugu xafiddo ciyaarta maxalliga ah iyo dookhyo kooban. Nuqulladan qalabka ku jira si toos ah looguma raro kayd xogeed dhexe.",
+        "Shaxda waxay isticmaashaa localStorage si ay qalabkaaga ugu xafiddo ciyaarta maxalliga ah iyo dookhyo kooban. Nuqulladan qalabka ku jira si toos ah looguma raro kayd xogeed dhexe. Haddii aad Google ku gasho, biraawsarku wuxuu sidoo kale kaydiyaa cookie fadhi oo lagama maarmaan ah; qaybta akoonka ayaa sharxaysa.",
         "Service worker-ku wuxuu qalabka ku sii diyaariyaa faylasha bogga, sawirrada, codadka, iyo boggaga horay loo dhisay si ciyaarta maxalliga ahi u shaqayn karto marka khadku maqan yahay. Kaydkan waxaa laga saari karaa dejimaha biraawsarka ama marka barnaamijka laga tirtiro qalabka. Shaxda ma isticmaasho IndexedDB.",
       ],
       bullets: [],
@@ -129,10 +136,50 @@ export const legalContentSo = {
       notes: [],
     },
     {
+      id: "akoonka",
+      heading: "Akoonka Google iyo bogga dadweynaha",
+      paragraphs: [
+        "Marka aad Google ku gasho, Google wuxuu Shaxda u soo diraa aqoonsigaaga Google, iimaylkaaga la xaqiijiyay, magacaaga, xiriiriyaha sawirkaaga, iyo calaamadaha gelitaanka. Magacaaga Google looma isticmaalo magac ahaan, meelna lagama muujiyo Shaxda. Shaxda uma adeegsato gelitaanka Google inay adeegyada kale ee Google wax ka akhrido.",
+        "Kadib waxaad doorataa magac dadweyne iyo sawirka bogga. Magaca dadweynaha iyo sawirka aad doorato ayaa ka muuqda bogga dadweynaha ee /u/<magaca> iyo qolalka ciyaarta khadka. Iimaylka, aqoonsiga Google, iyo aqoonsiga gudaha ee akoonku waa gaar; lama tuso ciyaartoyda kale ama booqdayaasha.",
+      ],
+      bullets: [],
+      details: [
+        {
+          term: "Iimaylka Google",
+          detail:
+            "Waa gaar. Waxaa loo isticmaalaa in akoonka Google lagu xiro akoonka Shaxda, waxaadna ku aragtaa bogga akoonkaaga oo keliya.",
+        },
+        {
+          term: "Magaca dadweynaha",
+          detail:
+            "Waa dadweyne. Waxaa la beddeli karaa 30 maalmood kasta. Magacyadii hore way xafidan yihiin oo qof kale ma qaadan karo, xiriiriyaha bogga ee magac hore wuxuu u gudbaa magacaaga hadda.",
+        },
+        {
+          term: "Sawirka bogga",
+          detail:
+            "Caadi ahaan waa xarafka magacaaga. Xiriiriyaha sawirka Google waa la kaydiyaa, laakiin ma muuqdo ilaa aad doorato. Haddii aad doorato sawirka Google, biraawsarka booqdaha wuxuu sawirka ka codsanayaa Google.",
+        },
+        {
+          term: "Fadhiga gelitaanka",
+          detail:
+            "Cookie lagama maarmaan ah ayaa biraawsarkaaga kugu haya adigoo galsan. D1 wuxuu kaydiyaa fadhiga, waqtiyadiisa, cinwaanka IP-ga, iyo macluumaadka biraawsarka (user agent) si akoonka loo ilaaliyo. Fadhigu wuxuu dhacaa 7 maalmood oo aan la isticmaalin kadib, ama marka aad akoonka ka baxdo.",
+        },
+        {
+          term: "Habka gelitaanka Google",
+          detail:
+            "Inta gelitaanku socdo, cookie gaaban oo ugu badnaan 5 daqiiqo ah iyo diiwaan D1 ah oo ugu badnaan 10 daqiiqo ah ayaa hubiya in jawaabta Google ay adiga kuu socoto.",
+        },
+      ],
+      notes: [
+        "Xogta akoonka waxay jirtaa ilaa akoonka la tirtiro. Tirtiridda akoonka ee aad adigu samayn karto hadda ma jirto; si aad u codsato in akoonkaaga la tirtiro, la xiriir [EMAIL XIRIIRKA].",
+      ],
+    },
+    {
       id: "ciyaarta-martida",
-      heading: "Xogta qolka ciyaarta martida",
+      heading: "Xogta qolalka ciyaarta khadka",
       paragraphs: [
         "Marka aad samayso ama gasho qol marti ah, aqoonsiga martida iyo magaca bandhigga waxaa loo diraa Worker-ka Shaxda. Waxaa lagu hayaa Durable Object-ka qolka si labada ciyaaryahan loo kala garto, xaaladda ciyaartana loo waafajiyo.",
+        "Haddii aad akoonkaaga ku ciyaarto, Worker-ka bogga wuxuu bixiyaa tigidh saxiixan oo 90 ilbiriqsi ah. Tigidhku wuxuu sidaa aqoonsiga gudaha ee akoonka, magaca dadweynaha, iyo sawirka la doortay. Qolku wuxuu aqoonsiga gudaha u hayaa si gaar ah si kursigu akoonkaaga ugu xirnaado; ciyaaryahanka kale wuxuu arkaa magaca dadweynaha iyo sawirka oo keliya. Iimaylka iyo cookie-ga gelitaanka looma diro Worker-ka ciyaarta.",
         "Xaaladda qolka waxaa ka mid ah boosaska ciyaartoyda, magacyada bandhigga, looxa, wareegga, iyo waqtiyada xiriirka. Server-ku wuxuu hubiyaa tallaabo kasta oo ciyaarta khadka ah. Qof haysta koodhka ama xiriiriyaha qolka ayaa isku dayi kara inuu qolka galo.",
       ],
       bullets: [],
@@ -198,13 +245,13 @@ export const legalContentSo = {
       id: "adeegyada",
       heading: "Cloudflare iyo diiwaannada hawlgalka",
       paragraphs: [
-        "Cloudflare waa adeeg bixiye martigeliya bogga oo socodsiiya Workers-ka, Durable Objects-ka, Turnstile, iyo Web Analytics marka la shido. Sidaas darteed xogta codsiyada iyo qolalka waxay dhex martaa nidaamyada Cloudflare.",
+        "Cloudflare waa adeeg bixiye martigeliya bogga oo socodsiiya Workers-ka, Durable Objects-ka, kaydka D1, Turnstile, iyo Web Analytics marka la shido. Sidaas darteed xogta codsiyada, qolalka, iyo akoonka waxay dhex martaa nidaamyada Cloudflare. Google wuxuu bixiyaa gelitaanka akoonka.",
         "Diiwaannada Workers-ka iyo la-socodka hawlgalka waa shidan yihiin. Diiwaannadani waxay ka koobnaan karaan macluumaad codsi, khaladaad, iyo xog farsamo oo lagu baaro cilladaha. Muddadu waxay ku xiran tahay qorshaha Cloudflare: 3 maalmood qorshaha bilaashka ah ama 7 maalmood qorshaha lacagta leh, sidaas darteed ugu badnaan toddobaad.",
       ],
       bullets: [
         "Cloudflare waxay xogta uga shaqayn kartaa dalal kala duwan iyadoo raacaysa heshiisyadeeda iyo sharciyada khuseeya.",
-        "Shaxda ma iibiso xogta martida, mana isticmaasho xayeysiis, lacag bixin, taageero ganacsi, ama xiriir iib.",
-        "Adeegga hadda kuma xirna kayd D1 ah oo ciyaaraha ama xogta martida lagu sii hayo.",
+        "Shaxda ma iibiso xogta martida ama akoonka, mana isticmaasho xayeysiis, lacag bixin, taageero ganacsi, ama xiriir iib.",
+        "Kaydka D1 wuxuu hayaa xogta akoonka oo keliya. Ciyaaraha, natiijooyinka, iyo xogta martida laguma hayo.",
       ],
       details: [],
       notes: [],
@@ -213,8 +260,8 @@ export const legalContentSo = {
       id: "carruurta",
       heading: "Carruurta iyo xogta gaarka ah",
       paragraphs: [
-        "Shaxda waa ciyaar dhaqameed ay qoysasku wada ciyaari karaan, laakiin adeeggu si gaar ah uguma talagelin ururinta xogta carruurta. Ha gelin magaca bandhigga magaca buuxa, cinwaan, dugsi, ama xog kale oo lagu garan karo ilmo.",
-        "Haddii waalid ama masuul u maleeyo in ilmo soo diray xog gaar ah oo aan loo baahnayn, wuxuu kala xiriiri karaa [EMAIL XIRIIRKA]. Maadaama uusan jirin akoon, aqoonsashada codsiga waxay ku xirnaan kartaa xogta la heli karo iyo qolka weli jira.",
+        "Shaxda waa ciyaar dhaqameed ay qoysasku wada ciyaari karaan, laakiin adeeggu si gaar ah uguma talagelin ururinta xogta carruurta. Ha gelin magaca bandhigga ama magaca dadweynaha magaca buuxa, cinwaan, dugsi, ama xog kale oo lagu garan karo ilmo.",
+        "Haddii waalid ama masuul u maleeyo in ilmo soo diray xog gaar ah oo aan loo baahnayn, wuxuu kala xiriiri karaa [EMAIL XIRIIRKA]. Haddii xogtu ku jirto akoon, sheeg magaca dadweynaha ee akoonkaas. Ciyaarta martida akoon ma leh, sidaas darteed aqoonsashada codsigu waxay ku xirnaan kartaa xogta la heli karo iyo qolka weli jira.",
       ],
       bullets: [],
       details: [],
@@ -225,7 +272,7 @@ export const legalContentSo = {
       heading: "Doorashooyinkaaga iyo codsiyada xogta",
       paragraphs: [
         "Waxaad localStorage-ka iyo kaydka service worker-ka ka tirtiri kartaa dejimaha biraawsarka, ama waxaad ka saari kartaa barnaamijka la rakibay. Tani waxay tirtiri kartaa ciyaarta maxalliga ah, aqoonsiga martida, magaca bandhigga, iyo dookhyada ku jira qalabkaas.",
-        "Xogta qolka martida si otomaatig ah ayay u baaba'daa marka muddada firfircoonaan la'aantu dhammaato. Si aad u weydiisato helitaan, sixid, tirtirid, ama xog dheeraad ah oo sharcigaagu kuu oggol yahay, la xiriir [EMAIL XIRIIRKA]. Aqoonsi la'aanta adeegga waxay mararka qaar ka dhigi kartaa in xog gaar ah aan laguu nisbayn karin.",
+        "Xogta qolalka si otomaatig ah ayay u baaba'daa marka muddada firfircoonaan la'aantu dhammaato. Magaca dadweynaha iyo sawirka bogga waxaad ka beddeli kartaa bogga akoonkaaga. Si aad u weydiisato helitaan, sixid, tirtirid, oo ay ku jirto tirtiridda akoonka, ama xog dheeraad ah oo sharcigaagu kuu oggol yahay, la xiriir [EMAIL XIRIIRKA]. Ciyaarta martida akoon ma leh, sidaas darteed mararka qaar xog gaar ah laguma nisbayn karo adiga.",
       ],
       bullets: [],
       details: [],
@@ -235,8 +282,8 @@ export const legalContentSo = {
       id: "shuruudaha",
       heading: "Adeegga aad isticmaalayso",
       paragraphs: [
-        "Markaad isticmaasho Shaxda, waxaad oggolaanaysaa shuruudahan inta sharcigu oggol yahay. Haddii aadan oggolayn, ha isticmaalin ciyaarta martida ama qaybaha kale ee adeegga.",
-        "Adeeggu wuxuu bixiyaa bog waxbarasho, ciyaar laba qof oo hal qalab ah, iyo qolal marti oo laba qof ku ciyaaraan. Ma bixiyo kayd joogto ah oo natiijooyinka ah, dib-u-ciyaar, ama ballanqaad ah in qol ama ciyaar dib loo soo celin karo.",
+        "Markaad isticmaasho Shaxda, waxaad oggolaanaysaa shuruudahan inta sharcigu oggol yahay. Haddii aadan oggolayn, ha isticmaalin ciyaarta, akoonka, ama qaybaha kale ee adeegga.",
+        "Adeeggu wuxuu bixiyaa bog waxbarasho, ciyaar laba qof oo hal qalab ah, qolal khadka ah oo laba qof ku ciyaaraan, iyo akoon ikhtiyaari ah oo Google lagu galo oo leh magac dadweyne iyo bog dadweyne. Ma bixiyo kayd joogto ah oo natiijooyinka ah, dib-u-ciyaar, ama ballanqaad ah in qol ama ciyaar dib loo soo celin karo.",
       ],
       bullets: [],
       details: [],
@@ -246,17 +293,17 @@ export const legalContentSo = {
       id: "isticmaal-fiican",
       heading: "Ciyaar caddaalad ah iyo ilaalinta adeegga",
       paragraphs: [
-        "Isticmaal Shaxda si sharci ah, si caddaalad ah, oo ixtiraam leh. Adiga ayaa masuul ka ah magaca bandhigga aad doorato iyo cidda aad la wadaagto xiriiriyaha qolka.",
+        "Isticmaal Shaxda si sharci ah, si caddaalad ah, oo ixtiraam leh. Adiga ayaa masuul ka ah magaca bandhigga ama magaca dadweynaha aad doorato, sawirka bogga aad doorato, iyo cidda aad la wadaagto xiriiriyaha qolka.",
       ],
       bullets: [
-        "Ha dooran magac aflagaado, handadaad, nacayb, ama qof kale iska dhigaya.",
+        "Ha dooran magac bandhig ama magac dadweyne oo aflagaado, handadaad, nacayb, ama qof kale iska dhigaya.",
         "Ha isku dayin inaad hareer marto Turnstile, xaddidaadaha codsiga, ama hubinta tallaabooyinka ciyaarta.",
         "Ha carqaladayn adeegga, ha gelin koodh waxyeello leh, hana isku dayin inaad gasho qol ama nidaam aadan fasax u haysan.",
         "Ha u isticmaalin adeegga fal sharci-darro ah ama waxyeello u geysanaya qof kale.",
       ],
       details: [],
       notes: [
-        "Helitaanka adeegga waa la xaddidi karaa ama waa laga joojin karaa codsi ama qalab si xun u isticmaala ama khatar geliya adeegga.",
+        "Helitaanka adeegga waa la xaddidi karaa ama waa laga joojin karaa codsi, qalab, ama akoon si xun u isticmaala ama khatar geliya adeegga.",
       ],
     },
     {

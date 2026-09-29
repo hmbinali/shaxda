@@ -69,16 +69,21 @@ The pilot sells what the register fixes (P14; Q2 confirms it):
   viewer of a slot sees the same sponsor. No rotation, no targeting.
 - An unbooked slot renders nothing.
 - Takedown: the public sponsor response is cached for at most 60 seconds, so
-  a cancelled booking disappears within a minute without a cache purge.
+  no page loaded more than a minute after a cancellation shows the booking; a
+  card already on screen goes at its next refresh (about two minutes at
+  most). No cache purge is needed.
 - `home` and `learn` are **not** in the pilot. They are added only after the
   evidence gates in §8.
 
 ## 4. Sponsor policy and vetting
 
-Placement rules (V2 brief §6.3): direct-sold only; no ad networks,
-programmatic ads, tracking pixels, or third-party scripts; creatives hosted
-by Shaxda; a visible Somali "sponsored" label (draft: `Waxaa kafaala qaaday`);
-payment off-platform; the app stores booking status, never money.
+Placement rules (V2 brief §6.3): direct-sold only; a placement loads no ad
+network, programmatic ad, tracking pixel, or third-party script, and its
+creative is hosted by Shaxda; a visible Somali "sponsored" label (draft:
+`Waxaa kafaala qaaday`); payment off-platform. The app takes no payment and
+stores no payment details, only the agreed price and currency as a note on
+the booking. The site's existing Cloudflare Web Analytics beacon, disclosed
+on `/legal`, is not part of sponsorship and is unchanged.
 
 Content policy — **proposed defaults for founder approval (Q5)**:
 
@@ -90,6 +95,10 @@ Content policy — **proposed defaults for founder approval (Q5)**:
 - no misleading claims.
 
 Priority: Somali-owned and Somali-serving businesses.
+
+This is **sponsor policy version 1** (`SPONSOR_POLICY_V`), in force once Q5
+approves it. A change to this section raises the version in the same commit;
+S1 stores the version with every approval.
 
 Vetting checklist, recorded with the policy version in admin (S1):
 
@@ -105,28 +114,31 @@ Vetting checklist, recorded with the policy version in admin (S1):
 
 ## 5. Fulfilment workflow
 
-| Step | What happens                                                                                    | Owner   | Evidence                       |
-| ---- | ----------------------------------------------------------------------------------------------- | ------- | ------------------------------ |
-| 1    | Inquiry through the S3a contact link (channel decided in Q5)                                    | Founder | Message thread                 |
-| 2    | Vetting against §4                                                                              | Founder | Policy version in admin        |
-| 3    | Creative entered and previewed on both slots, phone and desktop                                 | Founder | Creative version, preview      |
-| 4    | Quote and written agreement: slot, period, dates (UTC), price, make-good terms (§6)             | Founder | Agreement                      |
-| 5    | Payment off-platform                                                                            | Founder | Payment record outside the app |
-| 6    | Booking confirmed in admin — **blocked unless S2-min reporting works** (S1 rule)                | Founder | Confirmed booking              |
-| 7    | Display starts and ends by time, with no deploy; founder spot-checks the start                  | App     | Public response, spot check    |
-| 8    | Takedown if a policy problem appears: cancel with a reason; gone within 60 s                    | Founder | Cancellation record            |
-| 9    | Report sent after the period closes: qualified views, clicks, CTR, definitions, and any outages | Founder | S2 report or CSV               |
-| 10   | Make-good if owed (§6)                                                                          | Founder | Agreement note                 |
-| 11   | Renewal conversation                                                                            | Founder | —                              |
+| Step | What happens                                                                                           | Owner   | Evidence                       |
+| ---- | ------------------------------------------------------------------------------------------------------ | ------- | ------------------------------ |
+| 1    | Inquiry through the S3a contact link (channel decided in Q5)                                           | Founder | Message thread                 |
+| 2    | Vetting against §4                                                                                     | Founder | Policy version in admin        |
+| 3    | Creative entered and previewed on both slots, phone and desktop                                        | Founder | Creative version, preview      |
+| 4    | Quote and written agreement: slot, period, dates (UTC), price, make-good terms (§6)                    | Founder | Agreement                      |
+| 5    | Payment off-platform                                                                                   | Founder | Payment record outside the app |
+| 6    | Booking confirmed in admin — **blocked unless S2-min reporting works** (S1 rule)                       | Founder | Confirmed booking              |
+| 7    | Display starts and ends by time, with no deploy; founder spot-checks the start                         | App     | Public response, spot check    |
+| 8    | Takedown if a policy problem appears: cancel with a reason; new page loads stop showing it within 60 s | Founder | Cancellation record            |
+| 9    | Report sent after the period closes: qualified views, clicks, CTR, definitions, and any outages        | Founder | S2 report or CSV               |
+| 10   | Make-good if owed (§6)                                                                                 | Founder | Agreement note                 |
+| 11   | Renewal conversation                                                                                   | Founder | —                              |
 
 ## 6. Make-goods
 
 The pilot sells a flat price per period, **not** a number of views. A
-make-good is owed only for display time Shaxda lost: an outage recorded by
-S2, a takedown that was not the sponsor's fault, or a start that slipped.
-The agreement states the remedy: extra days equal to the lost time (rounded
-up to whole hours) or a pro-rata refund, at the founder's choice. Low
-measured views alone are not a make-good; they are a pricing signal (§7).
+make-good is owed only for display time Shaxda lost: a display outage the
+founder records in S2's gap log, a takedown that was not the sponsor's fault,
+or a start that slipped. The gap log also lists measurement gaps S2 records
+automatically; those change what the report can show, not the display time
+owed. The agreement states the remedy: a pro-rata refund for the lost hours,
+or a free booking of the shortest period (7, 14, or 30 days) that covers the
+lost time, at the founder's choice. Low measured views alone are not a
+make-good; they are a pricing signal (§7).
 
 ## 7. Pricing hypotheses
 
@@ -198,12 +210,12 @@ relied on.
 
 What V2 adds per unit (from the specs):
 
-| Unit                    | Adds                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Completed account game  | 3 ledger rows; ≈ 8 rating-event rows once R1 runs; ≈ 4 counter upserts (P13); one D1 round trip at game over |
-| Active identity per day | 1 pseudonymous beacon row (kept 90 days, P12)                                                                |
-| Sponsor qualified view  | at most one gated write per browser, booking, and slot per 30 minutes (S2)                                   |
-| Idle room               | nothing while hibernating; alarms only for deadlines and unsaved matches                                     |
+| Unit                    | Adds                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Completed account game  | 3 ledger rows; ≈ 8 rating rows per decision once R1 runs; ≈ 4 counter upserts (P13); one D1 round trip at game over |
+| Active identity per day | 1 pseudonymous beacon row per browser, plus 1 per signed-in account (kept 90 days, P12)                             |
+| Sponsor qualified view  | at most one gated batch (2–4 row writes) per browser, booking, and slot per 30 minutes (S2)                         |
+| Idle room               | nothing while hibernating; alarms only for deadlines and unsaved matches                                            |
 
 At the V2 brief's planning scale (about 1,500 active identities a day), D1
 writes stay far inside the free daily allowance. Billing alerts are set from

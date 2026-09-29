@@ -1,307 +1,403 @@
-# K1 — Quick Match Queue (Spec)
+# K1 — Quick-Match Queue (Spec)
 
-| Field        | Value                                                                                                                                                                                                                                  |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status       | Draft; specification only. H1 and R1/R2 contracts must be merged and reconciled before implementation.                                                                                                                                 |
-| Brief        | `docs/shaxda-v2.md` §6.4, §7, §11 (K1), §14                                                                                                                                                                                            |
-| Depends on   | H1 match persistence and quick-room fields; R1 rating state; R2 rated-play policy                                                                                                                                                      |
-| Workspace    | `k1-quick-match-queue`                                                                                                                                                                                                                 |
-| Unblocks     | K2 queue quality                                                                                                                                                                                                                       |
-| Touches      | `packages/shared` ticket and queue schemas, web Worker ticket endpoint and rating read, game Worker and Wrangler configs, new queue Durable Object, MatchRoom/RoomCoordinator, `/online`, `packages/i18n`, tests and hibernation check |
-| Freeze point | Additive queue wire messages freeze when K1 merges; later changes require an explicit contract-change commit.                                                                                                                          |
+| Field      | Value                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | `revised` (see [README](README.md#spec-index))                                                                                                                                                                                                                                                                                                                                                                  |
+| Wave       | 3, then a community beta at scheduled play windows                                                                                                                                                                                                                                                                                                                                                              |
+| Depends on | H1, R1, R2, X1b (P13 counters)                                                                                                                                                                                                                                                                                                                                                                                  |
+| Register   | F1, F6, P1, P3, P13, P15                                                                                                                                                                                                                                                                                                                                                                                        |
+| Contracts  | Owns the queue protocol of [§6.4](v2-contracts.md#64-quick-match-queue), defined in §3 below. Consumes [§3](v2-contracts.md#3-room-lifecycle), [§4.1](v2-contracts.md#41-which-endings-write-a-row), [§6.2](v2-contracts.md#62-server-to-client), [§6.3](v2-contracts.md#63-client-to-server), [§9](v2-contracts.md#9-metrics-dictionary), [§10.3](v2-contracts.md#103-bindings-flags-and-rollout-by-milestone) |
+| Brief      | [`docs/shaxda-v2.md`](../shaxda-v2.md) §6.4, §11 (K1)                                                                                                                                                                                                                                                                                                                                                           |
+| Touches    | `packages/shared`, `packages/i18n`, web identity route and `/online`, `worker/src` (new `matchmaking-queue.ts`, `queue-policy.ts`; `index.ts`, `room-coordinator.ts`, `match-room.ts`), `worker/wrangler*.toml`, `web/wrangler*.jsonc`, `scripts/check-hibernation.mjs`, `tests/e2e`                                                                                                                            |
 
-The V2 brief controls scope. The PRD controls the stack and infrastructure; the
-game rules document controls play. K1 finds two account players and hands them
-to the existing server-authoritative room. It does not change legal moves or
-calculate ratings. The current checkout has V1.1-A2 tickets and invite rooms;
-H1/R1/R2 are still draft specs here. Names below are proposed interfaces to
-reconcile against their merged contracts, not claims that those features ship.
+K1 lets a complete account find an opponent without sharing a code: one
+hibernating queue Durable Object pairs accounts under P15, hands each pair to
+a pre-claimed rated quick room, recovers no-shows, and counts the funnel with
+P13 counters. The room lifecycle, consent, and ledger stay with H1 and R2
+([§3](v2-contracts.md#3-room-lifecycle)); ratings with R1; presence, re-queue,
+and cooldowns with K2; analytics tables and the admin page with X1.
 
 ---
 
-## 1. Outcome and boundary
+## 1. Outcome and non-goals
 
-A complete, signed-in account selects quick match on `/online`, sees a waiting
-state, and either cancels or enters a room with another account without sharing
-a code. The room is `mode: "quick"` and `rated: true` from trusted server state.
-R2 may still skip the final rating event (for example, a pair cap); the UI must
-not promise rating points for every completed quick game.
+### Outcome
+
+A complete account on `/online` reads that quick games are rated and public,
+taps one action, and lands in a rated quick room with another account within
+the P15 windows. It can cancel until then; if the opponent does not arrive
+within 45 s, it is searching again with its original wait.
 
 ### Must
 
-1. One global `MatchmakingQueue` Durable Object per deployment, with hibernating
-   WebSockets, waiting entries keyed by private `userId`, and alarms only while
-   it has waiting players or an unfinished match handoff.
-2. A web-Worker-minted, short-lived `queue` identity ticket carries a trusted
-   rating and effective RD snapshot. The game Worker verifies it without
-   reading D1, Better Auth, cookies, or sessions.
-3. One queue entry per account. A second tab takes over the entry and closes
-   the previous queue socket; the older socket cannot cancel or accept a match.
-4. Deterministic skill pairing on join and on an alarm, with a basic widening
-   window. A user is never paired with themself.
-5. Reserve a room through `RoomCoordinator`, initialize `MatchRoom` as quick and
-   rated, pre-claim A/B for the two account ids, and only then notify both
-   clients. Both clients mint normal room-scoped `join` tickets to enter.
-6. Recover from a room creation failure, a dropped queue socket, a room join
-   race, and a player who never enters. A connected player is automatically
-   returned to waiting after a no-show; an abandoned room is released.
-7. Keep guest invite play and account invite play working. Validate every HTTP
-   and WebSocket payload with Zod; keep protocol `v: 1` additive.
-8. Extend `pnpm check:hibernation` and cover the queue and handoff with Workers
-   tests and an authenticated two-account E2E test.
+1. One global `MatchmakingQueue` Durable Object: `ctx.acceptWebSocket`, no
+   `setInterval` or lifecycle `setTimeout`, alarms only while an entry waits
+   or a handoff is unfinished (§4.4).
+2. First-frame `queue` tickets with R1's rating snapshot, verified without
+   D1 or auth reads, single-use; one entry per account with epoch takeover.
+3. Deterministic P15 pairing, never an account with itself (§3.3).
+4. An idempotent `pairId` handoff to a pre-claimed rated quick room, with
+   `matched` only after init and entry by normal `join` tickets (§4.3).
+5. Recovery from setup failure, dropped sockets, join races, and no-shows;
+   capacity and join-rate limits; Zod on every frame and internal body.
+6. The P13 queue counters (§3.6); `pnpm check:hibernation` extended.
+7. The `/online` entry for complete accounts, with R2's disclosure, Somali
+   copy, and the `QUICK_MATCH_ENABLED` kill switch.
 
-### Out of scope
+### Should
 
-K2 owns tuned widening and wait-quality policy, waiting-player counts,
-result-overlay requeue, repeat-abandon cooldowns, and queue funnel metrics.
-There is no guest queue, unrated quick mode, regional partition, bot, push
-notification, async play, new rating formula, or new game rule in K1. The K1
-entry button and waiting state need Somali copy, but a public queue count does
-not appear yet.
+Play the existing sound (per the saved preference) and show a visible banner
+when matched in a background tab. No push notifications.
+
+### Not in K1
+
+Guest or friendly quick match, regional queues, bots, async play, ETA,
+RD-aware pairing, waiting presence, re-queue from the result, cooldowns (K2,
+P16), public queue numbers, new game rules, rating arithmetic.
 
 ---
 
-## 2. Ticket and trust boundary
+## 2. Decisions and dependencies
 
-The existing same-origin `/api/online/identity` `POST` adds action `queue`.
-Its request, response and signed payload stay Zod-validated. `queue` forbids
-`roomCode`, like `create`; `join` and `reconnect` still require one. The web
-Worker requires a valid session and confirmed username, reads the current R1
-`player_rating` row, and signs the existing account display claims plus
-`rating` and `rd` only for `queue`. The ticket has the existing random `jti`,
-issue time, and expiry.
+| ID  | How K1 applies it ([register](README.md#decision-register))                                                                                                                             |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F1  | Quick is always rated: no friendly option, both consents recorded at init, every quick rematch vote rated (R2). The ledger enforces `mode = 'invite' OR rated = 1`.                     |
+| F6  | After 120 s of its own wait every account, new and provisional included, admits any gap; the other player's window must admit it too (P15), so a wide pair forms once both have waited. |
+| P1  | The room reports when play began (`queue_started`). Any ending before it, a no-show included, writes no row.                                                                            |
+| P3  | Entering the queue is consent: `joinQueue` carries the `disclosureV` the player saw, and the room records it for that seat. Cached clients have no queue UI and cannot enter.           |
+| P13 | The queue DO only increments the `queue_*` names of §3.6 and never reads D1.                                                                                                            |
+| P15 | The pairing function (§3.3) and the 45 s no-show grace (§4.3).                                                                                                                          |
 
-`rating` is R1's full-precision current rating; `rd` is effective RD at mint
-time, including inactivity. For an account without a rating row, use R1's
-initial 1500/350 values. This is a pairing snapshot, never a rating event or
-leaderboard assertion. Add finite positive bounds to the queue-only claims
-and reject malformed values; the browser cannot supply or edit them. Keep the
-existing 90-second ticket lifetime, current/previous secret rotation, and
-no-store response. Check the encoded ticket against the existing maximum
-length and raise that bound only with tests if the claims require it.
+Also cited: F2 and P2 (quick games are public and the entry says so), F4 (a
+no-show is not a loss), P7 (a quick game may be `skipped:pairCap`), P10 (no
+cross-room registry), P11 (pending deletion stops tickets), Q3 (beta targets).
 
-The game Worker routes `GET /queue/ws` upgrades to the single DO named
-`global`. Reject a missing/invalid upgrade, disallowed origin, invalid
-ticket, wrong action, expiry, or unavailable secret before adding a waiting
-entry. The DO accepts the socket with `ctx.acceptWebSocket(...)`, verifies the
-ticket, and stores only queue state and an attachment needed for hibernation.
-Never persist the raw ticket or send `userId`, rating, RD, JTI, email, or
-provider data in a queue or room message. Reuse the account ticket's public
-display snapshot only after the room handoff. Queue tickets have single-use
-JTIs; replays are rejected even after cancel until expiry, with lazily pruned,
-bounded markers. The account id is the ownership key, not a username or IP.
+| Dependency | Provides                                                                                                                                                                                                                |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1         | Room lifecycle ([§3](v2-contracts.md#3-room-lifecycle)), random first starting seat ([§3.4](v2-contracts.md#34-game-rules-inside-the-room)), room fields `mode`/`ratedRequest`/`consent`, quick ledger rows, game `DB`. |
+| R2         | Consent rules ([§6.3](v2-contracts.md#63-client-to-server)), `RATED_DISCLOSURE_V` (`@shaxda/shared/rated-play`) and `RatedDisclosure.svelte`, `consentClosed`, `ratedOnlyRematch`, game var `RATED_PLAY_ENABLED`.       |
+| R1         | `player_rating` and the pure effective-RD function in `packages/rating` ([§7.3](v2-contracts.md#73-arithmetic-and-reads)), used when the web Worker mints a `queue` ticket.                                             |
+| X1b        | `incrementCounter` in `@shaxda/db/counters`, the `onlineCounterNameSchema` allowlist in `packages/shared`, game var `ANALYTICS_ENABLED`.                                                                                |
 
-The existing `join`/`reconnect` ticket verifier remains the sole way to claim
-a quick-room socket. A supplied bad ticket cannot fall back to guest play.
-Quick-room initialization is an internal Worker/DO operation, unavailable via
-the public `POST /rooms` or a browser WebSocket. A client-sent `mode: "quick"`,
-`rated: true`, or pre-claim list is ignored/rejected at public boundaries.
+K1 unblocks K2, which uses P15 as defined here and does not redefine it.
 
 ---
 
-## 3. Queue state, pairing, and alarms
+## 3. Contracts
 
-Persist a compact waiting record per user: rating, RD, original `joinedAt`,
-socket epoch, and public display snapshot. The socket attachment carries the
-user key and epoch so a hibernated instance can authorize messages. On wake,
-reconcile records with live accepted sockets; do not pair a stale entry. An
-account's second accepted socket replaces the first, keeps its original
-waiting time, refreshes its rating/RD snapshot, increments its epoch, and
-closes the prior socket. A late close/cancel from an older epoch is a no-op.
-During a pending handoff, takeover attaches the new socket to the same
-`pairId` and resends that room assignment; it cannot create another room.
-An explicit cancel removes the entry immediately and acknowledges it. A socket
-close/error removes a waiting entry; a client reload may enter again with a
-fresh ticket.
+### 3.1 Queue ticket
 
-**K1 pairing baseline.** For a waiting player aged less than 30 seconds, the
-maximum rating gap is 100; from 30 to 89 seconds, 300; from 90 seconds, any
-gap. Both players must admit the pair under their own current window.
-Effective RD is carried and tested; in K1 it identifies an uncertain player
-for UI explanation and future K2 tuning rather than overriding the widening
-rule. Thus a new/provisional account can meet any waiting account after a
-short wait, as the founder chose. K2 may tune thresholds and RD-aware matching
-without changing the queue protocol. Never use rounded display ratings.
+- `ticketActionSchema` gains `queue`: no `roomCode`, plus `rating` (R1's
+  full-precision rating; finite, absolute value below 10 000) and `rd`
+  (effective RD at mint; finite, above 0, at most 350), which every other
+  action forbids. Lifetime (90 s), skew, and secret rotation are unchanged.
+- `POST /api/online/identity { action: "queue" }` keeps every existing check
+  and `no-store`, answers `403 quick-match-disabled` unless the web var
+  `QUICK_MATCH_ENABLED` is `"true"`, and reads `player_rating` by primary
+  key. No row → 1500/350, a pairing input that is never shown.
+- The longest possible `queue` ticket must fit the 1,024-character bound, or
+  that commit raises it with tests. `GET /api/online/identity` gains optional
+  `quickMatch: boolean`, so the prerendered `/online` learns the web var.
 
-At every join, replacement, cancel, and alarm, consider all eligible pairs.
-Choose the pair with the earliest `max(joinedAtA, joinedAtB)` (the first time
-both were waiting); break ties by smaller absolute rating gap, then sorted
-user ids. Mark both entries as a pending handoff before awaiting coordinator
-or room calls so a reentrant event cannot assign either account twice. Set
-the next alarm to the earliest waiting player's next window boundary or an
-unfinished handoff deadline; if no future boundary exists, a bounded
-stale-entry check can be scheduled while someone waits. Delete the alarm when
-both waiting and handoff sets are empty. No periodic timer, `setInterval`,
-lifecycle `setTimeout`, or normal socket `accept()` is permitted. A pending
-handoff counts as non-empty queue work until confirmed or rolled back, so its
-deadline alarm obeys §6.4.
+### 3.2 Queue socket protocol
 
-Cap waiting sockets at a documented operational limit and return a Somali
-retry state at capacity. Keep a basic queue-join rate limit keyed by account
-(for example, 10 joins per rolling minute); tab takeover is allowed within
-that budget. Apply existing edge/IP protections where available, without
-making public IP the identity key. A capacity/rate rejection must not create
-a room. K2 may add stronger abuse cooldowns later.
+`GET /queue/ws` on the game Worker answers 426 without an upgrade and 403
+when `ALLOWED_ORIGIN` is set and `Origin` differs; only this path reaches the
+DO, and `/internal/*` is never routed. Frames carry `v: 1` and `type`, are
+at most 4,096 bytes, and never carry a user id, rating, RD, JTI, ticket, or
+opponent identity.
 
----
+| Direction      | Frame         | Fields and meaning                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| client → queue | `joinQueue`   | `identityTicket` (`queue` action), `disclosureV: number`. Must be the first frame; creates the account's entry or takes it over.                                                                                                                                                                                                                                                                          |
+| client → queue | `cancelQueue` | No fields. Leaves the queue if this socket's epoch owns the entry.                                                                                                                                                                                                                                                                                                                                        |
+| client → queue | `ping`        | Exactly `{"v":1,"type":"ping"}` every 30 s, answered by `ctx.setWebSocketAutoResponse` with `{"v":1,"type":"pong"}` without waking the DO.                                                                                                                                                                                                                                                                |
+| queue → client | `queueStatus` | `state: "waiting" \| "handoff" \| "settled" \| "cancelled"`; `joinedAt` (server ms) with `waiting`; optional `notice: "opponentNoShow" \| "handoffFailed"`.                                                                                                                                                                                                                                               |
+| queue → client | `matched`     | `roomCode`, `pairId` (128 random bits, base64url). Sent only after the room is initialized.                                                                                                                                                                                                                                                                                                               |
+| queue → client | `queueError`  | `code`: `invalidMessage` (malformed, oversize, unknown, or a first frame other than `joinQueue`), `identityInvalid`, `identityExpired`, `identityScope`, `identityReplayed`, `identityUnavailable`, `disclosureOutdated`, `queueDisabled`, `queueFull`, `rateLimited`, `replaced`, `matchExpired`, `handoffFailed`. The socket then closes with 4000; after `settled` or `cancelled` it closes with 1000. |
 
-## 4. Idempotent room handoff
+After the freeze only optional keys may be added: a new server `type` breaks
+cached clients ([§6.2](v2-contracts.md#62-server-to-client)). `queueError.code`
+is a string of at most 64 characters, and the client shows a generic message
+for a code it does not know; `cooldown` with `retryAt` is reserved for K2 and
+never sent by K1 ([§6.4](v2-contracts.md#64-quick-match-queue)).
 
-Use a random opaque `pairId` for each pending pair. The queue is the only
-component allowed to request a quick reservation. Extend the coordinator's
-internal reservation path to accept a trusted quick source with an idempotent
-`pairId`; it still enforces unique room codes and the global active-room cap.
-Quick creation does not consume the guest per-IP Turnstile/create quota, but
-queue join has its own account quota. A failed reservation leaves the two
-entries waiting with their original `joinedAt` and a recoverable error.
+### 3.3 Pairing (P15)
 
-Before sending `matched`, initialize MatchRoom with immutable
-`mode: "quick"`, `rated: true`, `pairId`, and two distinct pre-claimed account
-seats. Randomize the starting seat using H1's rule. A and B are assigned
-without relying on who connects first. Store the private user ids and
-username/avatar snapshots only in room state. Neither guest identity nor a
-third account can occupy these seats, even if they guess the room code. A
-valid room-scoped `join` ticket can attach only to its matching pre-claimed
-seat; reconnect continues to use the existing account epoch/JTI rules.
-Return the existing room status and game state only to authorized players.
-The room does not start or record a match until both seats connect. A quick
-room cannot be created through the public invite endpoint by forging options.
+- `window(w)` for an entry's own wait `w` on the queue clock: 100 below
+  30 s, 200 below 60 s, 300 below 90 s, 400 below 120 s, unbounded after.
+- An entry is eligible when it is `waiting`, its current-epoch socket is
+  open, and its `disclosureV` equals the current `RATED_DISCLOSURE_V`. Two
+  eligible entries of different accounts pair when their full-precision
+  rating gap is at most the smaller of their two windows, boundary
+  inclusive: **both** windows must admit it.
+- On every join, takeover, return, and alarm, repeatedly take the pair with
+  the smallest `max(joinedAtA, joinedAtB)`, then the smaller gap, then the
+  lexicographically smaller sorted pair of user ids. Seat A is the earlier
+  `joinedAt`; the starting seat is random (H1).
+- `joinedAt` is set at entry creation and survives takeover and every
+  return. RD is stored with the entry; P15 does not use it.
 
-The queue persists `pairId`, room code, both user ids, reservation/init stage,
-and the handoff deadline. Coordinator reserve and room init are idempotent for
-that `pairId`; a retry may read the same room but cannot create a second one.
-Only after successful init does each live queue socket receive
-`matched { roomCode, pairId }`. Clients keep the queue connection during
-handoff, mint fresh room-scoped `join` tickets, and open the room socket.
-If one queue socket was lost before notification, revalidate socket presence
-and roll back the pair or let the handoff deadline recover it. On errors,
-release a reserved room safely and return eligible live players to waiting.
-Never disclose a room code before both seats are reserved.
+### 3.4 Queue DO state
 
-The no-show deadline is **45 seconds after room initialization and attempted
-delivery of both `matched` notices** (pending founder confirmation in §7).
-At the deadline, the queue asks MatchRoom for
-the authoritative connected/pre-claim state. If both have joined, finalize
-the handoff and close the queue sockets. The room may notify the queue as
-soon as its second seat joins; the alarm is the recovery backstop. If only
-one joined, abort the unstarted room through an idempotent internal operation,
-release its coordinator reservation, and restore the present account to
-waiting with its original `joinedAt`; notify its client to leave the dead room
-and resume searching. If its queue socket was lost, the room sends a
-recoverable no-show status and the client obtains a new queue ticket to
-re-enter automatically. Discard the absent account's entry. If neither
-joined, abort and remove both. If both joined just as the alarm fires, room
-state wins and the room must not be aborted. Once any game action is accepted,
-abort is forbidden; normal room disconnect/claim-win rules take over.
-No-show before the first action is not a game result or a rated loss and
-writes no match ledger row.
+KV storage of the SQLite-backed class; each transition is one `put` before
+any reply or outbound call.
 
-Room cleanup and reservation release must be retryable after a DO restart or
-partial failure. Keep a pending handoff until it is resolved; a retried alarm
-uses `pairId` and room status rather than issuing duplicate `matched` rooms.
-The coordinator's active-room count returns to its prior value after an
-aborted handoff. Do not use D1 for queue membership or per-move records.
+| Key                   | Value                                                                                                                                                                                                   | Lifetime                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `entry:<userId>`      | `joinedAt`, `epoch`, `rating`, `rd`, `disclosureV`, `display` (username, avatar), `state: "waiting" \| "handoff" \| "returning"`, `pairId?`, `returnUntil?`                                             | Until cancel, close while waiting, settle, removal                              |
+| `pair:<pairId>`       | `roomCode`, `seats { A, B }` (user ids), `stage` (`reserving` → `initializing` → `announced` → `settled` → `started` → `completed`, or `closed`), `setupDeadline`, `noShowDeadline?`, `resolveAttempts` | Ids dropped at settle; deleted when closed, at completion, or 24 h after settle |
+| `jti:<jti>`           | The ticket's `exp`                                                                                                                                                                                      | `exp` + 5 s                                                                     |
+| `joins:<userId>`      | Accepted join times (at most 10)                                                                                                                                                                        | 60 s                                                                            |
+| `reserveBlockedUntil` | Timestamp                                                                                                                                                                                               | 10 s after a failed reservation                                                 |
+| Socket attachment     | `acceptedAt`, `userId?`, `epoch?`, `frameTimes`; never a ticket, rating, or RD                                                                                                                          | The socket                                                                      |
 
----
+### 3.5 Internal handoff paths
 
-## 5. Protocol and `/online` experience
+Reachable only through Durable Object stubs; every body is Zod-validated.
 
-Add queue-specific Zod schemas beside the existing `v: 1` room protocol;
-do not change existing invite message meanings. Suggested messages:
+| Path (caller)                                       | Request → response                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /internal/coordinator/reserve`, quick (queue) | `{ roomCode, quickPairId }` → `{ ok: true }` or `{ ok: false, code: "capacityFull" \| "roomCodeTaken" }`. No IP and no per-IP limits; the unique-code and 500-room global checks stay; a repeat for the same pair answers `ok`.                                                                                                     |
+| `POST /internal/rooms/init`, quick (queue)          | `{ roomCode, quick: { pairId, seats: { A, B } } }`, each seat `{ userId, username, avatarMode, imageUrl, disclosureV }` from its verified ticket and `joinQueue` → 200, also for a repeat with the same `pairId`; 409 for any other room. The public `POST /rooms` rejects these fields with 400 ([§6.1](v2-contracts.md#61-http)). |
+| `POST /internal/rooms/quick-resolve` (queue)        | `{ pairId }` → `{ outcome: "settled" }` if both seats have connected; else the room cancels itself → `{ outcome: "cancelled", joined: { A, B } }`; a missing room → `{ outcome: "gone" }`.                                                                                                                                          |
+| `POST /internal/queue/room-report` (room)           | `{ pairId, event: "seatsJoined" \| "started" \| "completed" }` → 204. Best effort; the room persists a flag with the transition and sends each event once.                                                                                                                                                                          |
 
-| Direction       | Message                                                         | Meaning                                                             |
-| --------------- | --------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Client to queue | `joinQueue { v: 1, identityTicket }`                            | Authenticate and enter once; ticket action must be `queue`.         |
-| Client to queue | `cancelQueue { v: 1 }`                                          | Remove this socket's current entry, if its epoch still owns it.     |
-| Queue to client | `queueStatus { v: 1, state: "waiting" \| "handoff", joinedAt }` | Authoritative status after join/reconnect and rollback.             |
-| Queue to client | `matched { v: 1, roomCode, pairId }`                            | Both seats are already reserved.                                    |
-| Queue to client | `queueError { v: 1, code }`                                     | Typed authentication, capacity, rate, or retryable handoff failure. |
+### 3.6 Queue counters (P13)
 
-Bound every message and reject unknown/malformed variants without mutating
-membership. No queue message carries another player's private id, rating, or
-ticket. A stale `matched` notice is ignored when `pairId` differs from the
-client's active handoff.
+These names join `onlineCounterNameSchema`, the P13 allowlist
+([§9](v2-contracts.md#9-metrics-dictionary)); each adds 1 to `event_daily`
+on the UTC day of its transition.
 
-On `/online`, show quick match only for `identity.status === "complete"`.
-Signed-out and incomplete users get a sign-in/finish-registration path and
-retain the invite/guest flow. The waiting state shows cancel, connection
-status, and a short explanation that skill pairing widens with wait time.
-On match, reuse the existing room UI and online game controller with a fresh
-`join` ticket; keep the queue socket until the handoff is confirmed. Cancel
-while waiting removes the entry. Cancel after `matched` but before both have
-joined is treated as a no-show and returns the other player to waiting; the
-client does not get to change a started game's result. Navigation and reload
-must not leave a hidden duplicate queue entry. Keep `/online` prerendered and
-client-rendered for gameplay.
+| Name                  | Adds 1 when                                                                                                                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `queue_joined`        | A `joinQueue` creates a new entry (not a takeover or a return).                                                                                                                                                  |
+| `queue_paired`        | A pair is announced (`matched` sent after init).                                                                                                                                                                 |
+| `queue_wait_<bucket>` | Once per player at announcement, for `announcedAt − joinedAt`. Buckets: `lt10s`, `lt20s`, `lt30s`, `lt60s`, `lt90s`, `lt120s`, `lt180s`, `lt300s` (each from the previous bound up to N s, exclusive), `ge300s`. |
+| `queue_started`       | The room first reports that play began (P1).                                                                                                                                                                     |
+| `queue_completed`     | The room first reports that a match in which play began reached game over.                                                                                                                                       |
+| `queue_no_show`       | An announced pair is cancelled because a seat did not join within 45 s or cancelled after `matched`; one per pair.                                                                                               |
 
-Place all visible copy in `packages/i18n` in Somali, including the action,
-waiting, cancel, match found, connection failure, no-show return, queue full,
-and rating-intent explanation. Reuse the founder-approved R2 terms once
-settled. While R2 policy can skip rating later, show quick mode as **rated
-intent** in the lobby and only confirmed rating change after processing.
-As optional polish, play the existing sound preference and show a visible
-match-found banner when the tab is backgrounded; do not add push alerts.
+The queue persists the transition, then writes through the game Worker's
+`DB` with `incrementCounters(db, names, day, now)`, which K1 adds to
+`@shaxda/db/counters` (X1b's upsert per name, one `db.batch`). `queue_paired`
+and its two buckets share a batch, so Σ `queue_wait_*` = 2 × `queue_paired`.
+A crash between the steps loses that increment, never doubles it. Failures
+are logged without ids and dropped; `ANALYTICS_ENABLED = "false"` skips them.
+
+### 3.7 Quick-room additions
+
+| Topic           | MatchRoom rule                                                                                                                                                                                                                                                                                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| State           | Gains `quick: { pairId, connected, reported }`; `MatchRoomEnv` gains `MATCH_QUEUE`. Init sets H1's `options` to `{ mode: "quick", ratedRequest: true }`, fills both slots with the two account seats and both `consent` slots with `{ accept: true, disclosureV }`, and draws the starting seat at random (H1); before play, `matchStatus` shows all of it. |
+| Until both join | Until both seats have connected, actions get `waitingForOpponent` and no turn clock, nudge, or claim runs. A guest or third account gets `roomFull`; a `join` ticket claims only its own seat.                                                                                                                                                              |
+| Consent         | `rateConsent` gets `consentClosed`; a friendly rematch vote gets `ratedOnlyRematch` (R2).                                                                                                                                                                                                                                                                   |
+| Cancellation    | Sends `error { code: "quickCancelled" }`, closes sockets, releases the reservation, and deletes storage.                                                                                                                                                                                                                                                    |
 
 ---
 
-## 6. Verification and rollout
+## 4. Behaviour and failure handling
 
-Workers/Miniflare tests must cover:
+### 4.1 Entry lifecycle
 
-- queue ticket session/username gate, missing rating fallback, effective-RD
-  snapshot, expiry, action/room scope, tampering, JTI replay, and secret
-  rotation; no auth/D1 read in the game Worker;
-- two distinct accounts pairing at each window boundary, exact boundary
-  times, deterministic tie breaking, provisional/new account broadening,
-  self-pair prevention, and no pairing with a stale socket;
-- second-tab takeover with epoch protection against an old cancel/close,
-  capacity and join-rate limits, and concurrent join/alarm events;
-- coordinator reservation and room init retries, code collisions, global
-  capacity failure, both seats pre-claimed, guest/third-account rejection,
-  randomized first seat, and rated quick status visible before play;
-- both players connecting, one/no player connecting, last-moment join race,
-  cancel during handoff, no-show requeue, failed cleanup retry, and no ledger
-  row for a pre-action no-show;
-- alarm exists only while waiting or handoff work exists, is removed when
-  empty, and queue sockets survive a DO hibernation/reconstruction cycle.
+```txt
+joinQueue ─► waiting ─(pair)─► reserving ─► initializing ─► announced
+announced ─(both seats connected)─► settled ─(play began)─► started ─► completed
+announced ─(45 s, or cancel after matched)─► room cancelled:
+           each connected seat returns, each never-connected seat is removed
+setup failure ─► both return (handoffFailed)
+waiting ─(cancelQueue, or its socket closes)─► removed
+return: socket open ─► waiting (original joinedAt); closed ─► returning (30 s)
+```
 
-Extend `pnpm check:hibernation` to cover the new DO source. E2E uses two real
-complete accounts in separate browser contexts: both enter from `/online`,
-receive the same room code, occupy different pre-claimed seats, and start a
-quick room with rated intent. Add a cancel/no-show path and check that invite
-creation and guest join still work. Use local Miniflare data and tracked E2E
-fixtures; preserve `pnpm check:e2e-isolation`. During implementation run
-`pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:worker`,
-`pnpm build`, `pnpm check:hibernation`, and relevant `pnpm test:e2e` cases.
-A spec-only edit needs document consistency checks, not an application build.
+### 4.2 Join, takeover, cancel
 
-Roll out after H1 and R1/R2 have landed. Reconcile their actual mode, seat,
-rating, and result contracts first; make any frozen-contract change explicit.
-Deploy the new DO binding and migration in local, preview, then production
-config; add the production `/queue*` route. Keep the entry action hidden
-until preview verifies two devices, a rated quick-room start, and no-show
-recovery. A feature flag or removal of the entry action can stop new joins
-without interrupting active rooms. Observe queue joins/matches/failures and
-DO alarm activity through bounded operational logs; K2/X1 owns the product
-metrics contract. Do not log raw tickets, ids, or IPs.
+| Event              | Behaviour                                                                                                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `joinQueue`        | Checks in order: frame and schema, switches, secret, ticket, JTI (recorded once the ticket verifies), `disclosureV`, 10 joins per account per rolling 60 s (takeovers included), 200 entries for a new entry.    |
+| Join with an entry | Takeover: epoch + 1, `joinedAt` kept; rating, RD, display, and `disclosureV` refreshed; `replaced` to the old socket; the current state, or the same `matched`, to the new one. Older epochs are ignored.        |
+| `cancelQueue`      | While waiting, the entry is removed. During setup the canceller leaves when setup ends, a created room is cancelled, the other entry returns, and nothing is counted. After `matched`, §4.3 step 6 runs at once. |
+| Socket close       | Removes a `waiting` entry; during a handoff the deadline decides.                                                                                                                                                |
+| Abuse              | A socket without `joinQueue` after 10 s closes at the next wake; upgrades get 503 at 400 sockets; each socket may send 10 frames per 10 s, auto-answered pings excluded.                                         |
 
-**Done when** two complete accounts on separate preview devices enter the
-queue, automatically reach the same pre-claimed quick room, and start a game
-without sharing a link; the tests above pass, no-show recovery works, and
-the hibernation guard covers the queue. Production enablement is a separate
-operational decision.
+### 4.3 Handoff and no-show
+
+| Step        | Rule                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Pair     | The pair record and both `handoff` entries are one `put` before any outbound call, so an interleaved event cannot reuse either account.                                                                                                                                                                                                                                                                                 |
+| 2. Setup    | Reserve a fresh code, then initialize the room; on `roomCodeTaken` or 409, release it and try a new code, at most 5. After a crash, setup resumes at `setupDeadline` (pairing + 15 s); reserve and init are idempotent per `pairId`, so no second room appears.                                                                                                                                                         |
+| 3. Failure  | Capacity, an init error, or five collisions: release the reservation, return both entries with `handoffFailed`, block reservations for 10 s.                                                                                                                                                                                                                                                                            |
+| 4. Announce | Persist `noShowDeadline = announcedAt + 45 000`, send `matched` to each open socket, then write the counters.                                                                                                                                                                                                                                                                                                           |
+| 5. Enter    | Clients keep the queue socket, mint `join` tickets, open the room like an invite link (`/online?room=<code>`), and claim their seats. `seatsJoined` settles the pair: `queueStatus settled`, sockets closed, entries deleted, user ids dropped.                                                                                                                                                                         |
+| 6. Resolve  | At the deadline, or a cancel after `matched`, call quick-resolve. `settled` settles (room state wins the both-connect race). `cancelled` adds `queue_no_show`, returns each connected seat with `opponentNoShow`, and removes each never-connected seat with `matchExpired`. `gone` (an earlier answer was lost) returns both. A failed call retries every 5 s; after two minutes both entries go with `handoffFailed`. |
+| Client      | If the queue socket drops before the room confirms the seat, reconnect with a fresh ticket (the takeover resends `matched`); afterwards ignore it. On `quickCancelled`, wait for `queueStatus` if the queue socket is open, else send `joinQueue` to take over the `returning` entry.                                                                                                                                   |
+
+A cancelled room never began play: no outbox, no row, no loss (F4, P1,
+[§4.1](v2-contracts.md#41-which-endings-write-a-row)). After settle the room
+rules apply: a resign or claim before play began writes no row, and after it
+is a loss in every phase.
+
+### 4.4 Alarms
+
+One `scheduleAlarm()` sets or deletes the alarm. It sets the earliest of each
+unfinished pair's `setupDeadline`, `noShowDeadline`, or resolve retry; each
+`returnUntil`; and, while two or more entries wait, the next window boundary
+(`joinedAt` + 30, 60, 90, or 120 s) and `reserveBlockedUntil`. Otherwise it
+deletes the alarm: an empty queue or a lone waiter has none. Settled pairs,
+JTI markers, and join lists are pruned on wake only.
+
+### 4.5 Hibernation, deploys, and switches
+
+| Situation              | Behaviour                                                                                                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hibernation            | State lives in storage and attachments, so any event rebuilds it.                                                                                                                                   |
+| Restart or deploy      | Each wake removes `waiting` entries whose socket is not in `ctx.getWebSockets()`. A deploy drops every socket, so waiting players re-enter as new entries; handoffs finish through their deadlines. |
+| Game switch off        | `QUICK_MATCH_ENABLED` or `RATED_PLAY_ENABLED` (F1) not `"true"`: joins get `queueDisabled`, waiting entries are cleared at the next wake, announced handoffs and rooms continue.                    |
+| Web switch off         | `/online` hides the entry and `queue` tickets are refused.                                                                                                                                          |
+| Disclosure bump        | Entries with an old `disclosureV` get `disclosureOutdated` at the next wake and the client reloads. A room keeps the version recorded at init as its consent.                                       |
+| Pending deletion (P11) | No `queue` or `join` ticket is minted, so a paired entry of that account ends as a no-show for its seat.                                                                                            |
 
 ---
 
-## 7. Decisions and contract checks
+## 5. Privacy and access
 
-| ID    | Decision                                            | Treatment                                                                           |
-| ----- | --------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| K1-D1 | Broaden new/provisional pairing after a short wait? | **Founder answered yes.** K1 uses the 30/90-second basic window above; K2 tunes it. |
-| K1-D2 | No-show grace after `matched`?                      | **Pending founder answer.** 45 seconds is the spec default until confirmed.         |
-| K1-D3 | H1/R1/R2 merged field and message names             | Reconcile before coding. Do not assume the current drafts are deployed.             |
-| K1-D4 | Final Somali wording for quick match/rated intent   | Reuse R2's approved terms; do not ship English placeholders.                        |
+- Quick games are rated, so they follow the rated rows of
+  [§5](v2-contracts.md#5-access-matrix): `/match/<id>` with its replay,
+  stats, and rating status is open to everyone, and the game is listed on
+  `/u/<username>`. K1 adds no reader.
+- The entry says so first (F2, P2) with R2's `RatedDisclosure.svelte` and
+  K1's always-rated line; pressing the action is consent (P3).
+- User ids, ratings, and RD stay in queue storage and go at settle, cancel,
+  or removal. Rooms show only username and avatar, as invite rooms do.
+- Tickets travel in the first frame, never in a URL. Logs carry `pairId`,
+  stage, and codes, never tickets, user ids, IPs, or ratings.
+- Counters are daily aggregates without identifiers (P12).
 
-The queue protocol freezes at K1 merge. Threshold changes in K2 can be
-configuration/policy changes if the wire shape stays intact; message-shape
-changes need the V2 explicit contract-change process.
+---
+
+## 6. Resource budget
+
+| Per quick game (happy path) | Cost                                                                                                       |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Web identity `POST`         | 2 `queue` (one `player_rating` primary-key read each) and 2 `join`                                         |
+| Queue DO wake-ups           | 2 joins and 3 room reports; up to 4 boundary alarms per entry while two or more wait; pings wake nothing   |
+| Outbound queue calls        | 1 reserve and 1 init (+1 each per code collision; +1 quick-resolve on a no-show)                           |
+| D1 by K1                    | 5 requests, 7 `event_daily` upserts, no reads; the ledger rows are H1's                                    |
+| `event_daily` growth        | At most 14 rows per day for all K1 names                                                                   |
+| Queue storage               | Under 1 KiB per entry (at most 200), under 0.5 KiB per pair (≤ 24 h after settle), ~100 B per JTI (≤ 95 s) |
+| Idle                        | An empty queue or a lone waiter: no alarm, no wake-up; hibernated sockets bill no duration                 |
+
+---
+
+## 7. Somali copy
+
+Keys are relative to `onlineGame.quickMatch` unless written in full, behind
+`TODO(translation-review)`, using the README glossary. R2 owns the disclosure
+(`ratedPlay.disclosure.*`); K1 reuses `onlineGame.errors.identity*`,
+`errors.rateLimited`, `errors.disclosureOutdated`, `connection.replaced`,
+`notices.reconnecting`, and the `identity` actions.
+
+| Key                                | Somali draft                                                                                         | Meaning                              |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `title`                            | Kulan degdeg ah                                                                                      | Quick match                          |
+| `start`                            | Raadi kulan degdeg ah                                                                                | Find a quick match                   |
+| `alwaysRated`                      | Kulanka degdegga ah had iyo jeer waa Tartan.                                                         | Quick matches are always rated       |
+| `accountNeeded`                    | Kulan degdeg ah wuxuu u baahan yahay akoon dhammaystiran.                                            | Needs a complete account             |
+| `searching`                        | Ciyaaryahan ayaa laguu raadinayaa…                                                                   | Searching for a player               |
+| `widening`                         | Inta aad sugayso, waxaa laguu keeni karaa ciyaaryahan darajadiisu kaa fog tahay.                     | The search widens while you wait     |
+| `cancel`                           | Jooji raadinta                                                                                       | Stop searching                       |
+| `matched`                          | Kulan ayaa la helay. Waxaad gelaysaa qolka…                                                          | Match found; entering the room       |
+| `notices.opponentNoShow`           | Ciyaaryahankii kale ma iman. Raadintu way sii socotaa, waqtigaagii sugitaanka waa la xafiday.        | Opponent absent; wait time kept      |
+| `notices.handoffFailed`            | Qolka lama diyaarin karin. Raadintu way sii socotaa.                                                 | Room not prepared; still searching   |
+| `errors.queueFull`                 | Safku hadda wuu buuxaa; wax yar kadib isku day.                                                      | Queue full                           |
+| `errors.queueDisabled`             | Kulanka degdegga ah hadda lama heli karo. Weli qol ayaad samayn kartaa oo saaxiib ku casuumi kartaa. | Unavailable; invite play still works |
+| `errors.matchExpired`              | Qolka lama gelin waqtigii loogu talagalay, kulankiina wuu dhacay. Dib u raadi.                       | You did not join in time             |
+| `errors.handoffFailed`             | Kulanka lama bilaabi karin. Dib u raadi.                                                             | Handoff could not be recovered       |
+| `onlineGame.errors.quickCancelled` | Kulankan waa la joojiyay maadaama ciyaaryahan uusan iman.                                            | Room error after a no-show           |
+
+---
+
+## 8. Implementation slices
+
+Each code slice carries its tests; slice 1 applies brief §6.4 first.
+
+1. `docs: apply the V2 queue Durable Object rule to AGENTS and the PRD`
+2. `feat(shared): add the queue ticket action and rating claims`
+3. `feat(shared): add queue protocol schemas and counter names`
+4. `feat(web): mint queue tickets with the pairing snapshot`
+5. `feat(online): reserve quick rooms in the coordinator`
+6. `feat(online): initialize and resolve pre-claimed quick rooms`
+7. `feat(online): add the MatchmakingQueue Durable Object` (binding and `v3`
+   migration in `worker/wrangler.toml`, membership, limits, pairing, alarms)
+8. `chore(worker): extend the hibernation check to the queue` (the scan
+   already covers `worker/src`; `matchmaking-queue.ts` must also call
+   `ctx.acceptWebSocket(` and contain exactly one `setAlarm(` call)
+9. `feat(online): hand quick pairs to rooms and recover no-shows`
+10. `feat(online): count queue transitions`
+11. `feat(i18n): add quick-match Somali copy`
+12. `feat(web): add quick match to /online`
+13. `test(e2e): cover quick match between two accounts`
+14. `build: add quick-match bindings and flags for preview and production`
+
+---
+
+## 9. Acceptance tests
+
+Workers tests run on Miniflare with an injected clock. The e2e file is
+`tests/e2e/quick-match.spec.ts` on the shared local D1
+([§10.4](v2-contracts.md#104-shared-local-d1-in-e2e)).
+
+| Layer   | Area                | Cases                                                                                                                                                                                                                                                                                                                                                    |
+| ------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit    | Ticket and frames   | `queue` requires `rating` and `rd` and forbids `roomCode`; other actions forbid the claims; NaN, infinities, and `rd` of 0 or above 350 fail; the worst-case ticket fits the bound; every frame parses; oversize and unknown frames fail.                                                                                                                |
+| Unit    | Pairing             | Every window boundary for both players (29 999 and 30 000 ms through 119 999 and 120 000 ms; gaps of exactly 100–400 and 0.001 above): a new arrival never pairs beyond 100, even against a ten-minute waiter. Deterministic ties with three and four entries. Buckets at each bound.                                                                    |
+| Workers | Tickets             | Expiry, tampering, `join` and `create` tickets, a `roomCode` in a queue ticket, the previous secret, no secret; a replayed JTI gets `identityReplayed`, also after cancel and takeover. The queue issues no D1 statement except counter upserts, and no auth call.                                                                                       |
+| Workers | Takeover, limits    | Takeover while waiting, in setup, after `matched`, and from `returning` (which ends at exactly 30 s); an old socket's cancel or close is ignored. The 11th join in 60 s, the 201st entry (a takeover still works), the 401st socket, 11 frames in 10 s, a 4,097-byte frame, a wrong first frame; switches off; an old `disclosureV`.                     |
+| Workers | Pairing, alarms     | A waited 100 s, B 0 s, gap 350: paired exactly when B reaches 90 s. Self-pairing is impossible; a join and an alarm together never put one account in two pairs; an empty queue and a lone waiter have no alarm; entries survive hibernation; socketless waiting entries go after a restart.                                                             |
+| Workers | Handoff             | Repeated reserve and init for one `pairId` give one reservation and one room; crashes after reserve, init, or announce resume; collisions retry up to 5 codes; `capacityFull` returns both and counts no pair; the coordinator's active count returns to its prior value.                                                                                |
+| Workers | Pre-claimed room    | Guest and third account get `roomFull`; each `join` ticket claims only its seat; `waitingForOpponent` before both connect; a never-connected seat is not claimable; consent shows before play; both starting seats occur; `rateConsent` → `consentClosed`; a friendly rematch vote → `ratedOnlyRematch`; public `POST /rooms` with quick fields → 400.   |
+| Workers | No-show             | Nothing at 44 999 ms; at 45 000 ms `quickCancelled`, reservation released, storage deleted, the connected seat back with its original `joinedAt`, `matchExpired` to the other, `queue_no_show` + 1, no `match` row. A seat connecting as the deadline fires wins; the pair settles. Cancels in each state; two cancels count one no-show.                |
+| Workers | Counters            | Once per transition across takeover, retried alarms, duplicate reports, and restarts; Σ `queue_wait_*` = 2 × `queue_paired`; a failing `DB` does not stop the queue; `ANALYTICS_ENABLED = "false"` writes none.                                                                                                                                          |
+| Web     | Identity, `/online` | `queue` refused signed out (401), incomplete (409), flag off (403), cross-origin (403); rating row versus none (1500/350); an inactive account's RD grows; `no-store`; `GET` returns `quickMatch`. The entry shows only for complete accounts with `quickMatch`, disclosure first; every state has Somali copy.                                          |
+| e2e     | Two accounts        | Separate contexts get one code and two seats, see rated consent, place a piece each, and one resigns; after `save.status = "saved"` a signed-out context opens `/match/<id>`. Closing one context after `matched` returns the other to searching after 45 s with no row. Cancel, invite creation, guest join, and `pnpm check:e2e-isolation` still pass. |
+
+### Sample matches
+
+Outcomes follow [§4.3](v2-contracts.md#43-canonical-sample-matches). Quick
+rooms never produce M1, M6, or M9 (F1, account-only queue); M8 and M10 apply
+to quick rows unchanged.
+
+| Case | Setup                                  | Ending                            | Ledger                                                                            | Who can open          | Rating               | Queue counters             |
+| ---- | -------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------- | --------------------- | -------------------- | -------------------------- |
+| Q1   | Both seats connected (like M7)         | Seat A resigns before any action  | none                                                                              | —                     | —                    | paired                     |
+| Q2   | Quick game (like M2, M5)               | Win or draw after play began      | row, `mode = quick`, `rated = 1`, `consent_policy_v` = the entries' `disclosureV` | public                | `processed`          | paired, started, completed |
+| Q3   | The pair's 4th rated game in 24 h (M4) | Normal win                        | row                                                                               | public, "not counted" | `skipped:pairCap`    | paired, started, completed |
+| Q4   | B never connects                       | Cancelled at 45 s                 | none; not a loss                                                                  | —                     | —                    | paired, no_show            |
+| Q5   | Play began (like M3)                   | Idle claim while A owes a capture | row, `resignation`, `idle`                                                        | public                | `processed`, A loses | paired, started, completed |
+| Q6   | After Q2, a friendly rematch vote      | Refused: `ratedOnlyRematch`       | no new row                                                                        | —                     | —                    | none                       |
+
+---
+
+## 10. Rollout and rollback
+
+| Environment | Game Worker config                                                           | Web Worker config                               | `QUICK_MATCH_ENABLED`        |
+| ----------- | ---------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------- |
+| Tests, dev  | `worker/wrangler.toml`: `MATCH_QUEUE`, migration `v3`                        | `web/wrangler.jsonc` (read by local `vite dev`) | game `"true"`, web `"false"` |
+| e2e         | `worker/wrangler.toml` via `scripts/start-worker-e2e.mjs`                    | `web/wrangler.e2e.jsonc`                        | both `"true"`                |
+| Preview     | `worker/wrangler.preview.toml`: binding, `v3`                                | `web/wrangler.preview.jsonc`                    | `"false"` until enabled      |
+| Production  | `worker/wrangler.production.toml`: binding, `v3`, route `shaxda.app/queue/*` | `web/wrangler.jsonc`                            | `"false"` until the beta     |
+
+| Step        | What happens                                                                                                                                                                                                                                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deploy      | Per [§6.5](v2-contracts.md#65-deploy-order): the game Worker deploy carries DO migration `v3` (`new_sqlite_classes`, class `MatchmakingQueue`), the binding, and the route; the web Worker follows. No D1 migration: counter names are a Zod enum.                                                                               |
+| Preview     | Enable the game var, then the web var. On two real devices (not two tabs): find each other, start and finish a rated quick game that saves and opens publicly; one device leaves after `matched` and the other searches again; cancel works; counters appear in X1's admin view; the queue logs `queueAlarm deleted` once empty. |
+| Production  | Set wait and completion targets from Q3, then enable at a scheduled community play window and run the beta, reading the `queue_*` counters as raw counts beside any rate.                                                                                                                                                        |
+| Kill switch | Web var off first (entry hidden, `queue` tickets refused), then game var off (joins refused, waiting entries cleared). Running rooms and saved quick games are unaffected and stay public.                                                                                                                                       |
+| Rollback    | Switch off. A code rollback keeps the `v3` migration and the exported class; deleting the class needs a `deleted_classes` migration and is not part of rollback.                                                                                                                                                                 |
+
+**Done when** two complete accounts on separate preview devices find each
+other and start and finish a rated quick game without sharing anything; the
+no-show and cancel paths recover as specified; waits appear in the counters;
+the empty queue holds no alarm; and §9 passes, including
+`pnpm check:hibernation`. Production enablement and the beta are separate
+operational steps recorded in the ops record.

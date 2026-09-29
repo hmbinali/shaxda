@@ -1,327 +1,403 @@
 # R1 — Rating System (Spec)
 
-| Field        | Value                                                                                                                |
-| ------------ | -------------------------------------------------------------------------------------------------------------------- |
-| Status       | Draft; implementation blocked on the H1 ledger. R1 activation is coordinated with R2.                                |
-| Brief        | `docs/shaxda-v2.md` §6.2, §7.2, §10 (R1), §14                                                                        |
-| Depends on   | H1 match and match_player ledger, including an additive saved-match id on room status for the result overlay         |
-| Workspace    | `r1-rating-system` (the V2 brief recommends implementing R2 in the same workspace)                                   |
-| Unblocks     | R2 eligibility enforcement, R3 leaderboard, R4/R5 rating displays, K1 skill pairing, R6 rebuild and correction tools |
-| Freeze point | R1 event order, rating policy version, status, and before/after/delta semantics freeze on merge                      |
+| Field      | Value                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | `revised` (see [README](README.md#spec-index))                                                                                                      |
+| Wave       | 2, activated together with R2                                                                                                                       |
+| Depends on | H1, X1a (web entry wrapper and cron), R2 (activated together), R6-core's migration (§2)                                                             |
+| Register   | F4, P4, P9, P18, P20 (also cites P8, P19)                                                                                                           |
+| Contracts  | Owns [§2.5](v2-contracts.md#25-r1-extension) and [§7](v2-contracts.md#7-rating-processor); consumes §2.1–§2.3, §4.2–§4.3, §5, §6.2, §8, §10, §12    |
+| Brief      | `docs/shaxda-v2.md` §6.2, §7.2, §10 (R1), §14                                                                                                       |
+| Touches    | `packages/rating` (new), `packages/db`, `packages/shared`, `packages/i18n`, `web/`, `worker/`, root `package.json` and `scripts/`, `AGENTS.md`, PRD |
 
-This is an implementation spec for **R1 only**. R2 owns friendly-room controls,
-the full eligibility and claim policy, pair caps, and rated-play explanation.
-The two specs must be reconciled before ratings are enabled for production.
-The H1 spec is a proposed contract in this checkout; implementation must compare
-this document with the merged H1 migration and room messages before coding.
+R1 turns every saved account match into exactly one rating decision, in
+ledger order, and keeps each rated account's Glicko-2 rating and public
+record current and reproducible from the ledger. It owns the pure rating
+package, the rating tables beside the ledger, the web-Worker processor and
+its triggers, the rebuild and correction tool, and the rating on the online
+result overlay. R2 decides which matches count (R1 calls its pure policy),
+H1 writes the ledger, R6-core owns invalidations, exclusions, and the audited
+commands that run R1's correction, and R3–R5 own the leaderboard and
+profile reads of R1's tables.
 
----
+## 1. Outcome and non-goals
 
-## 1. Outcome and scope
+**Outcome.** Within a minute of a rated match being saved (normally
+seconds), both accounts' ratings and public records change in one atomic
+write, the result overlay turns "Waa la xisaabinayaa" into the confirmed
+rounded change, and a rebuild from the ledger shows zero drift.
 
-An account gets a Glicko-2 rating after each eligible completed online match.
-Every published rating can be reproduced by replaying the immutable match
-ledger in a deterministic order. A delayed write, duplicate trigger, or failed
-processor run must not silently change that order or count a match twice.
+**Must**
 
-### Must
+1. Pure `packages/rating` (§3.2): Glicko-2 per the March 2022 paper, one
+   match per period, simultaneous updates, closed-form inactivity, full
+   precision, P18 defaults, and `eligible_until`.
+2. The [§2.5](v2-contracts.md#25-r1-extension) tables beside the ledger,
+   with a Miniflare D1 test of their rules (§3.1).
+3. The web-Worker processor (§4): lease, at most 25 decisions per
+   invocation, one fenced batch each, the invalidation check then validation
+   (so `held` never blocks and an invalidation resolves it), R2's policy, and
+   every `player_rating` column in the same batch.
+4. Triggers: a best-effort hint over service binding `RATINGS` to
+   `RatingsEntrypoint` after each save, and the minute cron. The game
+   Worker never reads or computes ratings.
+5. `pnpm rating:rebuild` (§3.4): dry run by default; `--apply` is the
+   [§7.4](v2-contracts.md#74-corrections) correction R6-core calls; CI runs
+   the dry run on fixtures.
+6. Result overlay: pending, then the confirmed rounded change, never an
+   estimate (P18), from `GET /api/matches/<id>/rating` under the
+   [§5](v2-contracts.md#5-access-matrix) rows.
 
-1. Add pure, dependency-free `packages/rating` with the March 2022 Glicko-2
-   equations, a one-match wrapper, inactivity adjustment, and fixture/property
-   tests. It imports neither Svelte nor Cloudflare nor D1 nor the game engine.
-2. Add additive rating columns to H1 `match` and `match_player`, and a
-   `player_rating` current-state table. Keep H1 game result, identities, and
-   replay immutable; rating columns are rebuildable projections.
-3. Run one bounded processor in the **web Worker**. Drain pending matches in
-   `(ended_at, match.id)` order, commit both player updates and the match event
-   atomically, and make concurrent service-binding/cron calls idempotent.
-4. Trigger immediately after H1 has confirmed the ledger write; sweep once a
-   minute as recovery. The game Worker never computes or reads ratings.
-5. Show the rating and a `?` when effective RD is **greater than 110**. This
-   provisional state is the R1 exclusion signal for the later leaderboard.
-6. Track each player's peak post-match rating and their last rated match time.
-7. Provide a read-only full rebuild/diff command and deterministic fixtures in
-   CI. A separate guarded apply mode is needed for recovery and future R6
-   invalidation, but R1 must not silently rewrite live history.
-8. Show rating movement on the online result overlay once confirmed. A
-   short-lived estimate may be shown while the event is pending, clearly
-   labelled as an estimate and replaced with the confirmed event.
+**Should:** pre-match rating and provisional marker on the online player
+cards when the room requests rated play, from the public record through
+`GET /api/players/<username>/rating`.
 
-### Should
+**Not in R1:** which matches count, consent, the pair-cap rule, and the
+rated/friendly explanations (R2); invalidation, exclusion, audit, and
+detectors (R6); leaderboard, rank, profile numbers, rating chart, and
+head-to-head (R3–R5); any estimated change (P18); seasons, tiers, and guest
+or local ratings (F8).
 
-- Show a pre-match rating and provisional marker on online player cards only
-  when the room is marked rated. It is a snapshot for display, never authority
-  for the processor.
+## 2. Decisions and dependencies
 
-### Out of scope
+| ID  | How R1 applies it                                                                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F4  | A resignation or valid claim after play began scores 1 and 0 like any win (M2, M3). R1 adds no phase exception.                                                           |
+| P4  | Decisions follow `match.seq`. A late save is simply the next event, inactivity gaps clamp at zero, and there is no late-event pause or rebuild path.                      |
+| P8  | `player_rating` is the public record: processed rated events only. Skipped and held matches change no count, streak, form, or peak.                                       |
+| P9  | Peak is the highest post-event rating with no 1500 floor; an account without a row has no peak. Best win streak is the longest run of wins.                               |
+| P18 | 1500 / 350 / 0.06, τ 0.5, 24 h periods, provisional when effective RD > 110; pending, then confirmed.                                                                     |
+| P19 | R1 writes `eligible_until` so R3 tests eligibility at one `asOf` with no inactivity arithmetic; R1 enforces nothing about the leaderboard.                                |
+| P20 | `board_key` is assigned in first-processed order inside the event batch. A rebuild reproduces it; a correction may renumber it, since it is a tie-break, not an identity. |
 
-- Leaderboard page, ranks, public profile stats, rating trend, seasons, tiers.
-- Choosing which invite or quick matches count, friendly UI, resign/claim
-  eligibility, pair/daily caps, and player-facing rated rules (R2).
-- Suspicious-pattern flags, invalidation UI, or account exclusion workflow
-  (R6). R1 only defines fields and a safe rebuild primitive.
-- Guest rating or persistence; local games remain unrated.
+| Dependency | What it provides                                                                                                                                                                                                                                                                                                |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1         | The ledger and `seq` ([§2.1](v2-contracts.md#21-h1-tables)), `matchStatus.save.matchId` ([§6.2](v2-contracts.md#62-server-to-client)), and the successful save after which the game Worker sends the hint.                                                                                                      |
+| R2         | The pure policy module: validation and decision order ([§4.2](v2-contracts.md#42-rating-decision)), the P7 pair-cap rule, `RATING_POLICY_V`, and the rated/friendly and skip-reason copy.                                                                                                                       |
+| X1a        | The web entry wrapper and the `* * * * *` cron ([§10.2](v2-contracts.md#102-web-worker-entry-wrapper)); R1 adds one job and `RatingsEntrypoint`.                                                                                                                                                                |
+| R6-core    | The invalidation record, `rating_account_exclusion` ([§7.5](v2-contracts.md#75-exclusion-projection)), and the audited commands that call R1's correction. Wave-2 order: R6-core's migration merges before R1's processor, so R1 reads those tables from its first decision; R6-core's commands merge after R1. |
+| A3         | Pending and deleted account states ([§8](v2-contracts.md#8-deletion)). R1 does nothing on deletion (M10).                                                                                                                                                                                                       |
+| Proofs     | E1 (fence, swap) and E3 (wrapper, `scheduled`, entrypoint) pass ([§12](v2-contracts.md#12-evidence)); E5 must not contradict P18 before activation.                                                                                                                                                             |
+| Consumers  | R3–R5 read R1's tables and `packages/rating` functions; H2 shows the rating status on history rows; K1 pairs on ratings (P15) as its spec defines.                                                                                                                                                              |
 
----
+## 3. Contracts
 
-## 2. Inputs and rating semantics
+R1 owns [§2.5](v2-contracts.md#25-r1-extension), the rating tables beside
+a ledger it never alters, and [§7](v2-contracts.md#7-rating-processor), the
+processor. This section adds only what those leave to R1.
 
-The **source** is an H1 `match` row and exactly two `match_player` rows. The
-input fields are `id`, `ended_at`, `rated`, `winner_seat`, the two distinct
-`user_id` values and seat results. `rated` is the room's recorded intent. R2
-will define the final eligibility decision from these immutable fields plus
-its own policy inputs. A missing player, duplicate user id, contradictory
-results, unsupported replay version, or invalid result stops processing and
-raises an operator error; it never becomes a rated event by default.
+### 3.1 Table rules proved by the migration test
 
-For R1's arithmetic, scores are 1 for win, 0.5 for draw, 0 for loss. Both
-players are updated **simultaneously** from their own and the opponent's
-pre-match rating/RD/volatility. Processing A first and giving B A's new rating
-would change the result and is forbidden. Glicko-2 changes need not sum to
-zero when player uncertainties differ.
+Run on Miniflare D1 after the migration; every forbidden row is attempted
+and must fail.
 
-Defaults, frozen as `algorithm_v = 1`:
+| Rule                                                                                                                                                                                                      | Enforced by                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `match` and `match_player` definitions in `sqlite_schema` are unchanged                                                                                                                                   | test                                  |
+| State row seeded as `(1, 0, NULL, NULL, 0, 1, 1, <now>)`                                                                                                                                                  | migration                             |
+| `match_rating` rejects: another status; a skip reason without `skipped` or the reverse; an algorithm version without `processed` or the reverse; no policy version or `decided_at`; an unknown `match_id` | §2.5 `CHECK`, `NOT NULL`, foreign key |
+| `rating_fence` rejects `ok = 0` as `rating_fence_guard` and `NULL` as `rating_fence.ok`                                                                                                                   | §2.5                                  |
+| `match_player_rating` has every value and one row per seat                                                                                                                                                | §2.5                                  |
+| `match_rating.seq` equals the ledger row's `seq`                                                                                                                                                          | writer, test, dry run                 |
+| Ledger rows with `seq ≤ cursor_seq` have one `match_rating` row each; rows above have none                                                                                                                | fence, test, dry run                  |
+| Both seat rows exist if and only if the decision is `processed`                                                                                                                                           | one batch, test, dry run              |
+| `rating_delta` equals `rating_after − rating_before` exactly                                                                                                                                              | writer, test                          |
+| `skipped:friendly` if and only if the ledger row has `rated = 0`; such a row is never `processed`, `pairCap`, or `invalidated`                                                                            | R2 policy, test, dry run              |
+| One `player_rating` row per account with a processed event, each column equal to the fold of its events (§4.2)                                                                                            | processor, dry run                    |
 
-| Parameter          | Value              | Interpretation                                   |
-| ------------------ | ------------------ | ------------------------------------------------ |
-| Initial rating     | 1500               | Internal full-precision value                    |
-| Initial RD         | 350                | Maximum effective RD                             |
-| Initial volatility | 0.06               | Glicko-2 scale                                   |
-| τ                  | 0.5                | Volatility constraint                            |
-| Scale              | 173.7178           | `(rating - 1500) / scale`, `RD / scale`          |
-| Solver tolerance   | 0.000001           | Corrected Illinois iteration from the 2022 paper |
-| Inactivity period  | 24 elapsed hours   | A completed period with no match increases RD    |
-| Provisional cutoff | effective RD > 110 | Exactly 110 is not provisional                   |
+### 3.2 `packages/rating`
 
-The pure package exposes `updatePeriod(player, opponents[])` to test the
-published multi-opponent example and `updateMatch(preA, preB, result)` to
-update a single game. **One match is one rating period** in Shaxda. This is a
-product choice from the V2 brief: the [author's paper](https://www.glicko.net/glicko/glicko2.pdf)
-describes grouped periods and observes that larger groups work best. The
-per-game choice should be evaluated against real outcomes before changing
-`algorithm_v`; it is not interchangeable with daily batching.
+Pure TypeScript with no imports (no Svelte, Cloudflare, D1, Zod, or
+engine). `State` is `{ rating, rd, volatility }`; a score is 0, 0.5, or 1.
 
-For an existing player, require `match.ended_at >= last_rated_at` and let
-`n = floor((match.ended_at - last_rated_at) / 86_400_000)`. Apply `n`
-empty-period RD steps before the match-period update: on the Glicko-2 scale,
-`φ_next = min(350 / 173.7178, sqrt(φ² + nσ²))`. Use this closed form so a
-long absence does not create an unbounded loop. Rating and volatility do not
-change in empty periods. For a first rated match, start from 1500/350/0.06;
-do not count time since account registration. This convention makes a match
-after 24 hours exactly one empty period and does not penalize multiple matches
-within 24 hours. The match update itself performs the paper's normal Step 6.
+| Export                                | Contract                                                                                                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `updateMatch(a, b, scoreA)`           | Both seats from the two pre-event states at once, never one seat's new state fed into the other's update; the paper's steps 3–8 once per event; no RD clamp            |
+| `updatePeriod(p, games)`              | The paper's multi-opponent period, for its published example                                                                                                           |
+| `emptyPeriods(last, at)`              | `max(0, floor((at − last) / 86 400 000))`                                                                                                                              |
+| `effectiveRd(s, last, asOf)`          | The stored RD unchanged when `n = 0` (no scale round trip); otherwise the [§7.3](v2-contracts.md#73-arithmetic-and-reads) closed form, whose 350 cap bounds the growth |
+| `isProvisional(s, last, asOf)`        | `effectiveRd(…) > 110`                                                                                                                                                 |
+| `eligibleUntil(s, last)`              | `effectiveRd` at day boundaries k = 0…89: `last` + k days for the first k above 110, else `last` + 90 days, so it never disagrees with `isProvisional`                 |
+| `DEFAULTS`, `RATING_ALGORITHM_V = 1`  | P18 values, scale 173.7178, ε 0.000001                                                                                                                                 |
+| `RatingInputError`, `RatingMathError` | Non-finite or nonpositive input, or another score; the solver past 100 iterations, or a non-finite result                                                              |
 
-Store full finite double values; do not round between matches. UI displays
-whole ratings and `round(after) - round(before)` as the integer movement.
-For a read at time `t`, derive **effective RD** from the stored post-match
-state with the same empty-period function, without a D1 write. R3 must use
-that effective value (or a daily projection of it) for provisional checks.
-Peak is `max(1500, every post-match rating)` in full precision; inactivity
-does not change it. A player with no rated match has no `player_rating` row;
-the result overlay and profile can describe the initial 1500 as unrated.
+The volatility solver is the 2022 Illinois iteration with the corrected
+`f(C)·f(B) ≤ 0` branch. Nothing is rounded and no failure becomes a zero
+change. A first event starts from `DEFAULTS`; time since registration never
+counts. One match per period is P18's product choice; the paper prefers
+larger periods, so E5 and real outcomes judge it, and any change is a new
+`algorithm_v`.
 
-The package rejects NaN/infinity, nonpositive RD/volatility, malformed
-results, and solver non-convergence with a bounded iteration error. It never
-turns a failed calculation into a zero delta. Test the corrected `<=` branch
-and the published 1500/200 example ending near 1464.06/151.52.
+### 3.3 Processor, entrypoint, binding, and reads
 
----
+| Piece               | Contract                                                                                                                                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@shaxda/db/rating` | A raw-statement subpath like H1's `@shaxda/db/match`: `processPendingRatings(db, { now, budget })`, the pure `foldLedger(rows, sources)` shared by the rebuild and tests, and the two read queries                           |
+| `RatingsEntrypoint` | A `WorkerEntrypoint` in the web wrapper with one method, `processNow()`: no arguments; runs the processor under `ctx.waitUntil`; returns `{ accepted: true }` at once. No caller can supply a rating, a user id, or a match. |
+| `RATINGS` binding   | Game Worker → `RatingsEntrypoint` on `shaxda-web` (`worker/wrangler.toml`, `wrangler.production.toml`) or `shaxda-web-preview` (`wrangler.preview.toml`); none in e2e                                                        |
 
-## 3. Ledger extension and indexes
+Read schemas, as Zod in `packages/shared`. `GET /api/matches/<id>/rating`
+returns the first four fields; the card endpoint returns the last row:
 
-Use an additive, hand-written migration numbered after merged H1. Names here
-are a contract to reconcile with R2 before migration is committed.
+| Field         | Rule                                                                                                                                                                                                                             |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`      | `pending`, `processed`, `skipped`, or `held`                                                                                                                                                                                     |
+| `reason`      | `friendly`, `pairCap`, or `invalidated` when skipped, else `null`                                                                                                                                                                |
+| `updating`    | `true` while `maintenance = 1`                                                                                                                                                                                                   |
+| `seats`       | When processed, per seat A and B: `before` and `after` (`Math.round` of the stored values), `delta = after − before` so it matches the numbers shown, and `provisional` (`rd_after > 110`, the event's own instant); else `null` |
+| Card (Should) | `{ rated: false }` or `{ rated: true, rating, provisional }`, with `provisional` at one `asOf`                                                                                                                                   |
 
-| Table                    | Added fields                                                                                                                                                                                         | Rules                                                                                                                                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `match`                  | `rating_status` (`pending`, `processed`, `skipped`), `rating_skip_reason` nullable, `rating_policy_v` integer nullable, `rating_algorithm_v` integer nullable, `rated_processed_at` integer nullable | `rating_status` is NOT NULL DEFAULT `pending` so future H1 inserts enter the queue. `processed` and `skipped` are terminal projections. `rated` stays the immutable room intent.              |
-| `match_player`           | `rating_before`, `rd_before`, `volatility_before`, `rating_after`, `rd_after`, `volatility_after`, `rating_delta` (nullable REALs)                                                                   | Both seats populated together for `processed`; all null for `pending`/`skipped`. `rating_delta = rating_after - rating_before` at full precision. `rd_before` is after inactivity adjustment. |
-| `player_rating`          | `user_id` PK, `rating`, `rd`, `volatility`, `rated_games`, `peak_rating`, `last_rated_at`, `last_match_id`, `version`, `excluded`                                                                    | One row after the first rated game. `excluded` defaults false and is administrative metadata, preserved across rebuild. No foreign key to `user`, matching H1's deletion-safe ledger.         |
-| `rating_processor_state` | singleton key, `last_ended_at`, `last_match_id`, `version`, `lease_token`, `lease_expires_at`                                                                                                        | Global processed cursor and short lease for serialized processing. Cursor starts before the first event.                                                                                      |
+### 3.4 Rebuild tool
 
-Add an index on `match(rating_status, ended_at, id)` for the bounded pending
-scan; H1 already proposes `match(rated, ended_at)`. Add indexes on
-`match_player(user_id, ended_at, match_id)` if the merged H1 index does not
-support deterministic per-player history. Keep `player_rating` independent of
-auth table reads in the game Worker.
+`pnpm rating:rebuild -- --database <local|preview|production>` plus at most
+one flag:
 
-H1 cannot know R1's `rating_status`. During migration, initialize existing
-rows as `pending` only when `rated = 1`; initialize `rated = 0` as `skipped`
-with reason `friendly`. Before production activation, run the R2 policy over
-the entire H1 backfill cohort and record the policy version and skip reason.
-R1 never infers that every historical `rated = 1` row qualifies under the
-later R2 rules. Do this backfill in bounded, resumable chunks; verify counts
-and sample outcomes before enabling the cron.
+| Mode                  | Behaviour                                                                                                                                                                                                                                                                                                                                                                                   | Exit                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| dry run               | Reads the state row, every `player_rating` row, and the exclusion source in one batch, then the ledger and rating rows up to that `cursor_seq`; folds and diffs every column except `decided_at`. Prints counts by status and reason, pending count and oldest pending age, held match ids, changed rows per table, and the first mismatch (`seq`, match id, table, column, live, rebuilt). | 0 no drift; 1 drift; 2 invalid source, state changed, or error |
+| `--apply`             | The §4.3 correction                                                                                                                                                                                                                                                                                                                                                                         | 0 swapped; 1 refused; 2 error                                  |
+| `--pause`, `--resume` | Set or clear `maintenance` under an operator lease (R1's kill switch); `--resume` also empties the `*_next` tables                                                                                                                                                                                                                                                                          | 0; 2 error                                                     |
+| Databases             | `local` is the dev D1. `preview` and `production` use Wrangler D1 access to `shaxda-db-preview` and `shaxda-db`; only an operator runs them, never CI, a test, an agent, or a deploy hook. There, the mutating modes (`--apply`, `--pause`, `--resume`) run only through R6-core's audited `rating:admin` commands, which call them; the dry run stays direct.                              | —                                                              |
 
-Match result, seats, timestamps and replay remain immutable. Rating status
-and the before/after fields are **derived columns**, so a controlled rebuild
-can replace them. Distinguish that from editing a completed game's outcome.
-`rating_policy_v` records which R2 decision function was applied. R2 defines
-the concrete skip-reason enum, including `pairCap` and `aborted` if adopted.
+## 4. Behaviour and failure handling
 
----
+### 4.1 Processing
 
-## 4. Processor and ordering
+| Step        | Rule                                                                                                                                                                                                                                                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Check    | One statement reads the state row and the first ledger row after `cursor_seq`. Exit without writing if `maintenance = 1`, if `policy_v` or `algorithm_v` differs from the deployed versions (log `ratingVersionMismatch`), or if nothing is pending.                                                                                                          |
+| 2. Lease    | The [§7.1](v2-contracts.md#71-triggers-and-lease) compare-and-set; a loser exits.                                                                                                                                                                                                                                                                             |
+| 3. Decide   | Up to 25 ledger rows after the cursor, in `seq` order, with their seats. Per row: an invalidation → `skipped:invalidated`; else validate (`held` on failure); else read both `player_rating` rows and the pair-window count and call R2's policy; for `processed`, apply each seat's empty periods, then `updateMatch` (a `RatingMathError` makes it `held`). |
+| 4. Write    | One [§7.2](v2-contracts.md#72-the-fence) batch per decision: fence (token, `now`, expected cursor), `match_rating`, for `processed` both seat rows and both `player_rating` rows, `cursor_seq = seq`, fence delete.                                                                                                                                           |
+| 5. Finish   | Stop after 25 decisions, on an empty queue, or with under 15 s of lease left; release the lease if still ours. With fewer than 25 decided, look once more from step 2, so a row saved meanwhile does not wait for the cron.                                                                                                                                   |
+| Pair window | One indexed query: seat A's `match_player_owner_idx` rows in the [§4.2](v2-contracts.md#42-rating-decision) window, joined to seat B by `(match_id, user_id)` and to `match_rating` by `match_id`, counting `processed` rows with a lower `seq`.                                                                                                              |
 
-`processPendingRatings(db, { maxMatches, deadline })` is shared by a private
-web-Worker service-binding entrypoint and the scheduled handler. Each
-invocation handles at most a small fixed number of matches (start with 25)
-and leaves the remainder for another invocation. Neither a browser nor a
-game-room request can supply calculated ratings or a user id to it.
+Each processed event updates both `player_rating` rows, in `seq` order like
+the rating, so a late save extends streak and form as the newest event:
 
-1. After H1 commits a match, the game Worker sends a best-effort "process
-   now" hint through a service binding to the web Worker. Failure does not
-   change H1 persistence success. The one-minute cron sweeps the same queue.
-   Use a named private Worker entrypoint if the SvelteKit adapter needs a
-   wrapper; no public HTTP route is required. Test this wiring locally.
-2. Acquire a short lease on the singleton `rating_processor_state` row with
-   a compare-and-set of `version` and expired lease. A loser exits. The
-   processor may run from either trigger, but only one lease owner mutates
-   rating rows. Keep each event commit short; release on normal exit.
-3. Select the globally earliest `pending` match by `(ended_at, id)` and
-   validate it and both player rows. Read both current player states and
-   compute both outputs from the same pre-match snapshot.
-4. In one D1 `batch`, condition every insert/update on the lease token,
-   unexpired lease and expected state version, write both `player_rating`
-   rows, both `match_player` events, mark the match `processed`, and advance
-   the cursor/version. Inspect affected-row counts. A lost lease or stale
-   version means **no event is accepted**; retry from fresh state. A SQL
-   failure rolls back the whole batch.
-5. If R2 says the match is skipped, mark it `skipped` with a reason and policy
-   version and advance the cursor in the same guarded batch. A skipped match
-   never changes either player state or peak.
+| Column                                                     | Rule                                                                                                                                    |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `rating`, `rd`, `volatility`; `last_seq`                   | The event's after values; this `seq`                                                                                                    |
+| `rated_games`, `rated_wins`, `rated_losses`, `rated_draws` | +1 for the event's result                                                                                                               |
+| `streak_kind`, `streak_len`, `best_win_streak`             | The same result extends the run, another starts a run of 1; best is the longest run of wins                                             |
+| `form`                                                     | Append `W`, `L`, or `D`; keep the last five, oldest first                                                                               |
+| `peak_rating`, `peak_seq`                                  | Set by the first event; later only when `rating_after` is strictly greater                                                              |
+| `last_rated_at`, `eligible_until`                          | `max(last_rated_at, ended_at)`; then `eligibleUntil(after state, last_rated_at)`                                                        |
+| `board_key`, `excluded`                                    | First event only, inside the insert: `MAX + 1` (seat A before seat B), and R6-core's exclusion source; R1 never writes `excluded` again |
 
-An event key is `match.id`; after `processed` or `skipped`, duplicate calls
-return the recorded result without applying it again. There is a total order
-even when two matches share `ended_at`: `id` breaks ties. Never use arrival
-order, D1 rowid, room code, or username. A later match may involve either of
-the same players, so the processor must preserve the **global** order.
+### 4.2 Failures and edge cases
 
-If a newly persisted match sorts **before** the committed cursor, stop the
-normal queue, report `lateLedgerEvent`, and run the guarded rebuild/apply
-path from the full ledger before resuming. Likewise, if a previously skipped
-event's R2 policy decision changes, rebuild from the earliest affected event.
-Processing it at the tail would give a plausible but incorrect rating. The
-one-minute sweep checks for these late rows; an older pending row is never
-silently ignored. The result overlay stays pending until recovery completes.
+| Case                                                      | Behaviour                                                                                                                                                                                             |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fence rejects (`rating_fence_guard` or `rating_fence.ok`) | The whole batch rolls back; the processor stops without retrying and logs `ratingFenceRejected`. The next trigger resumes from the committed cursor. Classify by constraint name, never message text. |
+| Any other D1 error                                        | The batch rolls back; log `ratingBatchFailed`, release the lease, stop. The next trigger retries the row.                                                                                             |
+| Validation fails, or `RatingMathError`                    | The row becomes `held` in a normal fenced batch and `ratingHeld` is logged at error level with the problem code; later rows continue. An R6 correction resolves it.                                   |
+| Hint fails, binding missing, web Worker down              | Nothing changes; the cron decides the row within a minute of recovery.                                                                                                                                |
+| Duplicate or overlapping triggers; processor dies         | One lease holder decides and the others exit; a decided row is behind the cursor and never revisited. A dead holder's committed decisions stand and its lease lapses within 60 s.                     |
+| Equal `ended_at`; late save after a newer processed match | `seq` orders them. A late save is decided next with `n = 0`; `last_rated_at` keeps the later instant; the pair window uses the row's own `ended_at`.                                                  |
+| `maintenance = 1` (correction or pause)                   | The processor exits and new saves wait as pending; reads show the last published state with the "updating" note.                                                                                      |
+| Version mismatch                                          | The processor exits until the correction that ships the new version swaps it in.                                                                                                                      |
+| Any log line                                              | Carries `seq` and the match id at most, never a user id.                                                                                                                                              |
 
-The singleton lease is operational coordination, not the source of truth.
-Tests must force two triggers to overlap and expire a lease mid-computation.
-The event batch must be atomic and guarded against stale writers after a
-new owner takes the lease. If D1's batch/conditional-statement behavior
-cannot guarantee that invariant in Miniflare, use a single transactional
-SQL statement or equivalent D1-supported primitive before shipping.
+### 4.3 Corrections (`--apply`)
 
----
+The [§7.4](v2-contracts.md#74-corrections) procedure, with these rules. A
+policy or algorithm change is always a new version plus this procedure,
+never an in-place reinterpretation.
 
-## 5. Rebuild and correction
+| Step         | Rule                                                                                                                                                                                                                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Stop      | `maintenance = 1` under an operator lease (compare-and-set against a live processor lease); the processor stops at its next fence.                                                                                                                                                       |
+| 2. Rebuild   | High-water mark = `cursor_seq`; fold the ledger up to it with R6-core's invalidations and exclusions; write the `*_next` tables in bounded, idempotent chunks.                                                                                                                           |
+| 3. Verify    | Counts (one `match_rating` per ledger row up to the mark, two seat rows per processed decision, one player row per account with a processed event), then the printed diff.                                                                                                               |
+| 4. Swap      | Only after the operator re-enters the high-water `seq` (R6-core passes its approved plan instead). The live tables' constraints re-check every copied row, so one bad row fails the whole swap; a version change also writes the state row's `policy_v` and `algorithm_v` in that batch. |
+| 5. Finish    | Empty the `*_next` tables; the dry run shows zero drift.                                                                                                                                                                                                                                 |
+| `decided_at` | Kept when a decision is unchanged, else the swap time.                                                                                                                                                                                                                                   |
+| Interrupted  | Live tables untouched and `maintenance` on: rerun `--apply` (it takes over the lapsed operator lease) or `--resume` to abandon.                                                                                                                                                          |
 
-`pnpm rating:rebuild -- --database <local|preview|production> --dry-run`
-reads the ledger in `(ended_at, id)` order, applies the versioned R2 policy,
-and runs the same pure rating package from 1500/350/0.06 for each user. It
-diffs every current `player_rating` field and every processed
-`match_player` event, including full-precision values, status, and skip
-reason. It reports row counts, first mismatch and event id, and nonzero exit
-status on drift or invalid source rows. Compare doubles at a documented tight
-tolerance only for driver serialization; all arithmetic and ordering remain
-deterministic. CI runs the dry run against fixed local fixtures.
+### 4.4 Reads and the overlay
 
-Apply mode is explicit and operational: pause normal processing with the
-same singleton lock, take a D1 backup/export, recompute in a shadow local
-dataset or temporary D1 tables, verify counts and sample history, then swap
-derived rows in bounded transactions while readers are gated from claiming
-freshness. Resume at the rebuilt cursor and run dry-run again. Do not run
-remote apply from unit tests or on a deploy hook. R6 later adds invalidation
-and the operator interface; its rebuild uses this engine.
+The match endpoint checks the id against the
+[§2.3](v2-contracts.md#23-public-match-id) pattern before any query, then
+reads the match, both seats, `match_rating`, the seat rows, and
+`maintenance`. The overlay and cards show:
 
-Algorithm or policy changes require a new version and a full rebuild or a
-separately defined migration; never reinterpret `algorithm_v = 1` in place.
+| State                                             | Display                                                                                                                                               |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `matchStatus.rated` not `true` (friendly, M1, M9) | No rating block and no request                                                                                                                        |
+| `save.status` `pending`                           | "Waa la xisaabinayaa"                                                                                                                                 |
+| `save.status` `stalled`                           | No rating block; H1 explains the save                                                                                                                 |
+| Saved; rating pending                             | "Waa la xisaabinayaa"; requests after 1, 2, 4, 8, 15, and 30 s, stopping on rematch; then the text stays and `/history` (H2) shows the decision later |
+| `held`                                            | R2's "Waa la hubinayaa" label; no numbers                                                                                                             |
+| `processed`                                       | Both seats' rounded after-ratings and signed changes, `?` when provisional                                                                            |
+| `skipped:pairCap`                                 | "Darajo laguma xisaabin" and R2's reason                                                                                                              |
+| `skipped:invalidated`                             | "Darajada waa laga saaray"                                                                                                                            |
+| `updating: true`                                  | The maintenance note under the last published values                                                                                                  |
+| Endpoint error                                    | The pending text stays; play, rematch, and saving are unaffected                                                                                      |
+| Player cards (Should)                             | One request per account seat when the room requests rated play: `1532`, `1532?`, or "Weli darajo ma laha"; nothing in friendly rooms or on a 404      |
 
----
+## 5. Privacy and access
 
-## 6. Result overlay and privacy
+| [§5](v2-contracts.md#5-access-matrix) row | R1 implementation                                                                                                                                  |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/match/<id>` … rating status — rated     | The match endpoint returns the view to anyone.                                                                                                     |
+| `/match/<id>` … rating status — friendly  | Participants only; signed-out and unrelated viewers get the same 404 status, body, and headers as an unknown or malformed id.                      |
+| `/u/<username>` numbers                   | The card endpoint returns the public record only: rounded rating and provisional flag.                                                             |
+| Pending/deleted account                   | The card endpoint returns the profile's 404; the match endpoint returns seat values without names, and the caller renders the neutral label (M10). |
 
-H1's optional `matchStatus.savedMatchId` becomes a required R1 integration
-point. The result overlay uses it to request a read-only rating event from
-the web Worker. The response includes status, seat A/B rounded before and
-after, displayed delta, and provisional markers, but no permanent user ids,
-email, identity ticket, or raw account session. Validate the match id and
-rate-limit/poll-bound the endpoint. A game still ends normally if D1 or the
-rating processor is delayed.
+- A participant is the active session's user id matched on the server
+  against `match_player.user_id`; a pending-deletion session counts as
+  signed out ([§8](v2-contracts.md#8-deletion)).
+- Responses hold only the §3.3 fields: no user id, email, room code,
+  ticket, `board_key`, raw RD or volatility, or full-precision value. Both
+  endpoints send `cache-control: no-store`; the service worker caches
+  neither path.
+- The hint carries no data. The game Worker holds no rating table, code, or
+  credential; a test fails if its bundle imports `packages/rating` or
+  `@shaxda/db/rating`.
 
-While pending, show a Somali "rating being calculated" state. If an immediate
-preview is enabled, compute it with `packages/rating` from **both** pre-match
-snapshots and label it as an estimate; it cannot account for an earlier match
-that has not processed or a later R2 eligibility decision. Replace the
-estimate with the stored event; after a short bounded poll, leave the pending
-state and let a later page load retrieve it. Never show an estimate as a
-confirmed delta. Friendly/skipped games show no rating change. A provisional
-`?` describes rating uncertainty, distinct from an unconfirmed estimate.
+## 6. Resource budget
 
-The online player-card Should feature may read an initial snapshot from the
-web Worker when the two account seats are known. Do not send the D1 rating
-table or rating processor credentials to the game Worker; the client treats
-these values as display-only.
+D1 rows count as billed, index entries included; the Workers tests check
+them against `meta.rows_read` and `meta.rows_written`.
 
----
+| Item                      | Budget                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Processed decision        | 8 table rows (fence insert and delete, `match_rating`, two seat rows, two `player_rating` rows, state): ≈ 14 billed rows written, 18 when both accounts are new                                        |
+| Skipped or held decision  | 4 table rows: ≈ 6 billed rows written                                                                                                                                                                  |
+| Reads per decision        | ≈ 12 rows (seats, both `player_rating` rows, invalidation, fence, updated rows) plus ≈ 3 per game seat A saved in the previous 24 h (pair window, owner index)                                         |
+| Full invocation           | ≈ 55 D1 calls for 25 decisions (a read and a write batch each, plus lease, release, and queue reads)                                                                                                   |
+| Idle cron sweep           | 1,440 per day; one statement reading ≤ 2 rows and writing none (≈ 2,900 rows read per day)                                                                                                             |
+| Hints and Durable Objects | One service-binding call per saved match, returning before any processing; no new DO wake-up, alarm, or storage, since the Match DO is already awake for the save                                      |
+| Storage                   | ≈ 0.35 KB per processed match and ≈ 0.25 KB per rated account, indexes included (estimates)                                                                                                            |
+| Overlay and cards         | ≤ 6 requests per participant per rated game and one per seat per rated room, each reading ≤ 10 rows                                                                                                    |
+| Dry run                   | Reads each ledger and rating row once (≈ 6 rows per match); writes nothing                                                                                                                             |
+| Correction                | Writes the `*_next` copies, then the one-batch swap that E1 sized ([§12](v2-contracts.md#12-evidence)). D1 serialises queries, so everything waits for the swap; corrections are rare operator events. |
 
-## 7. Verification and rollout
+## 7. Somali copy
 
-### Tests
+Keys live in `packages/i18n` under `rating`, each behind
+`TODO(translation-review)`. Drafts marked "new" are proposed for the
+[README glossary](README.md#somali-glossary-drafts-q4) (Q4).
 
-- Pure package: official multi-opponent example; win/loss/draw, identical
-  opponents, swapped-seat symmetry, finite outputs, RD cap, inactivity and
-  exact 24-hour boundary, `RD = 110` boundary, solver failure behavior,
-  repeated fixtures and reasonable convergence. Check that updates use
-  simultaneous pre-match snapshots.
-- D1/Workers: one committed match changes both ratings and fills both event
-  rows; a duplicate trigger is a no-op; overlapping cron/RPC invocations;
-  stale lease owner; a batch failure rolls back; out-of-order persist forces
-  rebuild before publication; skipped/friendly and malformed matches never
-  update ratings; H1 retry does not duplicate an event.
-- Rebuild: fixtures from multiple rooms with equal timestamps, rematches,
-  inactivity and skip decisions produce zero drift; mutate one event and
-  prove the first mismatch is reported. Verify real H1 schema and indexes.
-- Web: result overlay confirmed/pending/estimated/skipped paths in Somali;
-  no private identity in the read response; online gameplay remains usable
-  when the rating service is unavailable.
+| Key                  | Draft                                 | Used for                                   |
+| -------------------- | ------------------------------------- | ------------------------------------------ |
+| `rating.label`       | Darajo                                | Overlay and card label (glossary)          |
+| `rating.pending`     | Waa la xisaabinayaa                   | Pending (glossary); held uses R2's label   |
+| `rating.notCounted`  | Darajo laguma xisaabin                | `pairCap` (glossary)                       |
+| `rating.removed`     | Darajada waa laga saaray              | `invalidated`, M8's "rating removed" (new) |
+| `rating.updating`    | Darajooyinka waa la cusboonaysiinayaa | Maintenance note (new)                     |
+| `rating.provisional` | Darajo ku meel gaar ah                | Tooltip and accessible name of `?` (new)   |
+| `rating.change`      | Isbeddelka darajada: {delta}          | Accessible name of the change (new)        |
+| `rating.unrated`     | Weli darajo ma laha                   | Card for an account without a row (new)    |
 
-Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:worker`, `pnpm build`,
-and relevant `pnpm test:e2e` cases. `pnpm check:hibernation` must remain green.
-The spec-only change itself needs document/link validation, not an application
-build. Local tests use Miniflare D1; migration and cron on preview/production
-are explicit operational steps.
+Numbers are whole; a change reads `+14`, `−9` (U+2212), or `0`. R2 owns the
+rated/friendly labels and the pair-cap reason text.
 
-### Release gate
+## 8. Implementation slices
 
-1. Reconcile the merged H1 schema and `savedMatchId`; write R2's eligibility
-   policy and decide the production activation boundary. Freeze rating event
-   semantics with a contract-change commit if H1/H2 readers need adapting.
-2. Apply the additive migration to preview, backfill H1 rows under the R2
-   policy, and run a dry-run rebuild before enabling service binding/cron.
-3. Play two real account seats in preview: check the ledger, both full-precision
-   event rows, rating displays, duplicate invocation, and delayed cron catch-up.
-4. Apply the same migration/backfill/verification in production. Monitor
-   pending count, oldest pending age, skipped reasons, solver/ledger errors,
-   late-event rebuilds and dry-run drift. Keep a rollback path that disables
-   processing/display without deleting ledger or derived rows.
+1. `docs: apply the V2 ratings rule to AGENTS.md and the PRD` (brief §6.2)
+2. `test(rating): pin the published example and the rating boundaries`
+3. `feat(rating): add the pure Glicko-2 package`
+4. `feat(db): add rating tables beside the match ledger` (§3.1 test and
+   [§11](v2-contracts.md#11-migration-ownership) query-plan evidence)
+5. `feat(db): fold the ledger into rating decisions and records` (reads
+   R6-core's invalidations and exclusions)
+6. `feat(db): decide pending ratings under the lease and fence`
+7. `feat(web): run the rating processor from cron and RatingsEntrypoint`
+8. `feat(online): hint the rating processor after a save`
+9. `feat(db): add the rating rebuild and correction tool` (with CI dry run)
+10. `feat(web): serve match rating status for the result overlay`
+11. `feat(web): show the confirmed rating change on the result overlay`
+12. `feat(web): show pre-match ratings on rated player cards` (Should)
 
-R1 is done when two eligible accounts finish a match, both ratings move by
-the expected values, the result overlay shows the confirmed change, duplicate
-triggers do nothing, and a full ledger rebuild has zero drift. Do not mark R1
-shipped from a spec or local fixture alone.
+## 9. Acceptance tests
 
----
+Unit tests for `packages/rating`:
 
-## 8. Decisions to confirm with the founder
+| Case                                                                                | Expected                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Published example: 1500/200 against 1400/30 (win), 1550/100 (loss), 1700/300 (loss) | Within 0.01 of the paper's printed ≈ 1464.06 / 151.52 / 0.05999 (it rounds intermediate steps); the full-precision output (≈ 1464.0507 / 151.5165 / 0.059996) pinned as a regression fixture                                                             |
+| New players' first game                                                             | Winner ≈ 1662.31 / 290.32, loser ≈ 1337.69 / 290.32 (`+162` / `−162`); a draw keeps 1500                                                                                                                                                                 |
+| Simultaneity                                                                        | Updating B against A's new state would give ≈ 1383.36; the package gives 1337.69                                                                                                                                                                         |
+| Symmetry and finiteness                                                             | Swapped seats mirror; identical inputs give identical outputs; outputs are finite; changes need not sum to zero when RDs differ                                                                                                                          |
+| Solver                                                                              | The `≤ 0` branch runs when `f(C)` is exactly 0 (internal solver, exact root); the iteration cap throws `RatingMathError`; bad inputs throw `RatingInputError`; neither yields a zero change                                                              |
+| Inactivity                                                                          | 86,399,999 ms → `n = 0` and the stored RD bit-identical; 86,400,000 ms → `n = 1`; a negative gap → 0; a long gap stops at 350                                                                                                                            |
+| Provisional                                                                         | Effective RD exactly 110 is not provisional; the next double above 110 is                                                                                                                                                                                |
+| `eligible_until`, RD boundary                                                       | An RD found by bisection so one empty day gives exactly 110.0 (≈ 109.505 at σ 0.06) stays eligible there and gets `last_rated_at` + 2 days; the smallest RD whose one-day value exceeds 110 gets + 1 day; a post-event RD above 110 gets `last_rated_at` |
+| `eligible_until`, 90 days                                                           | RD 45 stays ≤ 110 for 92 days, so it gets + 90 days: eligible 1 ms before that instant, not at it                                                                                                                                                        |
+| Properties                                                                          | `eligibleUntil` equals a brute-force scan of day boundaries; `effectiveRd` never decreases as `asOf` grows                                                                                                                                               |
 
-| ID    | Proposed decision                                                                   | Why it matters                                                                            |
-| ----- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| R1-D1 | Ship R1 and R2 together and activate live ratings only after R2 policy is enforced. | H1's `rated = true` is intent, not the complete anti-farming/claim policy.                |
-| R1-D2 | Use per-game Glicko-2 with τ 0.5, 24-hour empty periods, RD > 110 provisional.      | Rebuild needs one stable arithmetic contract; τ can change only with a versioned rebuild. |
-| R1-D3 | Show an optional immediate estimate, then confirmed movement.                       | Gives timely feedback while retaining the ledger as authority.                            |
-| R1-D4 | Late historical matches pause normal publication until a guarded rebuild.           | Tail processing would make all affected subsequent ratings wrong.                         |
+Workers and D1 (Miniflare) tests:
 
-R1-D1 and R1-D3 are pending founder preference. All other choices are
-implementation defaults within the V2 brief and can be refined before the
-rating event contract freezes.
+| Case                                                                                                                                       | Expected                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration                                                                                                                                  | Every §3.1 rule                                                                                                                                                   |
+| Sample matches (below), real processor and R2 policy                                                                                       | Stored values equal the fold bit for bit (`Object.is`)                                                                                                            |
+| Fence, the E1 cases ([§12](v2-contracts.md#12-evidence)): another token, expired lease, moved cursor, missing state row, `maintenance = 1` | Rejected by constraint name, zero rows changed, processor stops                                                                                                   |
+| Two `processNow` calls and a cron run at once; a repeated hint after an H1 save retry; a call on an empty queue                            | Each row decided exactly once; nothing written                                                                                                                    |
+| Lease expires mid-invocation (injected clock)                                                                                              | The old holder's next batch is rejected; the new holder continues from the committed cursor                                                                       |
+| Equal `ended_at` in both `seq` orders; a late save after a newer processed match                                                           | Deterministic by `seq`; `n = 0`, `last_rated_at` unchanged, streak and form in `seq` order                                                                        |
+| Held row (unsupported `replay_v`), then a valid rated row; an injected `RatingMathError`                                                   | Both decided in one invocation; `held`, and later rows continue                                                                                                   |
+| A failing statement inside a batch                                                                                                         | Nothing from that decision; cursor unchanged                                                                                                                      |
+| 30 pending rows; a row committed while the holder finishes                                                                                 | 25 then 5; the late row decided without waiting for the cron; rows read and written within §6                                                                     |
+| Wrapper `scheduled` and `processNow` (as in E3); game Worker hint                                                                          | Both run the processor; one hint per saved entry; a throwing or missing binding changes neither the save status nor the broadcast; `pnpm check:hibernation` green |
+
+Rebuild, web, and end-to-end tests:
+
+| Case                                                                                                                                                         | Expected                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI fixtures: several rooms, equal `ended_at`, rematches, gaps beyond 90 days, late saves, every skip reason, a held row, two first-time players in one match | Dry run exits 0; changing any one stored value (a seat's last bit, `form`, a streak, `board_key`, `peak_seq`, `eligible_until`, `excluded`) exits 1 and names that first mismatch                                                                         |
+| `--apply` on local; interrupted after its chunk writes                                                                                                       | Result equals the fold; an interruption leaves live tables unchanged and `maintenance` on; a rerun completes; `--resume` abandons cleanly                                                                                                                 |
+| Reads during `maintenance`                                                                                                                                   | Last published values with `updating: true`; new rows stay pending                                                                                                                                                                                        |
+| A3 finalizes B's deletion (M10)                                                                                                                              | Dry run still shows zero drift                                                                                                                                                                                                                            |
+| Match endpoint per §5                                                                                                                                        | Rated to anyone; friendly to participants, the unknown-id 404 for everyone else; malformed id → 404 with no query; only §3.3 fields; `no-store`                                                                                                           |
+| Overlay and cards, in Somali                                                                                                                                 | Every §4.4 row; six requests at most; polling stops on rematch; cards show `1532`, `1532?`, or "Weli darajo ma laha" and nothing in friendly rooms                                                                                                        |
+| E2E on the shared D1 ([§10.4](v2-contracts.md#104-shared-local-d1-in-e2e))                                                                                   | Two seeded accounts finish a rated game; "Waa la xisaabinayaa"; the test runs the real processor once through `getPlatformProxy` (`vite preview` has no cron or entrypoint); both confirmed changes appear; both seat rows exist; a fold shows zero drift |
+
+Sample matches, as R1 decides and displays the
+[§4.3](v2-contracts.md#43-canonical-sample-matches) set:
+
+| ID  | R1 decision                                                                                                                | Player records                                   | Overlay and endpoint                                         |
+| --- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------ |
+| M2  | `processed`: A scores 1, B 0                                                                                               | Both update; two new players reach 1662 and 1338 | Public; pending, then `+162` and `−162`                      |
+| M3  | `processed`: idle A scores 0, B 1                                                                                          | Both update                                      | Public; confirmed changes                                    |
+| M4  | `skipped:pairCap`: three processed games already in the window                                                             | Unchanged                                        | Public; "Darajo laguma xisaabin" with R2's reason            |
+| M5  | `processed`: 0.5 each                                                                                                      | Draws +1, streak `draw`, form gains `D`          | Public; confirmed changes (0 for equal new players)          |
+| M8  | `processed`, then after R6 invalidation and `--apply` `skipped:invalidated`, with no seat rows and later events recomputed | Both records rebuilt                             | Public; "Darajada waa laga saaray"                           |
+| M9  | `skipped:friendly`                                                                                                         | Unchanged                                        | No rating block; non-participants get the 404                |
+| M10 | M2's rows untouched by deletion                                                                                            | B's row stays; A's is unaffected                 | Public; seat values without names, B under the neutral label |
+
+M1 behaves as M9. M6 and M7 write no ledger row, so R1 never sees them.
+
+## 10. Rollout and rollback
+
+| Environment | Setup                                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------- |
+| dev         | Miniflare D1; `wrangler dev` of the built web wrapper and the game Worker for hint wiring; `--database local` |
+| e2e         | Shared local D1; no `RATINGS` binding, cron, or entrypoint; tests run the processor                           |
+| preview     | `RATINGS` → `shaxda-web-preview`; X1a's cron; `shaxda-db-preview`                                             |
+| production  | `RATINGS` → `shaxda-web`; X1a's cron; `shaxda-db`                                                             |
+
+Deploy order ([§10.3](v2-contracts.md#103-bindings-flags-and-rollout-by-milestone)):
+migrations (R1's with R2's and R6-core's) → game Worker (binding and hint,
+`RATED_PLAY_ENABLED` off) → web Worker (processor job, entrypoint,
+endpoints, overlay). Hints fail harmlessly until the web deploy. Then, in
+preview first and production second:
+
+| Topic              | Rule                                                                                                                                                                                                                                                                   |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drain              | The processor decides the H1-era ledger (all friendly) at up to 25 per trigger; wait for zero pending and zero held, then a zero-drift dry run                                                                                                                         |
+| Rehearse (preview) | Two real accounts play an M2-like and an M5-like game: both full-precision seat rows, the overlay, a duplicate `processNow`, catch-up after `--pause` and `--resume`, an R6-core invalidate and rescind (M8) with the swap timed on real D1, then a zero-drift dry run |
+| Enable             | Once the wave-2 gate passes in preview and E5 does not contradict P18, R2's `RATED_PLAY_ENABLED` is turned on                                                                                                                                                          |
+| Monitoring         | The dry-run report (pending, oldest pending age, held, skips by reason, drift) after enablement, after every correction, and weekly for the first month; Workers Logs errors `ratingHeld`, `ratingFenceRejected`, `ratingBatchFailed`, `ratingVersionMismatch`         |
+| Kill switches      | `RATED_PLAY_ENABLED=false` (R2) stops new rated games; a pause through R6-core's audited command stops decisions (readers keep the last state with the note); resume restarts them                                                                                     |
+| Rollback           | Never drop R1 tables or touch the ledger. Pause first, roll back the web Worker if its code is at fault (saves continue, rows wait as pending), fix forward, and repair published values with an audited rebuild (R6-core)                                             |
+
+**Done when** CI is green (`pnpm lint`, `typecheck`, `test`, `test:worker`,
+`build`, `test:e2e`, `check:hibernation`, `check:e2e-isolation`,
+`format:check`), the preview rehearsal is recorded, and the ops record shows
+that in production two eligible accounts finished a rated match, both
+ratings moved by the expected values, the overlay showed the confirmed
+change, duplicate triggers did nothing, and the dry run showed zero drift. A
+spec or local fixture alone never marks R1 shipped.

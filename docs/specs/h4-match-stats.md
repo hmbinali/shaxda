@@ -1,165 +1,163 @@
-# H4 — Match Statistics Foundation (Spec)
+# H4 — Match Statistics (Spec)
 
-| Field      | Value                                                                                                                              |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Status     | Draft, not started                                                                                                                 |
-| Brief      | `docs/shaxda-v2.md` §9 (H4), §7.2–7.3, §14                                                                                         |
-| Workspace  | `h4-match-stats`                                                                                                                   |
-| Depends on | H1 for the replay and ledger; H2 for the match-page panel. The derivation and write path can be built while H2/H3 are in progress. |
-| Unblocks   | R4 profile statistics; R5 may reuse the same per-match values.                                                                     |
-| Touches    | `packages/shared`, `packages/db`, `worker/`, `packages/i18n`, `web/`, a backfill script, and release documentation.                |
+| Field      | Value                                                                                                                                                                                                                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status     | `revised` (see [README](README.md#spec-index))                                                                                                                                                                                                                                                                           |
+| Wave       | 4; may start any time after wave 1                                                                                                                                                                                                                                                                                       |
+| Depends on | H1, H2; X1a for the nightly backfill (§4.2)                                                                                                                                                                                                                                                                              |
+| Register   | F7, P21                                                                                                                                                                                                                                                                                                                  |
+| Contracts  | Owns §3 below. Consumes [§2.1](v2-contracts.md#21-h1-tables), [§2.2](v2-contracts.md#22-writer-invariants-and-the-payload), [§2.4](v2-contracts.md#24-compact-replay), [§3.4](v2-contracts.md#34-game-rules-inside-the-room), [§4.3](v2-contracts.md#43-canonical-sample-matches), [§5](v2-contracts.md#5-access-matrix) |
+| Brief      | [`docs/shaxda-v2.md`](../shaxda-v2.md) §9 (H4), §7.2                                                                                                                                                                                                                                                                     |
+| Touches    | `packages/shared` (stats module, fixtures), `worker/` (game over), `packages/db` (backfill core), H1's `match:ops` CLI, `packages/i18n`, `web/` (match loader and panel), `docs/ops/`                                                                                                                                    |
 
-This spec refines H4 without widening the V2 brief. `docs/shaxda_game.md` is
-authoritative for game rules. The H1 replay and ledger contracts are frozen at
-H1 merge; H4 consumes them and does not change action codes, game rules, or
-the `match` / `match_player` keys. Before implementation, reconcile this draft
-with the **merged** H1 and H2 contracts. Their current specs are drafts, and
-the H2 draft still names several columns differently from the later H1 draft.
-Use the merged schema and record any consequential difference in this spec
-before coding. No H4 code should be built against those conflicting names.
+H4 derives Shaxda statistics from a saved match's replay with one pure
+function, stores them on the `match` row, fills older or failed rows with a
+resumable backfill, and shows five of them on `/match/<id>` to exactly the
+viewers who may open that match. It leaves replay format and validation to
+H1, page access and layout to H2, replay viewing to H3, and player-level
+totals to R4. [`docs/shaxda_game.md`](../shaxda_game.md) is authoritative
+for the rules the counters describe.
 
----
+## 1. Outcome and non-goals
 
-## 1. Goal and boundaries
-
-**Goal.** Derive the same Shaxda statistics from a saved replay every time,
-store them once per match, backfill older saved matches, and show a compact
-comparison on the public match page.
+**Outcome.** Every saved match carries a versioned `MatchStatsV1` derived
+only from its replay, or a `none` or `error` status that the backfill later
+clears. The match page compares both seats and never shows zeros for
+statistics it does not have.
 
 ### Must
 
-1. A pure derivation module in `packages/shared/src/stats` imports the public
-   `@shaxda/game-engine` API. It accepts H1's decoded, validated replay and
-   returns a versioned, seat-keyed stats object. It performs no I/O.
-2. The MatchRoom derives stats from the validated in-memory log at game over,
-   puts `stats_json` in the immutable H1 persist payload, and writes it with
-   the existing `match` and two `match_player` rows. H1 retry and rematch
-   idempotency remain intact.
-3. A bounded, resumable backfill fills `stats_json` on pre-H4 rows from their
-   saved replay. It never silently replaces non-null stats or repairs a bad
-   replay by guessing.
-4. H2's public `/match/<id>` page renders a small seat-by-seat panel showing
-   captures, jare events, repeated jare events, movement turns, and a comeback
-   badge for the winner when applicable. All visible copy is Somali.
-5. The versioned schema and a narrow read API make the stored values reusable
-   by R4. R4 owns player-level aggregates, profile presentation, and averages.
+1. A pure module, `@shaxda/shared/stats`, that turns a decoded replay into
+   `MatchStatsV1` under the counting contract (§3.2), with no I/O.
+2. Derivation at game over in the Match DO, after H1's replay validation; a
+   failure stores `error` and the save goes ahead (P21).
+3. A bounded, resumable, compare-and-set backfill of `none` and `error`
+   rows that never rewrites `ok` rows and reports what it cannot fill.
+4. The F7 panel on `/match/<id>`, visible exactly where the match is (§5),
+   with "statistics unavailable" instead of false zeros.
+5. A typed read helper, for the panel and R4, that never exposes raw JSON
+   or user ids.
 
 ### Should
 
-- Precompute player-level totals and averages for R4 only if H4's real query
-  plan shows that summing the indexed match ledger is too costly. This is an
-  optimization within H4, not a dependency of the match-page panel.
+None: player-level totals belong to R4.
 
 ### Not in H4
 
-Style labels, public analytics dashboards, rating or leaderboard changes,
-new game rules, guest or local-game persistence, replay controls, per-move D1
-rows, and changes to the H1 compact replay format.
+Player-level totals, averages, or an aggregate table (R4 aggregates stored
+per-match statistics; public numbers use processed rated events only, P8);
+style labels; analytics dashboards; rating, leaderboard, or rule changes;
+guest or local statistics; replay controls; per-move D1 rows; changes to
+the compact replay or ledger schema; a migration; statistics in OG images or
+sitemaps.
 
----
+## 2. Decisions and dependencies
 
-## 2. Input and trust boundary
+| ID     | How H4 applies it                                                                                                                                                                         |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F7     | The panel shows exactly captures, jare, repeated jare, movement turns, and the comeback badge. `comeback` is F7's rule: the winner trailed by at least two captures after movement began. |
+| P21    | Statistics never block a save. A derivation error stores the match with `stats_status = 'error'`, `stats_json = NULL`, and `stats_v` = the version attempted; the backfill retries.       |
+| F2, P2 | The panel has the match's visibility: rated → public; friendly → its two players only, with the same 404 as an unknown id.                                                                |
+| P8     | Public Shaxda aggregates use processed rated events only. H4 stores per-match values and publishes no totals; R4 aggregates them.                                                         |
 
-The sole input is H1's `{ v: 1, s, a }` compact replay, decoded through the
-engine. Use each accepted action and its **before and after** `GameState`.
-Reject a malformed code, illegal action, unsupported replay version, or a
-replay whose final state differs from the state H1 intends to persist. H4
-derivation runs only after H1 replay validation; the backfill performs that
-validation itself. Neither path takes client-reported statistics.
+| Dependency    | What it provides                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1            | The compact replay, decoder, and schema ([§2.4](v2-contracts.md#24-compact-replay)); replay validation before the outbox entry ([§3.4](v2-contracts.md#34-game-rules-inside-the-room)); the payload's `statsV`, `statsStatus`, `statsJson`, and `payload_hash` ([§2.2](v2-contracts.md#22-writer-invariants-and-the-payload)); the stats columns ([§2.1](v2-contracts.md#21-h1-tables)); `stats_status = 'none'` on every save until H4 ships; the `match:ops` CLI ([§3.3](v2-contracts.md#33-cleanup-codes-and-limits)). |
+| H2            | The `/match/<id>` loader and its access decision ([§5](v2-contracts.md#5-access-matrix)), the reserved slot, player labels (current name or the neutral label, P5), and the ledger's capture counts.                                                                                                                                                                                                                                                                                                                      |
+| H3 (optional) | The position model `0..N`: `afterAction` is an H3 position. Without H3 the panel takes H2's slot alone, and H3 later mounts above it.                                                                                                                                                                                                                                                                                                                                                                                     |
+| Engine        | `applyAction`, `formsNewJare`, `hasLegalMoves`, `DRAW_TURN_LIMIT`, and `GameState` through the public `@shaxda/game-engine` API.                                                                                                                                                                                                                                                                                                                                                                                          |
+| R4 (consumer) | Reads stored statistics through `readMatchStats`; owns aggregates, averages, and their presentation.                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
-The function's result depends only on the replay. It does not depend on user
-ids, usernames, wall-clock time, match mode, rated status, or the online end
-reason. Claim-win's synthetic `resign` remains a resignation action; the
-online reason is not a statistic. An early resignation produces a valid
-zero/`null` stats object. Guest-involved games continue to write no match row.
+## 3. Contracts
 
-Use a dedicated `@shaxda/shared/stats` export so the game Worker imports only
-the stats module rather than the shared package's broad entry point. The
-module may depend on the engine and Zod; it must not import Svelte, D1,
-Cloudflare, the web Worker, or auth code. The engine never imports shared.
+### 3.1 Module
 
----
+The module lives in `packages/shared/src/stats/` behind the `./stats`
+export, so the game Worker never loads the broad shared entry. It imports
+only the public `@shaxda/game-engine` API and Zod (never Svelte, D1,
+Cloudflare, web, or auth code); the engine never imports shared. The replay
+is the only input, with no user id, name, clock, mode, rated flag, or online
+end reason; claim-win's synthetic `R:<seat>` is an ordinary resignation.
 
-## 3. Counting contract
+| Export                                                 | Contract                                                                                                                                                                                                                                  |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STATS_V`                                              | `1`: the `v` of every `MatchStatsV1` and the `stats_v` H4 writes.                                                                                                                                                                         |
+| `deriveMatchStats({ replayV, startingSeat, actions })` | H1-decoded actions, replayed from `createInitialState(startingSeat)` and re-checked. Returns `{ ok: true, stats }` or `{ ok: false, code, actionIndex? }`; `code` is `unsupportedReplay`, `illegalAction`, `notFinished`, or `invariant`. |
+| `matchStatsV1Schema`, `serializeMatchStats(stats)`     | The strict Zod schema and the stable text of §3.3.                                                                                                                                                                                        |
+| `readMatchStats({ statsStatus, statsV, statsJson })`   | `{ ok: true, stats }` or `{ ok: false, reason }`; `reason` is `notDerived` (`none`), `derivationFailed` (`error`), `unsupportedVersion`, or `invalid` (bad JSON, schema failure, or `v ≠ stats_v`). Never a zero-filled value.            |
 
-All counters are nonnegative integers. A **jare event** is one accepted
-`place` or `move` action that newly completes at least one of the 16 engine
-`JARE_LINES`; completing two lines with one action is **one** event. A line
-that stays intact is not a new event. Initial removals and captures are not
-jare events. `repeatedJareEvents` is a subset of movement jare events: at
-least one newly completed line in that move was previously completed by the
-same seat in this replay, during placement or movement, and later broken.
-Multiple repeated lines in one move still count once. Do not infer irmaan
-from this counter: irmaan also has a protection condition the log does not
-establish.
+### 3.2 Counting contract
 
-| Field                     | Per-seat definition                                                                                                                                                                                                                                                                                              |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `capturesMade`            | Number of accepted movement-phase `capture` actions by this seat. Excludes `removeInitial`. Must equal H1 `match_player.captured` and final engine `players[seat].captured`.                                                                                                                                     |
-| `capturesSuffered`        | Opponent's `capturesMade`; initial removal excluded.                                                                                                                                                                                                                                                             |
-| `jareEvents`              | Newly formed placement and movement jare action events, counted as above.                                                                                                                                                                                                                                        |
-| `repeatedJareEvents`      | Movement jare events that reform a previously completed exact line, counted as above.                                                                                                                                                                                                                            |
-| `firstPlacementJare`      | `true` only for the seat that makes the first placement jare in the replay. Both `false` if placement ends without one or the game ends earlier. A simultaneous double-line placement still awards one seat. This agrees with H1's `first_advantage_by = placementJare` and `first_advantage_seat`.              |
-| `movementTurns`           | Number of accepted `move` actions by this seat during movement, including space-making moves. A `move` followed by a `capture` is one turn, not two.                                                                                                                                                             |
-| `turnsBeforeFirstCapture` | This seat's completed movement turns before its first capture turn, including space-making turns. Exclude the move that formed the first capture's jare. `null` if this seat never captures.                                                                                                                     |
-| `maxPieceAdvantage`       | Maximum of `0` and `(own on-board pieces − opponent on-board pieces)` over states from completion of both initial removals through game end. Placement and half-completed initial removal are excluded. `0` if that boundary is never reached.                                                                   |
-| `blockedPlayerEvents`     | Number of distinct blocked episodes for this seat after movement begins: the seat is due to move but has no legal movement action. Count an episode once when entered, including one that immediately ends in a blocked draw; another episode counts only after the seat had at least one legal move in between. |
-| `spaceMakingTurns`        | This seat's accepted `move` actions when the other seat was the blocked current player in the before-state. This is a subset of `movementTurns`; use the engine's blocked/space-making rule, not board-shape heuristics.                                                                                         |
-| `comeback`                | `true` only for the match winner if, at an action boundary after movement begins, the winner had made at least two fewer captures than the opponent. Otherwise `false`; both seats are `false` for a draw. This is a deliberately narrow capture-deficit definition, not a claim about positional advantage.     |
+`s[k]` is the state after accepted action `k` (`s[0]` is the initial state,
+`1 ≤ k ≤ N`), which is H3 position `k`. X is a seat and Y its opponent.
 
-For `blockedPlayerEvents`, inspect the movement board and the player due to
-move after each accepted action, including the last initial removal. If the
-engine terminates with `bothBlocked` or `forcedJareSpaceMaking`, inspect the
-resulting board under movement rules before recording the terminal boundary.
-Do not count a blocked seat on every subsequent opponent space-making action.
-This rule is testable with H1's blocked-space-making conformance fixtures and
-a complete replay that reaches a blocked draw.
+- **Jare event**: a `place` or `move` for which
+  `formsNewJare(s[k-1].board, s[k].board, destination, seat)` holds, the
+  same test as H3's jare cue. One event per action, however many lines
+  complete. Only a `place` can complete two lines: every neighbour of a
+  point lies on one of that point's two lines, so a move vacates one.
+- **Movement boundary**: the state after the second initial removal
+  (`movement`, or `gameOver` for an immediate blocked draw).
+- **Blocked boundary for X**: a state from the movement boundary on, in
+  `movement`, where X is `currentPlayer` and `hasLegalMoves` is false; also
+  the final state of a `bothBlocked` or `forcedJareSpaceMaking` draw whose
+  `currentPlayer` is X.
 
-### Per-match fields
+`SeatStatsV1` is these eleven fields, in this order; every count is a
+non-negative integer.
 
-| Field                 | Definition                                                                                                                                                                                                                                                                                                            |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `phaseTransitions`    | Ordered `{ afterAction, from, to }` records for a change of engine phase. `afterAction` is the count of accepted actions already applied: first action = `1`, matching H3's action-position model. Include transitions to `capture` and `gameOver`; a capture followed by return to `movement` is another transition. |
-| `longestNoCaptureRun` | Maximum `draw.turnsSinceCapture` seen across replayed states after movement begins, including the final state. This is completed movement turns, not raw move/capture action count. A capture resets the engine clock. `0` for a game that never reaches movement.                                                    |
+| Field (per seat X)        | Type            | Definition                                                                                                                                                                                                          |
+| ------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `capturesMade`            | count           | Accepted `capture` actions by X. Initial removals never count.                                                                                                                                                      |
+| `capturesSuffered`        | count           | `capturesMade` of Y.                                                                                                                                                                                                |
+| `jareEvents`              | count           | X's jare events, in placement and movement.                                                                                                                                                                         |
+| `repeatedJareEvents`      | count           | X's movement jare events whose line was complete for X at any earlier state of this replay (a placement jare included), so it was broken and re-formed. Not irmaan, whose protection condition the log cannot show. |
+| `firstPlacementJare`      | boolean         | True only for the seat of the first `place` that is a jare event (it won first advantage). Both false if placement ends without one or the game ends first.                                                         |
+| `movementTurns`           | count           | Accepted `move` actions by X, space-making included. A move and the capture it earns are one turn.                                                                                                                  |
+| `turnsBeforeFirstCapture` | count or `null` | X's `move` actions before the move that earned X's first capture; `null` if X never captured.                                                                                                                       |
+| `maxPieceAdvantage`       | count           | Largest of 0 and (X's pieces on the board − Y's) over the states from the movement boundary to the end; 0 if the boundary is never reached.                                                                         |
+| `blockedPlayerEvents`     | count           | Maximal runs of consecutive blocked boundaries for X: an episode counts once, when entered, including one that ends the game.                                                                                       |
+| `spaceMakingTurns`        | count           | X's `move` actions whose before-state is a blocked boundary for Y (the engine's space-making move); never a jare event.                                                                                             |
+| `comeback`                | boolean         | True only if X won (on the board, by resignation, or by claim) and at some state after movement began Y had made at least two more captures than X (F7). False for the loser and for both seats in a draw.          |
 
-The derivation must also assert `capturesSuffered[A] === capturesMade[B]` and
-vice versa; `repeatedJareEvents <= jareEvents`;
-`spaceMakingTurns <= movementTurns`; and `turnsBeforeFirstCapture` is `null`
-iff no capture was made. Contradictions fail derivation rather than being
-written as valid stats.
+| Field (per match)     | Definition                                                                                                                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `phaseTransitions`    | `{ afterAction: k, from: s[k-1].phase, to: s[k].phase }` for every `k` where the phase changes, in order, including changes into `capture` and `gameOver` and a capture's return to `movement`. |
+| `longestNoCaptureRun` | Largest `draw.turnsSinceCapture` over all states: completed movement turns without a capture, space-making included, reset by a capture, at most `DRAW_TURN_LIMIT` (80); 0 without movement.    |
 
----
+Derivation fails with `invariant`, and nothing is stored as `ok`, unless:
+the last state is `gameOver` (else `notFinished`); `capturesMade[X]` equals
+`s[N].players[X].captured` and `capturesSuffered[Y]`; repeated jare events
+never exceed jare events, nor space-making turns movement turns;
+`turnsBeforeFirstCapture` is `null` exactly when X made no capture and is
+otherwise below `movementTurns`; at most one seat has `firstPlacementJare`,
+and it is `s[N].firstAdvantage`; only the winner has `comeback`;
+`afterAction` strictly increases and the last transition enters `gameOver`
+at `N`; and `longestNoCaptureRun` is at most 80.
 
-## 4. Stored contract
+| Example                                                                                  | Counted                                                                                                               |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| A's `place` completes O1–O2–O3 and O2–M2–I2 at once, the first placement jare            | A: `jareEvents` +1 (one event), `firstPlacementJare` true; a later placement jare by B leaves B's false               |
+| A moves a piece out of a line A completed in placement, and later back                   | A: `jareEvents` +1, `repeatedJareEvents` +1                                                                           |
+| A completes a line that only B had completed before                                      | A: `jareEvents` +1, not repeated                                                                                      |
+| A's sixth move earns A's first capture                                                   | A: `turnsBeforeFirstCapture` = 5                                                                                      |
+| B is due to move with no legal move and A makes the space-making move, twice in a game   | B: `blockedPlayerEvents` = 2; A: +2 on both `movementTurns` and `spaceMakingTurns`                                    |
+| The game ends `forcedJareSpaceMaking`                                                    | The seat due to move: `blockedPlayerEvents` +1                                                                        |
+| From 11–11, captures by A, A, then B                                                     | `maxPieceAdvantage`: A 2, B 0                                                                                         |
+| B leads 2–0 in captures and A later wins by any means; A trails by one at worst and wins | A: `comeback` true; false                                                                                             |
+| A's move forms a jare, then A is claimed against before capturing (M3)                   | A: `jareEvents` +1, `movementTurns` +1, no capture                                                                    |
+| Placements 1–24, removals 25–26, a jare-forming move at 30, its capture at 31            | Transitions `24 placement→initialRemoval`, `26 initialRemoval→movement`, `30 movement→capture`, `31 capture→movement` |
 
-H1 already reserves nullable `match.stats_json` (text). No H4 migration is
-needed if the merged H1 schema contains it. If H1 merged without the column,
-add one hand-written `ALTER TABLE` migration and update Drizzle metadata in
-H4; do not alter the H1 ledger migration after it has shipped.
+### 3.3 `MatchStatsV1`
 
 ```ts
 type MatchStatsV1 = {
-  v: 1; // stats schema version
-  replayV: 1; // source replay format version
-  players: Record<
-    "A" | "B",
-    {
-      capturesMade: number;
-      capturesSuffered: number;
-      jareEvents: number;
-      repeatedJareEvents: number;
-      firstPlacementJare: boolean;
-      movementTurns: number;
-      turnsBeforeFirstCapture: number | null;
-      maxPieceAdvantage: number;
-      blockedPlayerEvents: number;
-      spaceMakingTurns: number;
-      comeback: boolean;
-    }
-  >;
+  v: 1; // statistics semantics; equals match.stats_v
+  replayV: 1; // source replay format
+  players: { A: SeatStatsV1; B: SeatStatsV1 }; // §3.2, fields in table order
   match: {
     phaseTransitions: Array<{
-      afterAction: number;
+      afterAction: number; // H3 position, 1..N
       from: "placement" | "initialRemoval" | "movement" | "capture";
       to: "initialRemoval" | "movement" | "capture" | "gameOver";
     }>;
@@ -168,201 +166,243 @@ type MatchStatsV1 = {
 };
 ```
 
-The Zod schema lives beside the pure derivation and validates both the value
-before serialization and JSON parsed from D1. Serialize with a stable field
-order and no user-identifying values. `v` versions the stats semantics;
-`replayV` records the source format. A future replay decoder may still derive
-`MatchStatsV1` if the meanings stay the same. If a counting definition changes,
-create `v: 2` with a migration/backfill plan; never silently reinterpret
-stored `v: 1` rows. Unknown versions fail closed in reads and are reported for
-repair rather than displayed as zero.
+- The strict Zod schema (no unknown keys, non-negative integers,
+  `afterAction ≥ 1`) runs before serialization and after every D1 read.
+- `serializeMatchStats` writes keys in the order above and in §3.2, A before
+  B, with no whitespace: the same replay always gives byte-identical text,
+  and parse, validate, serialize returns the stored text. The text holds no
+  user id, name, room code, or timestamp.
+- Changing any definition creates `v: 2` with a written backfill plan,
+  edited here and in R4 in one commit; stored `v: 1` rows are never
+  reinterpreted. A later replay format may still yield `v: 1` if no meaning
+  changes. Readers accept only versions they know; anything else is
+  unavailable, never zero.
 
-`stats_json` remains on `match`, one small document per game. R4 may join
-`match_player` to `match` by primary key and aggregate the seat-specific
-values; the H1 `(user_id, ended_at)` index bounds a player's list. H4 adds no
-public account id to the stats schema and no per-player stats table by
-default.
+### 3.4 Ledger columns
 
----
+The columns and their `CHECK`s are H1's
+([§2.1](v2-contracts.md#21-h1-tables)); the checks already reject `ok`
+without JSON and `error` without `stats_v`. H4 writes them as follows.
 
-## 5. Write path and backfill
+| Writer                                                               | When                    | `stats_v`     | `stats_status` | `stats_json` |
+| -------------------------------------------------------------------- | ----------------------- | ------------- | -------------- | ------------ |
+| H1 before H4 ships, and any outbox entry frozen before the H4 deploy | Game over               | NULL          | `none`         | NULL         |
+| Match DO with H4                                                     | Derivation succeeds     | 1             | `ok`           | Serialized   |
+| Match DO with H4                                                     | Derivation fails (P21)  | 1 (attempted) | `error`        | NULL         |
+| Backfill                                                             | Fills `none` or `error` | 1             | `ok`           | Serialized   |
 
-### New matches
+`payload_hash` excludes the stats fields
+([§2.2](v2-contracts.md#22-writer-invariants-and-the-payload)), so neither
+H1's retry comparison nor the backfill touches it, and it stays a checksum of
+the immutable ledger facts. These three columns are the only ledger columns
+that change after insert ([§2.1](v2-contracts.md#21-h1-tables)). H4 adds no
+migration, index, or table ([§11](v2-contracts.md#11-migration-ownership)).
 
-After H1's decode/replay/final-state comparison succeeds, derive the stats
-from the same action log and store `JSON.stringify(stats)` in H1's pending
-payload **before** the first D1 write. A retry reuses those exact bytes. The
-existing three-row D1 batch contains the populated `stats_json` column on its
-`match` insert; no second write follows. A derivation failure prevents the
-ledger write, is logged with room instance and match number but no PII or
-replay body, and retains the room for the same manual-inspection path as an
-H1 replay mismatch. It must not silently write `NULL` after H4 is enabled.
+## 4. Behaviour and failure handling
 
-On an idempotent H1 retry that finds an existing row, do not overwrite that
-row's replay or stats. If the existing row predates H4 and has `NULL` stats,
-the backfill owns it. The worker never reads auth tables or computes ratings.
+### 4.1 At game over
 
-### Pre-H4 matches
+For a persistable match ([§1](v2-contracts.md#1-vocabulary)), after H1's
+replay validation and before the single storage `put`
+([§3.2](v2-contracts.md#32-storage-and-alarms)):
 
-Implement a reusable backfill core against `D1Database` and a local CLI
-wrapper. The CLI defaults to local D1; preview/production require explicit
-environment and write flags. The script must not apply migrations or deploy.
+1. Derive from the validated actions (reusing the validation pass's states
+   is allowed) inside a guard that turns an exception into a failure.
+2. Cross-check with the payload: `capturesMade` equals each seat's
+   `captured`, and `firstPlacementJare` agrees with `firstAdvantageBy` and
+   `firstAdvantageSeat`. A disagreement is a failure.
+3. Success: `statsV = 1`, `statsStatus = "ok"`, and the `statsJson` text.
+4. Failure: `statsV = 1`, `statsStatus = "error"`, `statsJson = null`, and a
+   `matchStatsError { matchId, statsV, code, actionIndex }` log line with no
+   user id, name, or replay text. The save goes ahead (P21).
 
-1. Select a bounded page (for example 100) of `match` rows with
-   `stats_json IS NULL`, ordered by `(ended_at, id)` for stable progress. It
-   reads `id`, `replay_v`, `replay`, and the H1 final-result fields needed to
-   verify the decoded terminal state; never selects auth tables.
-2. For each row, decode and replay from the initial state. Verify action
-   count, winner/end reason, final capture counts, and any other final-state
-   values H1 stores. Derive and Zod-validate stats only on a full match.
-3. `UPDATE match SET stats_json = ? WHERE id = ? AND stats_json IS NULL AND
-replay_v = ? AND replay = ?`. A zero-row update due to a concurrent fill is
-   a harmless skip. Do not rewrite a non-null value, even if its version is
-   old; report it separately.
-4. Continue until no eligible rows remain. Save/report a cursor or last id,
-   totals filled/skipped/failed, and failure ids. Avoid looping forever on
-   invalid rows: move past them for that run and exit nonzero with their ids.
-   A rerun is safe and fills rows fixed since the prior attempt.
+Retries write the same frozen bytes and never update statistics.
+Derivation adds no alarm, timer, storage key, message, or D1 statement. A
+replay mismatch takes H1's `stalled: replayMismatch` path and derives
+nothing; guest-seat and pre-play endings have no outbox entry (F8, P1).
 
-Invalid or mismatched replays stay `NULL` for investigation. The backfill does
-not turn an incomplete replay into invented zeros, mutate the ledger's
-result/replay, or expose user ids in logs. Keep transactions short; never
-materialize the whole match table in memory. Verify preview counts before
-production; production backfill is an explicit release operation, not a
-side effect of local tests or a deploy.
+### 4.2 Backfill
 
----
+One core, a function over `D1Database` in `packages/db` tested on Miniflare
+D1, runs in two places:
 
-## 6. Public match panel and R4 handoff
+- **Nightly**, in the web Worker's cron dispatcher at 00:15 UTC
+  ([§10.1](v2-contracts.md#101-one-cron-one-dispatcher)): a `job_state`
+  lease, a resumable `seq` cursor, and a bounded number of windows per run,
+  so every `error` row is retried without an operator (P21). The game Worker
+  never runs it: it reads nothing but its own insert result (P13).
+- **On demand**, through
+  `pnpm match:ops -- stats-backfill --database <env> [--apply] [--from-seq <n>]`,
+  which extends H1's operator CLI
+  ([§3.3](v2-contracts.md#33-cleanup-codes-and-limits)) and reaches D1
+  through Wrangler for the first backfill after a deploy and for reviews.
 
-H4 adds the stats panel **after H3's replay slot and before H2's details**.
-If H3 has not merged, it uses H2's documented insertion point and H3 later
-mounts above it. Load `stats_json` only for the requested match id; parse it
-server-side and send only the public stats DTO to the page. The DTO has seat
-labels and the five selected values, never `user_id`, email, room code, or
-the replay. Keep H2's session-sensitive page caching behavior.
+1. It is a dry run unless `--apply`, and records `max(seq)` at start; rows
+   saved later belong to the next run.
+2. It walks windows of 100 `seq` values from `--from-seq` (default 0),
+   reading rows with `stats_status IN ('none','error')` and each
+   candidate's two `match_player` rows by primary key.
+3. Per candidate: supported `replay_v` and `rules_v`, H1's schema and
+   decoder, `deriveMatchStats`, and a final state that matches
+   `action_count`, `starting_seat`, `winner_seat`, `end_reason`, the
+   first-advantage columns, and each seat's `pieces_left` and `captured`.
+4. One compare-and-set per row, batched per window, with `?4` the status it
+   read (`changes = 1` is filled, `0` is skipped):
 
-The panel compares A and B with existing seat colors and player labels. It
-shows captures, jare events, repeated jare events, and movement turns as
-numbers, plus a comeback badge only when `comeback` is true. Explain in a
-short Somali help line that the badge means winning after falling behind by
-two captures. Reuse H2's existing capture count display or move it into the
-panel so the page does not show contradictory duplicate numbers. If a valid
-older match has not yet been backfilled, omit the panel and show a modest
-Somali "statistics unavailable" line; never display zeros for missing data.
-An invalid/unknown stats version takes the same visible path and emits a
-server-side diagnostic. Public copy for jare preserves the Somali term.
+   ```sql
+   UPDATE match SET stats_v = ?1, stats_status = 'ok', stats_json = ?2
+    WHERE seq = ?3 AND stats_status = ?4 AND replay_v = ?5 AND replay = ?6;
+   ```
 
-R4 receives the schema and a read helper that returns typed `MatchStatsV1`
-for a match plus a seat. It can calculate total captures, average captures,
-jare/repeated-jare counts, comeback wins, and other §10 R4 measures from
-the ledger. Duration and draw type remain H1 match fields. H4 does not
-publish profile aggregates or a leaderboard. The helper should reject
-missing/unsupported stats explicitly so R4 cannot treat them as zero.
+5. A row that fails a check keeps its status and is reported by `seq`, `id`,
+   and code; the run carries on and exits nonzero at the end.
+6. Every run prints filled, skipped, and failed counts and the last
+   completed window, where `--from-seq` resumes. A rerun from 0 is safe:
+   `ok` rows never match.
 
----
+It writes only the three stats columns of `none` and `error` rows, and
+never zeros for a bad replay; rating state lives in R1's own tables, so it
+can run beside R1's processor. It runs from the commit deployed to that
+environment, and preview and production runs are explicit operator steps,
+never a test or deploy side effect.
 
-## 7. Tests and verification
+### 4.3 Reading and the panel
 
-### Pure stats (Vitest)
+- H2's match query also selects the three stats columns. After H2's access
+  decision, H4 calls `readMatchStats` and adds `stats` to the page data:
+  `{ kind: "unavailable" }` or `{ kind: "ok", seats }`, each seat being
+  `{ captures, jare, repeatedJare, movementTurns, comeback }` from
+  `capturesMade`, `jareEvents`, `repeatedJareEvents`, `movementTurns`, and
+  `comeback`.
+- `none` and `error` read as unavailable without a diagnostic (the backfill
+  report covers them); `unsupportedVersion` and `invalid` also log a server
+  diagnostic with the match id and reason.
+- The panel sits in H2's slot, after H3's viewer when present: a table with
+  the players as columns (seat colours, H2's labels) and captures, jare,
+  repeated jare, and movement turns as rows. The comeback badge appears only
+  in the winner's column, with the Somali help line under the table.
+  Unavailable shows one Somali line and no numbers. Captures appear once:
+  in the panel, or from the ledger's `captured` in H2's details.
 
-- Golden expected stats for **every shared full-game fixture**. Add complete
-  action logs that exercise placement jare, multi-line placement (one event),
-  repeated exact-line jare, a movement capture, a blocked episode plus
-  space-making, a blocked draw, an 80-turn draw, a two-capture comeback, and
-  early resignation. Existing mid-game conformance fixtures are useful for
-  focused state transitions but are not substitutes for full replay tests.
-- Assert both starting seats produce the appropriate seat-keyed stats; the
-  same replay twice produces byte-identical JSON; decode/encode round trips
-  preserve stats; an illegal or truncated replay fails.
-- Assert the engine final capture counts match `capturesMade`; initial
-  removals never increment captures; `longestNoCaptureRun` matches the
-  engine clock (including a reset after capture); phase indices align with
-  H3 action positions; multi-line moves count one jare event.
-- For the comeback case, a winner who was down exactly one capture gets
-  `false`, down two gets `true`, and a draw gives both seats `false`.
+## 5. Privacy and access
 
-### Worker/D1 (Workers Vitest pool)
+H4 implements the two `/match/<id>` rows of
+[§5](v2-contracts.md#5-access-matrix) for its statistics:
 
-- A completed account match writes non-null valid stats in the same H1 batch.
-  Reconnect/retry leaves one row and identical stats; rematch writes separate
-  stats; guest-involved game writes no row; claim-win has no fabricated
-  capture.
-- Derivation failure writes no match row and follows H1's retained-room
-  failure behavior; `pnpm check:hibernation` still passes.
-- Seed pre-H4 rows with `NULL` stats. Backfill fills each once; a second run
-  changes zero rows. A bad replay is reported and remains `NULL`; a non-null
-  existing version is unchanged; a concurrent fill is skipped. Assert query
-  plans use the match index/primary key or a bounded scan appropriate to the
-  one-time backfill, and no per-move rows are created.
+| Match                                                      | Signed out or unrelated account                                | Participant |
+| ---------------------------------------------------------- | -------------------------------------------------------------- | ----------- |
+| Rated (`rated = 1`), including pair-capped and invalidated | Panel shown                                                    | Panel shown |
+| Friendly (`rated = 0`)                                     | The same 404 as an unknown id; the response holds no statistic | Panel shown |
 
-### Web (Vitest and Playwright)
+- Statistics travel only in H2's loader response for `/match/<id>` (its
+  `__data.json` included), after H2's access decision. H4 adds no route,
+  API, cache rule, OG content, or sitemap entry; friendly responses keep
+  H2's `no-store` and `noindex`.
+- Panel data is the five values per seat: no user id, email, room code,
+  replay, or raw stats JSON. Statistics hold no identity (P5), so a rename
+  or deletion (M10) changes nothing. Logs and backfill reports carry match
+  ids, `seq`, and error codes only.
+- R4's public Shaxda aggregates use processed rated events only (P8), read
+  through `readMatchStats`; H4 exposes no aggregate.
 
-- Match loader returns a public DTO only, parses supported stats, and handles
-  `NULL`/unsupported stats without false zeros or PII. The panel shows the
-  five selected values for both seats, labels a comeback only for its winner,
-  and remains readable on a narrow mobile viewport with keyboard/screen
-  reader labels.
-- One saved-account-match E2E confirms both the stored JSON and public panel;
-  an older seeded `NULL` match confirms the unavailable state, then the
-  backfill makes the panel appear. Reuse H2's match route fixtures.
+## 6. Resource budget
 
-Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:worker`,
-`pnpm build`, `pnpm check:hibernation`, and relevant `pnpm test:e2e` cases.
-No remote D1 operation is part of those commands.
+| Path       | D1                                                                                                                                                                                                         | Durable Object                                   | Storage                                                                                                                 |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Game over  | No extra statement: statistics ride in H1's insert batch                                                                                                                                                   | No extra wake-up, alarm, storage key, or message | ≈ 0.6 KB (M2), ≈ 1.6 KB (9 captures), under 3 KB worst case (at most 37 transitions); in the outbox entry, then the row |
+| Match page | No extra query: three more columns on H2's read by id                                                                                                                                                      | —                                                | —                                                                                                                       |
+| Backfill   | `max(seq)` once; each `match` row read once by primary key; two `match_player` reads and one `UPDATE` per candidate; 3 D1 calls per window of 100; the nightly run stops after a bounded number of windows | —                                                | —                                                                                                                       |
 
----
+- Backfilling 10,000 `none` rows reads about 40,000 rows and writes 10,000.
+- Derivation is one pass over at most 1,403 actions (proof E4,
+  [§12](v2-contracts.md#12-evidence)). A disposable local run on 2026-09-29
+  (Node 24.20, 1,000 seeded random legal playouts) cost about 5.5 µs per
+  action, so about 8 ms for the longest legal game. That is not a Workers
+  figure; the Worker test records the time for the longest golden.
 
-## 8. Implementation and rollout
+## 7. Somali copy
 
-Use focused Conventional Commits in this order:
+Strings live in `packages/i18n` under `matchStats`, behind
+`TODO(translation-review)` until the Q4 native review
+([glossary](README.md#somali-glossary-drafts-q4)). `jare` stays unchanged.
 
-1. Reconcile merged H1/H2 contracts and freeze the H4 counting examples.
-2. Add golden complete replays and failing stats derivation tests.
-3. Implement the pure module, schema, and narrow package export.
-4. Add the populated `stats_json` field to the H1 persist payload and worker
-   tests; preserve the existing idempotent batch and alarms.
-5. Add bounded backfill core, CLI, dry run/reporting, and D1 tests.
-6. Add Somali copy, match loader DTO, and public panel tests/UI.
-7. Add the H4 release and verification steps to the V2 operations runbook.
+| Key                        | Draft                                                                                       | Note                             |
+| -------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------- |
+| `matchStats.heading`       | Tirakoobka ciyaarta                                                                         | Table caption                    |
+| `matchStats.captures`      | Qabashooyin                                                                                 | Same word as H2's captures label |
+| `matchStats.jare`          | Jare                                                                                        |                                  |
+| `matchStats.repeatedJare`  | Jare soo noqnoqda                                                                           | Existing board-gallery term      |
+| `matchStats.movementTurns` | Dhaqaaqyo                                                                                   |                                  |
+| `matchStats.comebackBadge` | Soo kabasho                                                                                 | Winner's column only             |
+| `matchStats.comebackHelp`  | Guuleystuhu wuxuu ka dambeeyay ugu yaraan laba qabasho kadib markii dhaqdhaqaaqu bilaabmay. | F7 rule                          |
+| `matchStats.unavailable`   | Tirakoobka ciyaartan lama heli karo hadda.                                                  | Replaces the numbers; no zeros   |
 
-Release order: deploy the H4 writer and reader together to preview; finish
-real account matches and verify non-null stats and rendered values; dry-run
-then execute the preview backfill; repeat in production after confirming the
-H1/H2 schema and migration state. Query counts of `NULL` and unsupported
-stats before and after. If the backfill reports failures, investigate and
-rerun only after the underlying replay problem is fixed. Do not mark H4
-shipped while stored matches are still missing valid stats.
+## 8. Implementation slices
 
----
+1. `test(shared): add complete replays and golden match statistics`
+2. `feat(shared): derive versioned match statistics` (§3)
+3. `feat(worker): store match statistics with each saved match` (§4.1)
+4. `feat(db): backfill missing match statistics` (§4.2)
+5. `feat(i18n): add Somali match statistics copy`
+6. `feat(web): show match statistics on the match page`
+7. `test(e2e): cover the match statistics panel`
+8. `docs(ops): add the H4 release and backfill steps`
 
-## 9. Decisions and open questions
+## 9. Acceptance tests
 
-| ID    | Decision                                                                                   | Reason                                                                                                |
-| ----- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| H4-D1 | A comeback requires the eventual winner to have trailed by at least two movement captures. | Founder choice. A strict, reproducible flag avoids claiming every narrow win was a comeback.          |
-| H4-D2 | The public panel shows captures, jare, repeated jare, movement turns, and comeback.        | Founder choice. Other fields remain stored for R4 without crowding the match page.                    |
-| H4-D3 | Count jare by accepted action event, not completed line.                                   | The game awards one capture for a multi-line move and one first advantage for a multi-line placement. |
-| H4-D4 | Keep stats in versioned `match.stats_json`; no default aggregate table.                    | H1 has the column, and R4 can derive player totals from the indexed ledger.                           |
-| H4-D5 | Backfill only `NULL` rows with compare-and-set updates.                                    | Safe to resume; no silent replacement of historical data.                                             |
+| Layer                                  | Must pass                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Goldens (`packages/shared`, Vitest)    | A `MatchStatsV1` golden for every `fullGameActionScripts` entry that ends in `gameOver` (`placement-through-initial-removal` stops at movement and returns `notFinished`), and for new complete replays from the empty board whose goldens change only in reviewed diffs: a placement jare by the starter and one by the other seat; a two-line placement; a movement capture; a repeated exact-line jare; a blocked episode with space-making; `forcedJareSpaceMaking`, 80-turn, and repetition draws; a two-capture comeback; a one-capture-deficit win; a resignation with a capture pending. `bothBlocked` cannot occur in legal play (E4), so it is tested on the conformance state. |
+| Properties                             | Every golden also passes mirrored (A and B swapped, starting seat included). The §3.2 invariants hold on every golden and on the engine fuzz harness's seeded playouts; every serialized value is under 3 KB. Initial removals never add captures; `longestNoCaptureRun` follows the engine clock, reset included; each `afterAction` is the position where the phase changes; a board test pins "a move completes at most one line".                                                                                                                                                                                                                                                     |
+| Determinism and rejection              | The same replay gives byte-identical text, as does encode, decode, derive; parse, validate, serialize returns the stored text. Truncated, illegal, unsupported, and unfinished replays fail with the right code and index. `readMatchStats` returns the right reason for `none`, `error`, an unknown version, bad JSON, an extra key, and `v ≠ stats_v`.                                                                                                                                                                                                                                                                                                                                  |
+| Worker (Workers Vitest pool)           | A finished account match saves `ok` statistics in H1's single batch, equal to `deriveMatchStats` on the stored replay. With the deriver forced to throw, the match saves with `stats_status = 'error'`, `stats_v = 1`, `stats_json = NULL`, the log line has no user id, and `matchStatus.save` reaches `saved`. A retry after a lost D1 response keeps one row and identical statistics; a rematch gets its own; a guest-seat game writes nothing; M3 adds no capture; an outbox entry frozen with `none` saves as `none`. `pnpm check:hibernation` passes with no new alarm or storage key.                                                                                             |
+| Backfill (`packages/db`, Miniflare D1) | With seeded `none`, `error`, and `ok` rows, a bad replay, and a stored-field mismatch, `--apply` fills each `none` and `error` row once, keeps `ok` rows byte-identical, reports the bad rows unchanged, and exits nonzero. A second run and a dry run change nothing. A concurrent fill (status changed between read and write) is skipped. Every non-stats column, `payload_hash` included, is unchanged. A run stopped after one window and resumed with `--from-seq` ends in the same state. `EXPLAIN QUERY PLAN` shows primary-key access for windows and player reads.                                                                                                              |
+| Loader (Vitest)                        | `ok` gives panel data and every other reason `unavailable`, with a diagnostic only for `unsupportedVersion` and `invalid`. No user id, email, room code, replay, or raw-only key (`phaseTransitions`, `capturesSuffered`) appears, checked structurally and by scanning for seeded ids.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Access (Vitest, Playwright)            | On the page and on its `__data.json`: a rated match shows the panel signed out; a friendly match returns the unknown-id 404, with no statistic in the body, to a signed-out viewer and to an unrelated account; its two players see the panel.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Panel (Playwright)                     | Five values per seat; the badge only for a winner with `comeback`, with the help line; unavailable shows no digits; captures appear once; table semantics hold at 320 px.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| E2E (shared local D1, contracts §10.4) | Once a real account game's `matchStatus.save.status` is `saved`, a participant sees the stored values; a seeded rated row shows the panel signed out; a seeded `none` row shows the unavailable line until the local backfill runs.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
-No founder decision is required to start implementation. If real-match
-review reveals that a stored metric is misleading, change the counting
-contract and version deliberately before shipping, rather than editing the
-meaning of `v: 1` silently.
+### Sample matches ([contracts §4.3](v2-contracts.md#43-canonical-sample-matches))
 
----
+| ID  | Ledger                                       | H4 statistics                                                                                                                                  | Panel                                       |
+| --- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| M1  | Friendly row; A wins by pieces               | `ok` at game over                                                                                                                              | A and B only; others get the unknown-id 404 |
+| M2  | Rated row; B resigns after three placements  | `ok`: every counter 0 or false, `turnsBeforeFirstCapture` `null`, `phaseTransitions` `[{ afterAction: 4, from: "placement", to: "gameOver" }]` | Public                                      |
+| M3  | Rated row; idle claim while A owes a capture | `ok`: A's jare-forming move counts in `jareEvents` and `movementTurns`; captures equal the engine's, none added                                | Public                                      |
+| M4  | Rated row; pair-capped                       | `ok`; "not counted" changes no statistic                                                                                                       | Public                                      |
+| M5  | Rated row; 80-turn draw                      | `ok`: `longestNoCaptureRun` = 80; no comeback                                                                                                  | Public                                      |
+| M6  | Guest vs account                             | No row: nothing derived or backfilled                                                                                                          | —                                           |
+| M7  | Resign before any action                     | No row                                                                                                                                         | —                                           |
+| M8  | Rated row; later invalidated                 | Unchanged                                                                                                                                      | Public                                      |
+| M9  | Friendly rematch                             | Its own row and statistics                                                                                                                     | A and B only                                |
+| M10 | B deletes the account after M2               | Unchanged; B shows as the neutral label (H2)                                                                                                   | Public                                      |
 
-## 10. Done when
+## 10. Rollout and rollback
 
-- Every stored H1 match has a valid `MatchStatsV1` (new and backfilled), with
-  zero unexplained `NULL` or unsupported `stats_json` values.
-- Every newly completed account match persists stats with its ledger row;
-  idempotent retries do not change them.
-- The public match page shows the selected seat-by-seat stats and labels a
-  comeback only under H4-D1.
-- Golden fixture, worker, backfill, web, and relevant E2E checks pass; H1
-  replay validation and DO hibernation checks remain green.
-- The merged H1/H2 contracts have been reconciled, the release runbook has
-  preview/production verification, and `docs/shaxda-v2.md` §4 marks H4
-  **shipped** with the merge date only after these conditions are met.
+| Environment | Steps                                                                                                                                                                                                                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dev         | Miniflare D1: `pnpm match:ops -- stats-backfill --database local`, then with `--apply`.                                                                                                                                                                                               |
+| e2e         | Shared local D1 ([§10.4](v2-contracts.md#104-shared-local-d1-in-e2e)); tests seed rows and call the backfill core.                                                                                                                                                                    |
+| preview     | Game Worker, then web Worker ([§6.5](v2-contracts.md#65-deploy-order); no migration). Play friendly and rated account games; check `ok` rows and the panel signed out, as a participant, and as an unrelated account. Backfill dry run, `--apply`, then a rerun that changes nothing. |
+| production  | The same order after preview passes. The operator runs the first backfill (dry run, then `--apply`) after the deploy; afterwards the nightly job fills new `none` and `error` rows. Status counts before and after, and every reported row, go in the ops record.                     |
+
+- Until R2 activates, every saved match is friendly (wave 1), so the panel
+  is participant-only until then.
+- Kill switch: none, as in
+  [§10.3](v2-contracts.md#103-bindings-flags-and-rollout-by-milestone);
+  statistics cannot block a save (P21), and the panel degrades gracefully.
+- Rollback: the previous web version removes the panel and changes no data;
+  the previous game version saves `none` again for the next backfill. For a
+  wrong `v: 1` counter, roll back the web Worker, then ship `v: 2` with a
+  reviewed backfill plan; `v: 1` rows are never rewritten in place.
+
+### Done when
+
+- §9 passes, together with `pnpm lint`, `pnpm typecheck`, `pnpm test`,
+  `pnpm test:worker`, `pnpm build`, `pnpm check:hibernation`, and the H4
+  `pnpm test:e2e` cases.
+- In preview, new matches save `ok`; after the backfill no `none` or
+  `error` row lacks a reported reason; the panel shows on a rated match
+  signed out and on a friendly match only to its two players.
+- Production results are recorded in the ops record, which alone states
+  what was verified there; the shipping commit then sets the README status.

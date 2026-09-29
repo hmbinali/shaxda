@@ -29,7 +29,7 @@ starts only when the spec is frozen **and** its milestone is activated
 ## Spec index
 
 Register IDs are defined in the tables below. "Wave" is the build wave in
-`docs/specs-revision-plan.md` §12.
+[`docs/shaxda-v2.md` §14](../shaxda-v2.md#14-build-waves).
 
 | ID  | Spec                                                                           | Status  | Wave  | Depends on                                                            | Register IDs                       |
 | --- | ------------------------------------------------------------------------------ | ------- | ----- | --------------------------------------------------------------------- | ---------------------------------- |

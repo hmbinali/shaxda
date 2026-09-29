@@ -40,9 +40,9 @@ groups and social media. Somali-owned and Somali-serving businesses want to
 reach them.
 
 Until X1 reports production numbers, every audience figure is a planning
-input. The V2 brief's assumptions (3 qualified sponsor views per active
-browser per day, 15 % daily-to-monthly ratio, 45 % weekly-to-monthly ratio,
-75 % slot fill) are **hypotheses to test**, not facts to quote.
+input. The planning inputs used in this document (about 1,500 active
+browsers a day, 3 qualified sponsor views per active browser per day, 75 %
+slot fill) are **hypotheses to test**, not facts to quote.
 
 | Hypothesis                                  | Tested by                                                     |
 | ------------------------------------------- | ------------------------------------------------------------- |
@@ -142,11 +142,11 @@ make-good; they are a pricing signal (§7).
 
 ## 7. Pricing hypotheses
 
-| Period  | Price per slot | Status                       |
-| ------- | -------------- | ---------------------------- |
-| 7 days  | $80            | Hypothesis from V2 brief §15 |
-| 14 days | $140           | Hypothesis                   |
-| 30 days | $250           | Hypothesis                   |
+| Period  | Price per slot | Status     |
+| ------- | -------------- | ---------- |
+| 7 days  | $80            | Hypothesis |
+| 14 days | $140           | Hypothesis |
+| 30 days | $250           | Hypothesis |
 
 Currency, final prices, and whether prices differ by slot are Q5. No price is
 published until S3b, which follows a first delivered report; the S3a pilot
@@ -217,8 +217,7 @@ What V2 adds per unit (from the specs):
 | Sponsor qualified view  | at most one gated batch (2–4 row writes) per browser, booking, and slot per 30 minutes (S2)                         |
 | Idle room               | nothing while hibernating; alarms only for deadlines and unsaved matches                                            |
 
-At the V2 brief's planning scale (about 1,500 active identities a day), D1
-writes stay far inside the free daily allowance. Billing alerts are set from
+At the §2 planning inputs (about 1,500 active browsers a day), D1 writes stay far inside the free daily allowance. Billing alerts are set from
 the Q3 budget, and the "Cloudflare bill per 1,000 completed online games"
 metric in the V2 brief is computed from the dashboard, not estimated.
 
@@ -230,8 +229,7 @@ metric in the V2 brief is computed from the dashboard, not estimated.
    placement visible for one second, at most one per browser every 30
    minutes").
 2. No count of people, no demographic or geographic claim without
-   measurement, and no modelled figure (including the V2 brief's planning
-   scale) in public copy or a sponsor conversation.
+   measurement, and no modelled figure (including the §2 planning inputs) in public copy or a sponsor conversation.
 3. Reports show raw counts beside percentages, the measurement window, and
    any outage. A zero is shown as zero; missing data is shown as missing.
 4. No "fair CPM", "market rate", or "guaranteed impressions" claims.

@@ -64,8 +64,7 @@ measured numbers with their definitions.
   `learn` slots or mockups ([BRD §3](../shaxda_brd.md#3-pilot-inventory), §8).
 - Enquiry forms, storage, or analytics events; changes to S1 placement or
   booking rules or to S2 measurement; English copy (F8).
-- Any modelled, projected, or founder-estimated figure (the V2 brief's planning
-  scale and Q3 inputs included); fair-rate, market-rate, cost-per-thousand, or
+- Any modelled, projected, or founder-estimated figure (the BRD §2 planning inputs and Q3 inputs included); fair-rate, market-rate, cost-per-thousand, or
   guaranteed-view claims; customer lists or testimonials
   ([BRD §10](../shaxda_brd.md#10-truthful-claims)).
 

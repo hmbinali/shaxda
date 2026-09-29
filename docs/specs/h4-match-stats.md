@@ -1,13 +1,13 @@
 # H4 — Match Statistics Foundation (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft, not started |
-| Brief | `docs/shaxda-v2.md` §9 (H4), §7.2–7.3, §14 |
-| Workspace | `h4-match-stats` |
+| Field      | Value                                                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | Draft, not started                                                                                                                 |
+| Brief      | `docs/shaxda-v2.md` §9 (H4), §7.2–7.3, §14                                                                                         |
+| Workspace  | `h4-match-stats`                                                                                                                   |
 | Depends on | H1 for the replay and ledger; H2 for the match-page panel. The derivation and write path can be built while H2/H3 are in progress. |
-| Unblocks | R4 profile statistics; R5 may reuse the same per-match values. |
-| Touches | `packages/shared`, `packages/db`, `worker/`, `packages/i18n`, `web/`, a backfill script, and release documentation. |
+| Unblocks   | R4 profile statistics; R5 may reuse the same per-match values.                                                                     |
+| Touches    | `packages/shared`, `packages/db`, `worker/`, `packages/i18n`, `web/`, a backfill script, and release documentation.                |
 
 This spec refines H4 without widening the V2 brief. `docs/shaxda_game.md` is
 authoritative for game rules. The H1 replay and ledger contracts are frozen at
@@ -93,19 +93,19 @@ Multiple repeated lines in one move still count once. Do not infer irmaan
 from this counter: irmaan also has a protection condition the log does not
 establish.
 
-| Field | Per-seat definition |
-| --- | --- |
-| `capturesMade` | Number of accepted movement-phase `capture` actions by this seat. Excludes `removeInitial`. Must equal H1 `match_player.captured` and final engine `players[seat].captured`. |
-| `capturesSuffered` | Opponent's `capturesMade`; initial removal excluded. |
-| `jareEvents` | Newly formed placement and movement jare action events, counted as above. |
-| `repeatedJareEvents` | Movement jare events that reform a previously completed exact line, counted as above. |
-| `firstPlacementJare` | `true` only for the seat that makes the first placement jare in the replay. Both `false` if placement ends without one or the game ends earlier. A simultaneous double-line placement still awards one seat. This agrees with H1's `first_advantage_by = placementJare` and `first_advantage_seat`. |
-| `movementTurns` | Number of accepted `move` actions by this seat during movement, including space-making moves. A `move` followed by a `capture` is one turn, not two. |
-| `turnsBeforeFirstCapture` | This seat's completed movement turns before its first capture turn, including space-making turns. Exclude the move that formed the first capture's jare. `null` if this seat never captures. |
-| `maxPieceAdvantage` | Maximum of `0` and `(own on-board pieces − opponent on-board pieces)` over states from completion of both initial removals through game end. Placement and half-completed initial removal are excluded. `0` if that boundary is never reached. |
-| `blockedPlayerEvents` | Number of distinct blocked episodes for this seat after movement begins: the seat is due to move but has no legal movement action. Count an episode once when entered, including one that immediately ends in a blocked draw; another episode counts only after the seat had at least one legal move in between. |
-| `spaceMakingTurns` | This seat's accepted `move` actions when the other seat was the blocked current player in the before-state. This is a subset of `movementTurns`; use the engine's blocked/space-making rule, not board-shape heuristics. |
-| `comeback` | `true` only for the match winner if, at an action boundary after movement begins, the winner had made at least two fewer captures than the opponent. Otherwise `false`; both seats are `false` for a draw. This is a deliberately narrow capture-deficit definition, not a claim about positional advantage. |
+| Field                     | Per-seat definition                                                                                                                                                                                                                                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `capturesMade`            | Number of accepted movement-phase `capture` actions by this seat. Excludes `removeInitial`. Must equal H1 `match_player.captured` and final engine `players[seat].captured`.                                                                                                                                     |
+| `capturesSuffered`        | Opponent's `capturesMade`; initial removal excluded.                                                                                                                                                                                                                                                             |
+| `jareEvents`              | Newly formed placement and movement jare action events, counted as above.                                                                                                                                                                                                                                        |
+| `repeatedJareEvents`      | Movement jare events that reform a previously completed exact line, counted as above.                                                                                                                                                                                                                            |
+| `firstPlacementJare`      | `true` only for the seat that makes the first placement jare in the replay. Both `false` if placement ends without one or the game ends earlier. A simultaneous double-line placement still awards one seat. This agrees with H1's `first_advantage_by = placementJare` and `first_advantage_seat`.              |
+| `movementTurns`           | Number of accepted `move` actions by this seat during movement, including space-making moves. A `move` followed by a `capture` is one turn, not two.                                                                                                                                                             |
+| `turnsBeforeFirstCapture` | This seat's completed movement turns before its first capture turn, including space-making turns. Exclude the move that formed the first capture's jare. `null` if this seat never captures.                                                                                                                     |
+| `maxPieceAdvantage`       | Maximum of `0` and `(own on-board pieces − opponent on-board pieces)` over states from completion of both initial removals through game end. Placement and half-completed initial removal are excluded. `0` if that boundary is never reached.                                                                   |
+| `blockedPlayerEvents`     | Number of distinct blocked episodes for this seat after movement begins: the seat is due to move but has no legal movement action. Count an episode once when entered, including one that immediately ends in a blocked draw; another episode counts only after the seat had at least one legal move in between. |
+| `spaceMakingTurns`        | This seat's accepted `move` actions when the other seat was the blocked current player in the before-state. This is a subset of `movementTurns`; use the engine's blocked/space-making rule, not board-shape heuristics.                                                                                         |
+| `comeback`                | `true` only for the match winner if, at an action boundary after movement begins, the winner had made at least two fewer captures than the opponent. Otherwise `false`; both seats are `false` for a draw. This is a deliberately narrow capture-deficit definition, not a claim about positional advantage.     |
 
 For `blockedPlayerEvents`, inspect the movement board and the player due to
 move after each accepted action, including the last initial removal. If the
@@ -117,10 +117,10 @@ a complete replay that reaches a blocked draw.
 
 ### Per-match fields
 
-| Field | Definition |
-| --- | --- |
-| `phaseTransitions` | Ordered `{ afterAction, from, to }` records for a change of engine phase. `afterAction` is the count of accepted actions already applied: first action = `1`, matching H3's action-position model. Include transitions to `capture` and `gameOver`; a capture followed by return to `movement` is another transition. |
-| `longestNoCaptureRun` | Maximum `draw.turnsSinceCapture` seen across replayed states after movement begins, including the final state. This is completed movement turns, not raw move/capture action count. A capture resets the engine clock. `0` for a game that never reaches movement. |
+| Field                 | Definition                                                                                                                                                                                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `phaseTransitions`    | Ordered `{ afterAction, from, to }` records for a change of engine phase. `afterAction` is the count of accepted actions already applied: first action = `1`, matching H3's action-position model. Include transitions to `capture` and `gameOver`; a capture followed by return to `movement` is another transition. |
+| `longestNoCaptureRun` | Maximum `draw.turnsSinceCapture` seen across replayed states after movement begins, including the final state. This is completed movement turns, not raw move/capture action count. A capture resets the engine clock. `0` for a game that never reaches movement.                                                    |
 
 The derivation must also assert `capturesSuffered[A] === capturesMade[B]` and
 vice versa; `repeatedJareEvents <= jareEvents`;
@@ -139,21 +139,24 @@ H4; do not alter the H1 ledger migration after it has shipped.
 
 ```ts
 type MatchStatsV1 = {
-  v: 1;                 // stats schema version
-  replayV: 1;           // source replay format version
-  players: Record<"A" | "B", {
-    capturesMade: number;
-    capturesSuffered: number;
-    jareEvents: number;
-    repeatedJareEvents: number;
-    firstPlacementJare: boolean;
-    movementTurns: number;
-    turnsBeforeFirstCapture: number | null;
-    maxPieceAdvantage: number;
-    blockedPlayerEvents: number;
-    spaceMakingTurns: number;
-    comeback: boolean;
-  }>;
+  v: 1; // stats schema version
+  replayV: 1; // source replay format version
+  players: Record<
+    "A" | "B",
+    {
+      capturesMade: number;
+      capturesSuffered: number;
+      jareEvents: number;
+      repeatedJareEvents: number;
+      firstPlacementJare: boolean;
+      movementTurns: number;
+      turnsBeforeFirstCapture: number | null;
+      maxPieceAdvantage: number;
+      blockedPlayerEvents: number;
+      spaceMakingTurns: number;
+      comeback: boolean;
+    }
+  >;
   match: {
     phaseTransitions: Array<{
       afterAction: number;
@@ -213,7 +216,7 @@ environment and write flags. The script must not apply migrations or deploy.
    count, winner/end reason, final capture counts, and any other final-state
    values H1 stores. Derive and Zod-validate stats only on a full match.
 3. `UPDATE match SET stats_json = ? WHERE id = ? AND stats_json IS NULL AND
-   replay_v = ? AND replay = ?`. A zero-row update due to a concurrent fill is
+replay_v = ? AND replay = ?`. A zero-row update due to a concurrent fill is
    a harmless skip. Do not rewrite a non-null value, even if its version is
    old; report it separately.
 4. Continue until no eligible rows remain. Save/report a cursor or last id,
@@ -335,13 +338,13 @@ shipped while stored matches are still missing valid stats.
 
 ## 9. Decisions and open questions
 
-| ID | Decision | Reason |
-| --- | --- | --- |
-| H4-D1 | A comeback requires the eventual winner to have trailed by at least two movement captures. | Founder choice. A strict, reproducible flag avoids claiming every narrow win was a comeback. |
-| H4-D2 | The public panel shows captures, jare, repeated jare, movement turns, and comeback. | Founder choice. Other fields remain stored for R4 without crowding the match page. |
-| H4-D3 | Count jare by accepted action event, not completed line. | The game awards one capture for a multi-line move and one first advantage for a multi-line placement. |
-| H4-D4 | Keep stats in versioned `match.stats_json`; no default aggregate table. | H1 has the column, and R4 can derive player totals from the indexed ledger. |
-| H4-D5 | Backfill only `NULL` rows with compare-and-set updates. | Safe to resume; no silent replacement of historical data. |
+| ID    | Decision                                                                                   | Reason                                                                                                |
+| ----- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| H4-D1 | A comeback requires the eventual winner to have trailed by at least two movement captures. | Founder choice. A strict, reproducible flag avoids claiming every narrow win was a comeback.          |
+| H4-D2 | The public panel shows captures, jare, repeated jare, movement turns, and comeback.        | Founder choice. Other fields remain stored for R4 without crowding the match page.                    |
+| H4-D3 | Count jare by accepted action event, not completed line.                                   | The game awards one capture for a multi-line move and one first advantage for a multi-line placement. |
+| H4-D4 | Keep stats in versioned `match.stats_json`; no default aggregate table.                    | H1 has the column, and R4 can derive player totals from the indexed ledger.                           |
+| H4-D5 | Backfill only `NULL` rows with compare-and-set updates.                                    | Safe to resume; no silent replacement of historical data.                                             |
 
 No founder decision is required to start implementation. If real-match
 review reveals that a stored metric is misleading, change the counting

@@ -1,12 +1,12 @@
 # R5 — Head-to-Head and Rating History (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; specification only. R5 is not active or shipped. |
-| Brief | `docs/shaxda-v2.md` §10 (R5), §5, §7.2, §14, §16 D8 |
-| Depends on | R4 public profile record; H2 match links and owner-indexed ledger reads; R1 confirmed rating events; R2 competition status; R3 leaderboard rows and rated-result semantics |
-| Workspace | `r5-head-to-head` |
-| Touches when implemented | `packages/db` read queries and, if needed, the R3 derived form projection; `web/src/routes/u/[username]`; `/leaderboard`; `packages/i18n`; tests |
+| Field                    | Value                                                                                                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status                   | Draft; specification only. R5 is not active or shipped.                                                                                                                    |
+| Brief                    | `docs/shaxda-v2.md` §10 (R5), §5, §7.2, §14, §16 D8                                                                                                                        |
+| Depends on               | R4 public profile record; H2 match links and owner-indexed ledger reads; R1 confirmed rating events; R2 competition status; R3 leaderboard rows and rated-result semantics |
+| Workspace                | `r5-head-to-head`                                                                                                                                                          |
+| Touches when implemented | `packages/db` read queries and, if needed, the R3 derived form projection; `web/src/routes/u/[username]`; `/leaderboard`; `packages/i18n`; tests                           |
 
 This spec refines the R5 brief without activating the milestone. The V2 brief
 wins on scope and order, the PRD on stack and infrastructure, and
@@ -74,12 +74,12 @@ terminal. This is R5-D1, pending the founder's answer. If R4-D1 resolves
 differently, settle both definitions together before coding; do not publish
 two incompatible labels for the same public record.
 
-| Field | Exact rule |
-| --- | --- |
-| Games | Count completed competitive ledger matches containing both distinct permanent account ids. A rematch is another match. Count each `match.id` once. |
-| Viewer wins / opponent wins / draws | Read the two authoritative `match_player.result` values from the viewer's perspective. Their sum equals games; a contradictory pair is a data error, not a draw. |
-| Last meeting | The newest included match by `(ended_at DESC, match.id DESC)`, with date, viewer-perspective result, and link to H2's public `/match/<id>` page. A later aborted encounter does not replace the last competitive meeting. |
-| Rating difference | `viewer.currentRating − opponent.currentRating` from R1 `player_rating`, in full precision before display rounding. Show a signed whole-number difference calculated as `round(viewer) − round(opponent)`; label whose rating is higher. Use R1 effective RD at one `asOf` to mark either rating provisional. If either has no confirmed rated match, show “rating comparison unavailable”, not a fabricated 1500 or zero. |
+| Field                               | Exact rule                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Games                               | Count completed competitive ledger matches containing both distinct permanent account ids. A rematch is another match. Count each `match.id` once.                                                                                                                                                                                                                                                                         |
+| Viewer wins / opponent wins / draws | Read the two authoritative `match_player.result` values from the viewer's perspective. Their sum equals games; a contradictory pair is a data error, not a draw.                                                                                                                                                                                                                                                           |
+| Last meeting                        | The newest included match by `(ended_at DESC, match.id DESC)`, with date, viewer-perspective result, and link to H2's public `/match/<id>` page. A later aborted encounter does not replace the last competitive meeting.                                                                                                                                                                                                  |
+| Rating difference                   | `viewer.currentRating − opponent.currentRating` from R1 `player_rating`, in full precision before display rounding. Show a signed whole-number difference calculated as `round(viewer) − round(opponent)`; label whose rating is higher. Use R1 effective RD at one `asOf` to mark either rating provisional. If either has no confirmed rated match, show “rating comparison unavailable”, not a fabricated 1500 or zero. |
 
 The card labels game results as **all completed account games** and rating
 difference as **confirmed rated-game rating**. A friendly or pair-capped game
@@ -141,7 +141,7 @@ request. Show dates in the site's established Somali date format, with UTC
 instants in machine-readable data.
 
 The visual line starts at the rating after the most recent processed event
-*before* the window, if one exists, as a context point at the window start.
+_before_ the window, if one exists, as a context point at the window start.
 When there is no earlier event, the first in-window event starts with its
 stored `rating_before` at that event time. Plot its `rating_after` at the same
 time so a player can see the first change; order same-time before/after
@@ -312,12 +312,12 @@ preview verification pass. Saving this spec alone does not ship R5.
 
 ## 7. Decisions to confirm
 
-| ID | Decision | Draft treatment |
-| --- | --- | --- |
-| R5-D1 | Which games count in head-to-head? | All persisted **completed competitive account matches**, including friendly and rating-skipped; exclude R2-aborted. Pending founder answer and tied to R4-D1. |
-| R5-D2 | Is rating history public on an account profile? | Yes, following V2 D8's public profile/match decision. Only confirmed rating event values are exposed. |
-| R5-D3 | What does “rating difference” mean? | Current confirmed R1 rating of viewer minus target, displayed as the difference of rounded ratings. Unavailable until both have a rating. |
-| R5-D4 | What does the leaderboard form mean? | Match final R3 W/L/D semantics; its current draft uses confirmed rated games. Reuse R4's visual, not its broader form data. |
+| ID    | Decision                                        | Draft treatment                                                                                                                                               |
+| ----- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R5-D1 | Which games count in head-to-head?              | All persisted **completed competitive account matches**, including friendly and rating-skipped; exclude R2-aborted. Pending founder answer and tied to R4-D1. |
+| R5-D2 | Is rating history public on an account profile? | Yes, following V2 D8's public profile/match decision. Only confirmed rating event values are exposed.                                                         |
+| R5-D3 | What does “rating difference” mean?             | Current confirmed R1 rating of viewer minus target, displayed as the difference of rounded ratings. Unavailable until both have a rating.                     |
+| R5-D4 | What does the leaderboard form mean?            | Match final R3 W/L/D semantics; its current draft uses confirmed rated games. Reuse R4's visual, not its broader form data.                                   |
 
 The V2 brief already fixes the three windows, ledger-derived chart, peak,
 signed-in opponent comparison, and no rating-snapshot table. These decisions

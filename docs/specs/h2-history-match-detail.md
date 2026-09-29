@@ -1,13 +1,13 @@
 # H2 — Match History and Match Detail (Spec)
 
-| Field          | Value                                                                                                                              |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Status         | Draft, not started. Blocked on H1: no H1 spec or code exists on `main` as of 2026-09-19.                                           |
-| Brief          | `docs/shaxda-v2.md` §9 (H2), §7.2 (tables), §16 (D4, D8)                                                                           |
-| Workspace      | `h2-history-match-detail`                                                                                                          |
-| Depends on     | H1 (ledger rows, `matchSaved`). Independent of X1; may run beside S1 (`shaxda-v2.md` §14 step 2).                                  |
+| Field          | Value                                                                                                                             |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Status         | Draft, not started. Blocked on H1: no H1 spec or code exists on `main` as of 2026-09-19.                                          |
+| Brief          | `docs/shaxda-v2.md` §9 (H2), §7.2 (tables), §16 (D4, D8)                                                                          |
+| Workspace      | `h2-history-match-detail`                                                                                                         |
+| Depends on     | H1 (ledger rows, `matchSaved`). Independent of X1; may run beside S1 (`shaxda-v2.md` §14 step 2).                                 |
 | Unblocks       | H3 (mounts on `/match/<id>`), H4 (stats panel slot on the match page), R4 (reuses the row component and the history queries)      |
-| Touches        | `packages/db` (read queries only), `packages/shared` (match id and filter schemas), `packages/i18n`, `web/`                        |
+| Touches        | `packages/db` (read queries only), `packages/shared` (match id and filter schemas), `packages/i18n`, `web/`                       |
 | Does not touch | `worker/` (except the `matchSaved` fallback in §3.3), `packages/game-engine`, auth tables, Turnstile, `/local`, any D1 write path |
 
 This spec refines the H2 brief; it does not widen it. Where it makes a choice
@@ -82,23 +82,23 @@ Added by this spec (each is a deliberate non-goal, not an oversight):
 
 ## 2. Definitions
 
-| Term              | Definition                                                                                                                                                                                                                                                                                                       |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Match             | One `match` row: a completed account-vs-account game, identified by `match.id`. A rematch is a separate match (`match_number + 1` in the same room).                                                                                                                                                             |
-| Match id          | The opaque, URL-safe value in `match.id` (§3.1, H2-D1). Never derived from the room code by H2.                                                                                                                                                                                                                  |
-| Owner             | The signed-in complete account whose `locals.user.id` matches `match_player.user_id`. Only the owner sees `/history`; there is no user parameter (H2-D2).                                                                                                                                                       |
-| Opponent          | The `match_player` row of the other seat.                                                                                                                                                                                                                                                                       |
-| Outcome           | The owner's perspective: `win`, `loss`, or `draw`, read from `match_player.result`. Used only on `/history`.                                                                                                                                                                                                     |
-| Result            | The neutral perspective: `winner` seat or draw, read from `match.winner` / `match.result`. Used on `/match/<id>` and in OG text.                                                                                                                                                                                 |
-| Engine reason     | `match.end_reason`, one of the six `GameEndReason` values.                                                                                                                                                                                                                                                       |
-| Online reason     | `match.online_end_reason`: `abandoned`, `idle`, or `NULL`. When non-null the game ended by claim-win and the engine reason is the synthetic `resignation`; the online reason replaces it in every user-facing string (H2-D16).                                                                                    |
-| Duration          | `ended_at − started_at` in milliseconds. `started_at` is whatever H1 defined (both seats present, or first action); H2 formats, it does not interpret.                                                                                                                                                          |
-| Current streak    | Length of the run of the newest outcome kind counting back from the newest match, computed over the newest 20 rows and shown as `20+` when the run fills the window (H2-D14). Draws form their own runs.                                                                                                        |
-| Recent form       | The newest five outcomes, newest last, rendered as labelled chips.                                                                                                                                                                                                                                              |
-| Win rate          | `wins / games`, games including draws, rendered as a whole percentage.                                                                                                                                                                                                                                          |
-| Cursor            | `base64url("<ended_at>:<match_id>")` of the last row on the page. Forward-only (older games). Opaque to the client; parsed with Zod on the server (H2-D4).                                                                                                                                                       |
-| Current username  | `user.username` at read time, always what links and labels use. `match_player.username_snapshot` is only a fallback label when the account no longer has a username (H2-D3).                                                                                                                                    |
-| Deleted member    | A `match_player` row whose `user` row is missing or has `username IS NULL` (the A3 tombstone). Rendered as a neutral label with no link.                                                                                                                                                                         |
+| Term             | Definition                                                                                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Match            | One `match` row: a completed account-vs-account game, identified by `match.id`. A rematch is a separate match (`match_number + 1` in the same room).                                                                           |
+| Match id         | The opaque, URL-safe value in `match.id` (§3.1, H2-D1). Never derived from the room code by H2.                                                                                                                                |
+| Owner            | The signed-in complete account whose `locals.user.id` matches `match_player.user_id`. Only the owner sees `/history`; there is no user parameter (H2-D2).                                                                      |
+| Opponent         | The `match_player` row of the other seat.                                                                                                                                                                                      |
+| Outcome          | The owner's perspective: `win`, `loss`, or `draw`, read from `match_player.result`. Used only on `/history`.                                                                                                                   |
+| Result           | The neutral perspective: `winner` seat or draw, read from `match.winner` / `match.result`. Used on `/match/<id>` and in OG text.                                                                                               |
+| Engine reason    | `match.end_reason`, one of the six `GameEndReason` values.                                                                                                                                                                     |
+| Online reason    | `match.online_end_reason`: `abandoned`, `idle`, or `NULL`. When non-null the game ended by claim-win and the engine reason is the synthetic `resignation`; the online reason replaces it in every user-facing string (H2-D16). |
+| Duration         | `ended_at − started_at` in milliseconds. `started_at` is whatever H1 defined (both seats present, or first action); H2 formats, it does not interpret.                                                                         |
+| Current streak   | Length of the run of the newest outcome kind counting back from the newest match, computed over the newest 20 rows and shown as `20+` when the run fills the window (H2-D14). Draws form their own runs.                       |
+| Recent form      | The newest five outcomes, newest last, rendered as labelled chips.                                                                                                                                                             |
+| Win rate         | `wins / games`, games including draws, rendered as a whole percentage.                                                                                                                                                         |
+| Cursor           | `base64url("<ended_at>:<match_id>")` of the last row on the page. Forward-only (older games). Opaque to the client; parsed with Zod on the server (H2-D4).                                                                     |
+| Current username | `user.username` at read time, always what links and labels use. `match_player.username_snapshot` is only a fallback label when the account no longer has a username (H2-D3).                                                   |
+| Deleted member   | A `match_player` row whose `user` row is missing or has `username IS NULL` (the A3 tombstone). Rendered as a neutral label with no link.                                                                                       |
 
 ---
 
@@ -113,34 +113,34 @@ contract change for H2, recorded in §14, never a silent adaptation in a query.
 
 `match` (H2 never reads `replay_json`; H3 does):
 
-| Column                     | Type                 | H2 use                                                              |
-| -------------------------- | -------------------- | ------------------------------------------------------------------- |
-| `id`                       | text PK              | URL segment; opaque, matches `^[A-Za-z0-9_-]{10,40}$` (H2-D1)        |
-| `room_code`, `match_number` | text, integer       | Not rendered. Uniqueness only.                                      |
-| `mode`                     | `'invite' \| 'quick'` | Mode label (`quick` label shipped now so K1 needs no H2 change)     |
-| `rated`                    | integer 0/1          | Rated/friendly badge and filter                                     |
-| `starting_player`          | `'A' \| 'B'`         | Match page details                                                  |
-| `first_advantage`          | `'A' \| 'B' \| NULL` | Match page details; `NULL` = ended before it was decided            |
-| `first_advantage_how`      | `'placementJare' \| 'noJare' \| NULL` | "How it was decided"                               |
-| `winner`                   | `'A' \| 'B' \| NULL` | Result headline                                                     |
-| `result`                   | `'A' \| 'B' \| 'draw'` | Result; R2 may add `'aborted'` later                              |
-| `end_reason`               | `GameEndReason`      | Reason text                                                         |
-| `online_end_reason`        | `'abandoned' \| 'idle' \| NULL` | Reason text override                                     |
-| `pieces_a`, `pieces_b`     | integer              | Final on-board counts                                               |
-| `captured_a`, `captured_b` | integer              | Capture counts                                                      |
-| `action_count`             | integer              | Match page details                                                  |
-| `started_at`, `ended_at`   | integer (epoch ms)   | Date, duration, ordering                                            |
+| Column                      | Type                                  | H2 use                                                          |
+| --------------------------- | ------------------------------------- | --------------------------------------------------------------- |
+| `id`                        | text PK                               | URL segment; opaque, matches `^[A-Za-z0-9_-]{10,40}$` (H2-D1)   |
+| `room_code`, `match_number` | text, integer                         | Not rendered. Uniqueness only.                                  |
+| `mode`                      | `'invite' \| 'quick'`                 | Mode label (`quick` label shipped now so K1 needs no H2 change) |
+| `rated`                     | integer 0/1                           | Rated/friendly badge and filter                                 |
+| `starting_player`           | `'A' \| 'B'`                          | Match page details                                              |
+| `first_advantage`           | `'A' \| 'B' \| NULL`                  | Match page details; `NULL` = ended before it was decided        |
+| `first_advantage_how`       | `'placementJare' \| 'noJare' \| NULL` | "How it was decided"                                            |
+| `winner`                    | `'A' \| 'B' \| NULL`                  | Result headline                                                 |
+| `result`                    | `'A' \| 'B' \| 'draw'`                | Result; R2 may add `'aborted'` later                            |
+| `end_reason`                | `GameEndReason`                       | Reason text                                                     |
+| `online_end_reason`         | `'abandoned' \| 'idle' \| NULL`       | Reason text override                                            |
+| `pieces_a`, `pieces_b`      | integer                               | Final on-board counts                                           |
+| `captured_a`, `captured_b`  | integer                               | Capture counts                                                  |
+| `action_count`              | integer                               | Match page details                                              |
+| `started_at`, `ended_at`    | integer (epoch ms)                    | Date, duration, ordering                                        |
 
 `match_player`:
 
-| Column              | Type                        | H2 use                                       |
-| ------------------- | --------------------------- | -------------------------------------------- |
-| `match_id`          | text FK → `match.id`        | Join                                         |
+| Column              | Type                        | H2 use                                          |
+| ------------------- | --------------------------- | ----------------------------------------------- |
+| `match_id`          | text FK → `match.id`        | Join                                            |
 | `user_id`           | text                        | Owner predicate and `user` join; never rendered |
-| `seat`              | `'A' \| 'B'`                | Seat, piece colour                           |
-| `result`            | `'win' \| 'loss' \| 'draw'` | Outcome, W/L/D filter, summary               |
-| `username_snapshot` | text                        | Fallback label only (H2-D3)                  |
-| `ended_at`          | integer (epoch ms)          | Denormalised for the owner index             |
+| `seat`              | `'A' \| 'B'`                | Seat, piece colour                              |
+| `result`            | `'win' \| 'loss' \| 'draw'` | Outcome, W/L/D filter, summary                  |
+| `username_snapshot` | text                        | Fallback label only (H2-D3)                     |
+| `ended_at`          | integer (epoch ms)          | Denormalised for the owner index                |
 
 Primary key `(match_id, seat)`. Two rows per match, written in one batch, so
 H2 treats "not exactly two player rows" as a missing match.
@@ -151,12 +151,12 @@ H1's, and the H2 copy is keyed by the stored names.
 
 ### 3.2 Indexes H2 relies on
 
-| Query (§5)                     | Index required                              | Ships in |
-| ------------------------------ | ------------------------------------------- | -------- |
-| History page, summary, form    | `match_player (user_id, ended_at)`           | H1 (§7.2) |
-| Match page player rows         | PK prefix `(match_id)`                       | H1       |
-| Opponent search (Should)       | PK prefix `(match_id)` on the opponent join  | H1       |
-| Match page                     | `match` PK                                   | H1       |
+| Query (§5)                  | Index required                              | Ships in  |
+| --------------------------- | ------------------------------------------- | --------- |
+| History page, summary, form | `match_player (user_id, ended_at)`          | H1 (§7.2) |
+| Match page player rows      | PK prefix `(match_id)`                      | H1        |
+| Opponent search (Should)    | PK prefix `(match_id)` on the opponent join | H1        |
+| Match page                  | `match` PK                                  | H1        |
 
 Recommendation to H1: define the owner index as
 `(user_id, ended_at, match_id)` so the cursor tie-break needs no sorter. If
@@ -240,12 +240,12 @@ Raw D1 prepared statements on `AnyD1Database`, matching `queries/account.ts`,
 exported from `@shaxda/db`. All are read-only; the module contains no
 `INSERT`, `UPDATE`, or `DELETE`.
 
-| Function                                                      | Used by                          |
-| ------------------------------------------------------------- | -------------------------------- |
-| `readHistoryPage(db, { userId, filter, cursor, limit })`      | `/history` loader                |
-| `readHistorySummary(db, userId)`                              | `/history` loader                |
-| `readMatch(db, matchId)`                                      | `/match/[id]` loader             |
-| `resolveOpponentUserId(db, username)`                         | `/history` opponent search (Should) |
+| Function                                                 | Used by                             |
+| -------------------------------------------------------- | ----------------------------------- |
+| `readHistoryPage(db, { userId, filter, cursor, limit })` | `/history` loader                   |
+| `readHistorySummary(db, userId)`                         | `/history` loader                   |
+| `readMatch(db, matchId)`                                 | `/match/[id]` loader                |
+| `resolveOpponentUserId(db, username)`                    | `/history` opponent search (Should) |
 
 Shared helper: `toPublicProfile({ id, username, image, avatar_mode })`, moved
 out of `resolveProfile` in `queries/account.ts` so both modules build the same
@@ -350,14 +350,14 @@ index.
 
 ### 5.5 Query coverage
 
-| Query                       | Index used                                  | Rows read                     |
-| --------------------------- | ------------------------------------------- | ----------------------------- |
-| History page                | `match_player (user_id, ended_at)` range, then PK lookups on `match`, `match_player`, `user` | ≤ 21 × 4 |
-| Summary counts              | `match_player (user_id, ended_at)` range     | owner's games (see §12)       |
-| Form window                 | same index, reverse, `LIMIT 20`             | 20                            |
-| Match row                   | `match` PK                                  | 1                             |
-| Player rows                 | `match_player` PK prefix `(match_id)` + `user` PK | 2 + 2                   |
-| Opponent search             | `username_claim` PK                         | 1                             |
+| Query           | Index used                                                                                   | Rows read               |
+| --------------- | -------------------------------------------------------------------------------------------- | ----------------------- |
+| History page    | `match_player (user_id, ended_at)` range, then PK lookups on `match`, `match_player`, `user` | ≤ 21 × 4                |
+| Summary counts  | `match_player (user_id, ended_at)` range                                                     | owner's games (see §12) |
+| Form window     | same index, reverse, `LIMIT 20`                                                              | 20                      |
+| Match row       | `match` PK                                                                                   | 1                       |
+| Player rows     | `match_player` PK prefix `(match_id)` + `user` PK                                            | 2 + 2                   |
+| Opponent search | `username_claim` PK                                                                          | 1                       |
 
 Rules carried from `shaxda-v2.md` §7.2: every list query hits an index; no
 per-move rows are ever read (H2 never selects `replay_json`).
@@ -396,7 +396,7 @@ optional `noindex` prop on `PageMeta` (also useful to X1's `/admin/stats`).
 `web/src/routes/match/[id]/+page.server.ts`:
 
 1. `matchIdSchema.safeParse(params.id)`; failure → `error(404,
-   "match-not-found")` **before** any D1 call. `/match` with no id has no
+"match-not-found")` **before** any D1 call. `/match` with no id has no
    route and 404s through SvelteKit.
 2. `readMatch(db, id)`; `missing` → `error(404, "match-not-found")`.
 3. `viewerSeat`: `"A" | "B" | null`, computed by comparing `locals.user?.id`
@@ -416,7 +416,7 @@ optional `noindex` prop on `PageMeta` (also useful to X1's `/admin/stats`).
   route, never user input.
 - `web/src/lib/history/format.ts`: `formatDuration(ms, copy)`,
   `formatMatchDate(ms)` (`Intl.DateTimeFormat("so-SO", { dateStyle:
-  "medium", timeZone: "UTC" })`), `formatMatchDateTime(ms)` (adds
+"medium", timeZone: "UTC" })`), `formatMatchDateTime(ms)` (adds
   `timeStyle: "short"` and the UTC marker), `computeStreak`, `recentForm`.
   Module-level formatters, like `/account`.
 
@@ -438,37 +438,48 @@ export const firstAdvantageHowSchema = z.enum(["placementJare", "noJare"]);
 // web/src/lib/history/types.ts (derived from @shaxda/db records)
 type Participant =
   | { kind: "member"; username: string; profile: PublicProfile; href: string }
-  | { kind: "deleted"; label: string };            // label = snapshot, no link
+  | { kind: "deleted"; label: string }; // label = snapshot, no link
 
 interface HistoryRow {
   id: string;
-  href: string;                                    // /match/<id>
+  href: string; // /match/<id>
   outcome: "win" | "loss" | "draw";
   rated: boolean;
   mode: "invite" | "quick";
-  reasonLabel: string;                             // short, online reason wins
-  endedAt: number;                                 // epoch ms, for <time datetime>
-  endedAtLabel: string;                            // SSR Somali date
+  reasonLabel: string; // short, online reason wins
+  endedAt: number; // epoch ms, for <time datetime>
+  endedAtLabel: string; // SSR Somali date
   durationLabel: string;
   pieces: { mine: number; theirs: number };
   opponent: Participant;
 }
 
 interface HistorySummary {
-  games: number; wins: number; losses: number; draws: number;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
   winRatePercent: number;
-  streak: { kind: "win" | "loss" | "draw"; length: number; capped: boolean } | null;
-  form: ("win" | "loss" | "draw")[];               // ≤ 5, newest last
+  streak: {
+    kind: "win" | "loss" | "draw";
+    length: number;
+    capped: boolean;
+  } | null;
+  form: ("win" | "loss" | "draw")[]; // ≤ 5, newest last
 }
 
 interface MatchPageData {
   id: string;
-  players: Record<"A" | "B", Participant & { result: "win" | "loss" | "draw"; isViewer: boolean }>;
+  players: Record<
+    "A" | "B",
+    Participant & { result: "win" | "loss" | "draw"; isViewer: boolean }
+  >;
   result: { kind: "win"; winner: "A" | "B" } | { kind: "draw" };
-  reasonText: string;                              // full sentence, online reason wins
+  reasonText: string; // full sentence, online reason wins
   rated: boolean;
   mode: "invite" | "quick";
-  playedAt: number; playedAtLabel: string;
+  playedAt: number;
+  playedAtLabel: string;
   durationLabel: string;
   startingPlayer: "A" | "B";
   firstAdvantage: { player: "A" | "B"; how: "placementJare" | "noJare" } | null;
@@ -572,8 +583,8 @@ Test ids: `match-page`, `match-player-A`, `match-player-B`, `match-headline`,
 
 - `ShareProfile.svelte` is generalised into
   `web/src/lib/components/ShareLink.svelte` with props `{ url, title, text,
-  label, copy: { statusLabel, shared, copied, failed }, variant, class,
-  testId }` and the same Web Share → clipboard → failed behaviour and
+label, copy: { statusLabel, shared, copied, failed }, variant, class,
+testId }` and the same Web Share → clipboard → failed behaviour and
   `AbortError` handling. `ShareProfile` becomes a thin wrapper that keeps its
   current props and tests (H2-D8).
 - Match share payload: `url = absoluteUrl(matchPath(id))`, `title`/`text` from
@@ -612,8 +623,8 @@ navigation to an SSR page.
   action with `href` as a `ButtonLink` (same variants), keeping `bind:element`
   and initial focus on the first action, which stays a button.
 - `OnlineTabletop` appends `{ id: "view-match", label:
-  copy.result.viewMatch, href: "/match/<id>", variant: "outline", testId:
-  "online-view-match" }` to `resultActions` whenever `savedMatchId` is
+copy.result.viewMatch, href: "/match/<id>", variant: "outline", testId:
+"online-view-match" }` to `resultActions` whenever `savedMatchId` is
   non-null. It is never the primary action; rematch keeps that place. Action
   counts become 3 (`rematch`, `newMatch`, `viewMatch`) or 4 in the
   `opponentRequested` case, which the overlay's odd/even grid already handles.
@@ -634,84 +645,84 @@ for "history", "rated", "friendly", "quick match", and "replay" are open in
 
 `siteContent.so.pages.history`:
 
-| Key                           | Draft                                                                                                                   |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `path`                        | `/history`                                                                                                              |
-| `title`                       | Ciyaarahayga                                                                                                            |
-| `description`                 | Liiska ciyaaraha aad akoonkaaga ku ciyaartay.                                                                           |
-| `eyebrow`                     | Taariikhda ciyaaraha                                                                                                    |
-| `summary.games`               | Ciyaaro                                                                                                                 |
-| `summary.wins` / `losses` / `draws` | Guul / Guuldarro / Barbaro                                                                                        |
-| `summary.winRate`             | Heerka guusha                                                                                                           |
-| `summary.streak`              | Isku xigxig                                                                                                             |
-| `summary.form`                | Natiijooyinkii u dambeeyay                                                                                              |
-| `streak.win`                  | {n} guul oo isku xigxiga                                                                                                |
-| `streak.loss`                 | {n} guuldarro oo isku xigxiga                                                                                           |
-| `streak.draw`                 | {n} barbaro oo isku xigxiga                                                                                             |
-| `streak.capped`               | {n}+                                                                                                                    |
-| `form.marks.win` / `loss` / `draw` | G / K / B (Guul / Khasaare / Barbaro; open question 2)                                                             |
-| `filters.label`               | Shaandhee ciyaaraha                                                                                                     |
-| `filters.all`                 | Dhammaan                                                                                                                |
-| `filters.wins` / `losses` / `draws` | Guulaha / Guuldarrooyinka / Barbarooyinka                                                                         |
-| `filters.rated` / `friendly`  | Tartan / Saaxiibtinimo                                                                                                  |
-| `row.outcome.win` / `loss` / `draw` | Guul / Guuldarro / Barbaro                                                                                        |
-| `row.rated` / `row.friendly`  | Tartan / Saaxiibtinimo                                                                                                  |
-| `row.pieces`                  | Dhagaxa haray                                                                                                           |
-| `row.duration`                | Muddada                                                                                                                 |
-| `row.opponent`                | Ka soo horjeeda                                                                                                         |
-| `row.view`                    | Eeg ciyaarta                                                                                                            |
-| `endReasons.opponentBelowThree` | Wax ka yar saddex dhagax                                                                                              |
-| `endReasons.opponentCapturedAll` | Dhammaan waa la qabtay                                                                                               |
-| `endReasons.resignation`      | Is dhiibid                                                                                                              |
-| `endReasons.drawTermination`  | Barbaro                                                                                                                 |
-| `endReasons.bothBlocked`      | Labaduba xanniban                                                                                                       |
-| `endReasons.forcedJareSpaceMaking` | Jare qasab ah                                                                                                      |
-| `endReasons.abandoned`        | Ka bixid                                                                                                                |
-| `endReasons.idle`             | Hakad                                                                                                                   |
-| `older`                       | Ciyaaro ka hor                                                                                                          |
-| `empty.title`                 | Weli ciyaar lama kaydin                                                                                                 |
-| `empty.body`                  | Ciyaaraha aad la ciyaarto akoon kale ayaa halkan ku kaydsama. Ciyaaraha martida lama kaydiyo.                           |
-| `empty.cta`                   | Ciyaar marti ah                                                                                                         |
-| `emptyFiltered`               | Shaandhadan ciyaar kuma jirto.                                                                                          |
-| `durationUnits.hours` / `minutes` / `seconds` | s / daq / il                                                                                            |
+| Key                                           | Draft                                                                                         |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `path`                                        | `/history`                                                                                    |
+| `title`                                       | Ciyaarahayga                                                                                  |
+| `description`                                 | Liiska ciyaaraha aad akoonkaaga ku ciyaartay.                                                 |
+| `eyebrow`                                     | Taariikhda ciyaaraha                                                                          |
+| `summary.games`                               | Ciyaaro                                                                                       |
+| `summary.wins` / `losses` / `draws`           | Guul / Guuldarro / Barbaro                                                                    |
+| `summary.winRate`                             | Heerka guusha                                                                                 |
+| `summary.streak`                              | Isku xigxig                                                                                   |
+| `summary.form`                                | Natiijooyinkii u dambeeyay                                                                    |
+| `streak.win`                                  | {n} guul oo isku xigxiga                                                                      |
+| `streak.loss`                                 | {n} guuldarro oo isku xigxiga                                                                 |
+| `streak.draw`                                 | {n} barbaro oo isku xigxiga                                                                   |
+| `streak.capped`                               | {n}+                                                                                          |
+| `form.marks.win` / `loss` / `draw`            | G / K / B (Guul / Khasaare / Barbaro; open question 2)                                        |
+| `filters.label`                               | Shaandhee ciyaaraha                                                                           |
+| `filters.all`                                 | Dhammaan                                                                                      |
+| `filters.wins` / `losses` / `draws`           | Guulaha / Guuldarrooyinka / Barbarooyinka                                                     |
+| `filters.rated` / `friendly`                  | Tartan / Saaxiibtinimo                                                                        |
+| `row.outcome.win` / `loss` / `draw`           | Guul / Guuldarro / Barbaro                                                                    |
+| `row.rated` / `row.friendly`                  | Tartan / Saaxiibtinimo                                                                        |
+| `row.pieces`                                  | Dhagaxa haray                                                                                 |
+| `row.duration`                                | Muddada                                                                                       |
+| `row.opponent`                                | Ka soo horjeeda                                                                               |
+| `row.view`                                    | Eeg ciyaarta                                                                                  |
+| `endReasons.opponentBelowThree`               | Wax ka yar saddex dhagax                                                                      |
+| `endReasons.opponentCapturedAll`              | Dhammaan waa la qabtay                                                                        |
+| `endReasons.resignation`                      | Is dhiibid                                                                                    |
+| `endReasons.drawTermination`                  | Barbaro                                                                                       |
+| `endReasons.bothBlocked`                      | Labaduba xanniban                                                                             |
+| `endReasons.forcedJareSpaceMaking`            | Jare qasab ah                                                                                 |
+| `endReasons.abandoned`                        | Ka bixid                                                                                      |
+| `endReasons.idle`                             | Hakad                                                                                         |
+| `older`                                       | Ciyaaro ka hor                                                                                |
+| `empty.title`                                 | Weli ciyaar lama kaydin                                                                       |
+| `empty.body`                                  | Ciyaaraha aad la ciyaarto akoon kale ayaa halkan ku kaydsama. Ciyaaraha martida lama kaydiyo. |
+| `empty.cta`                                   | Ciyaar marti ah                                                                               |
+| `emptyFiltered`                               | Shaandhadan ciyaar kuma jirto.                                                                |
+| `durationUnits.hours` / `minutes` / `seconds` | s / daq / il                                                                                  |
 
 `siteContent.so.pages.match`:
 
-| Key                             | Draft                                                                                              |
-| ------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `path`                          | `/match/[id]`                                                                                      |
-| `title`                         | Ciyaar Shaxda ah                                                                                   |
-| `pageTitle`                     | @{a} iyo @{b}                                                                                      |
-| `pageDescription.win`           | @{winner} ayaa ka guuleystay @{loser} ciyaar Shaxda ah.                                            |
-| `pageDescription.draw`          | @{a} iyo @{b} waxay ku kala tageen barbaro.                                                        |
-| `headline.win`                  | @{winner} ayaa guuleystay                                                                          |
-| `headline.draw`                 | Barbaro                                                                                            |
-| `playerResult.win` / `loss` / `draw` | Guuleystay / Khasaaray / Barbaro                                                              |
-| `youLabel`                      | Adiga                                                                                              |
-| `onlineEndReasons.abandoned`    | @{username} wuu ka baxay ciyaarta.                                                                 |
-| `onlineEndReasons.idle`         | @{username} wuu hakaday, wareeggiisiina wuu dhaafay.                                               |
-| `details.heading`               | Faahfaahinta ciyaarta                                                                              |
-| `details.playedAt`              | Taariikhda                                                                                         |
-| `details.utc`                   | UTC                                                                                                |
-| `details.duration`              | Muddada                                                                                            |
-| `details.mode`                  | Nooca                                                                                              |
-| `details.startingPlayer`        | Bilaabay                                                                                           |
-| `details.firstAdvantage`        | Horrayn                                                                                            |
-| `details.firstAdvantageHow.placementJare` | jare intii dhigista                                                                      |
-| `details.firstAdvantageHow.noJare` | jare la'aan, ciyaaryahanka labaad                                                             |
-| `details.undecided`             | Lama go'aamin                                                                                      |
-| `details.pieces`                | Dhagaxa haray                                                                                      |
-| `details.captures`              | Qabashooyin                                                                                        |
-| `details.actions`               | Tallaabooyin                                                                                       |
-| `modes.invite` / `modes.quick`  | Casuumaad / Kulan degdeg ah                                                                        |
-| `rated` / `friendly`            | Tartan / Saaxiibtinimo                                                                             |
-| `deletedMember`                 | Xubin la tirtiray                                                                                  |
-| `profilesHeading`               | Bogagga ciyaaryahannada                                                                            |
-| `share.action`                  | La wadaag ciyaarta                                                                                 |
-| `share.statusLabel`             | Xaaladda wadaagista                                                                                |
-| `share.shareTitle`              | @{a} iyo @{b} — Shaxda                                                                             |
-| `share.shareText`               | Eeg ciyaartan Shaxda ah.                                                                           |
-| `share.shared` / `copied` / `failed` | Ciyaarta waa la wadaagay. / Xiriiriyaha ciyaarta waa la koobiyeeyay. / Wadaagiddu ma shaqayn. Xiriiriyaha gacanta ku koobi. |
+| Key                                       | Draft                                                                                                                       |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `path`                                    | `/match/[id]`                                                                                                               |
+| `title`                                   | Ciyaar Shaxda ah                                                                                                            |
+| `pageTitle`                               | @{a} iyo @{b}                                                                                                               |
+| `pageDescription.win`                     | @{winner} ayaa ka guuleystay @{loser} ciyaar Shaxda ah.                                                                     |
+| `pageDescription.draw`                    | @{a} iyo @{b} waxay ku kala tageen barbaro.                                                                                 |
+| `headline.win`                            | @{winner} ayaa guuleystay                                                                                                   |
+| `headline.draw`                           | Barbaro                                                                                                                     |
+| `playerResult.win` / `loss` / `draw`      | Guuleystay / Khasaaray / Barbaro                                                                                            |
+| `youLabel`                                | Adiga                                                                                                                       |
+| `onlineEndReasons.abandoned`              | @{username} wuu ka baxay ciyaarta.                                                                                          |
+| `onlineEndReasons.idle`                   | @{username} wuu hakaday, wareeggiisiina wuu dhaafay.                                                                        |
+| `details.heading`                         | Faahfaahinta ciyaarta                                                                                                       |
+| `details.playedAt`                        | Taariikhda                                                                                                                  |
+| `details.utc`                             | UTC                                                                                                                         |
+| `details.duration`                        | Muddada                                                                                                                     |
+| `details.mode`                            | Nooca                                                                                                                       |
+| `details.startingPlayer`                  | Bilaabay                                                                                                                    |
+| `details.firstAdvantage`                  | Horrayn                                                                                                                     |
+| `details.firstAdvantageHow.placementJare` | jare intii dhigista                                                                                                         |
+| `details.firstAdvantageHow.noJare`        | jare la'aan, ciyaaryahanka labaad                                                                                           |
+| `details.undecided`                       | Lama go'aamin                                                                                                               |
+| `details.pieces`                          | Dhagaxa haray                                                                                                               |
+| `details.captures`                        | Qabashooyin                                                                                                                 |
+| `details.actions`                         | Tallaabooyin                                                                                                                |
+| `modes.invite` / `modes.quick`            | Casuumaad / Kulan degdeg ah                                                                                                 |
+| `rated` / `friendly`                      | Tartan / Saaxiibtinimo                                                                                                      |
+| `deletedMember`                           | Xubin la tirtiray                                                                                                           |
+| `profilesHeading`                         | Bogagga ciyaaryahannada                                                                                                     |
+| `share.action`                            | La wadaag ciyaarta                                                                                                          |
+| `share.statusLabel`                       | Xaaladda wadaagista                                                                                                         |
+| `share.shareTitle`                        | @{a} iyo @{b} — Shaxda                                                                                                      |
+| `share.shareText`                         | Eeg ciyaartan Shaxda ah.                                                                                                    |
+| `share.shared` / `copied` / `failed`      | Ciyaarta waa la wadaagay. / Xiriiriyaha ciyaarta waa la koobiyeeyay. / Wadaagiddu ma shaqayn. Xiriiriyaha gacanta ku koobi. |
 
 The engine reason on the match page reuses
 `messages.so.localGame.result.reasons[endReason]` unchanged; only the online
@@ -737,12 +748,12 @@ override sentences are new.
 Nothing new: no secrets, no bindings, no cron, no `vars`. H2 reads through
 the existing `DB` binding of the web Worker in every environment.
 
-| Item                 | dev                        | e2e                                                | preview / production                    |
-| -------------------- | -------------------------- | -------------------------------------------------- | --------------------------------------- |
-| Ledger tables        | H1 migration via Miniflare | applied by the e2e harness like `0000`             | applied by the H1 rollout, before H2 deploys |
-| Optional H2 index migration (§3.2) | Miniflare, applied by tests | e2e harness                              | `wrangler d1 migrations apply` (operational step) |
-| Seeded history rows  | none                       | `tests/e2e/fixtures/match.ts` (§13)                | none                                    |
-| `PUBLIC_SITE_ORIGIN` | existing                   | existing                                           | existing; match share URLs derive from it |
+| Item                               | dev                         | e2e                                    | preview / production                              |
+| ---------------------------------- | --------------------------- | -------------------------------------- | ------------------------------------------------- |
+| Ledger tables                      | H1 migration via Miniflare  | applied by the e2e harness like `0000` | applied by the H1 rollout, before H2 deploys      |
+| Optional H2 index migration (§3.2) | Miniflare, applied by tests | e2e harness                            | `wrangler d1 migrations apply` (operational step) |
+| Seeded history rows                | none                        | `tests/e2e/fixtures/match.ts` (§13)    | none                                              |
+| `PUBLIC_SITE_ORIGIN`               | existing                    | existing                               | existing; match share URLs derive from it         |
 
 `web/.env.production` and `.dev.vars` are untouched; the e2e harness keeps
 `pnpm check:e2e-isolation` passing.
@@ -755,14 +766,14 @@ At the `shaxda-v2.md` §15 target of ~1,500 DAU / ~10,000 MAU, assuming one
 `/history` view per active account per day and five match-page views per
 completed game:
 
-| Item                              | Per day                                                | Free tier |
-| --------------------------------- | ------------------------------------------------------ | --------- |
-| D1 rows read, `/history`          | ~1,500 × (owner's games + 20 + 84)                     | 5M        |
-| D1 rows read, `/match/<id>`       | ~5 × games/day × 6                                     | 5M        |
-| D1 rows written                   | 0                                                      | 100k      |
-| Storage                           | 0 new tables                                           | 5 GB      |
-| Worker requests                   | +1 SSR request per page view (plus the session read that `hooks.server.ts` already performs) | 100k/day |
-| Durable Object time               | none                                                   | —         |
+| Item                        | Per day                                                                                      | Free tier |
+| --------------------------- | -------------------------------------------------------------------------------------------- | --------- |
+| D1 rows read, `/history`    | ~1,500 × (owner's games + 20 + 84)                                                           | 5M        |
+| D1 rows read, `/match/<id>` | ~5 × games/day × 6                                                                           | 5M        |
+| D1 rows written             | 0                                                                                            | 100k      |
+| Storage                     | 0 new tables                                                                                 | 5 GB      |
+| Worker requests             | +1 SSR request per page view (plus the session read that `hooks.server.ts` already performs) | 100k/day  |
+| Durable Object time         | none                                                                                         | —         |
 
 The summary count is the one term that grows with a player's record: an
 account with 2,000 games reads 2,000 rows per `/history` load. R4 introduces
@@ -840,7 +851,7 @@ Vitest Workers pool (`packages/db`, Miniflare D1, real migrations):
 Playwright (existing harness):
 
 - New fixture `tests/e2e/fixtures/match.ts` `seedMatches(owner, opponent,
-  spec[])` writing `match` + `match_player` rows with `wrangler d1 execute`
+spec[])` writing `match` + `match_player` rows with `wrangler d1 execute`
   exactly like `seedAccount` (same retry on `SQLITE_BUSY`), with a `cleanup()`.
 - `/history` signed out redirects to `/login?returnTo=/history`.
 - Signed in with 25 seeded games: summary numbers, 20 rows, older link → 5
@@ -865,25 +876,25 @@ lint, typecheck, test, `test:worker`, build).
 
 ## 14. Decisions
 
-| ID     | Decision                                                                                                                                              | Rationale                                                                                                                                                                                                                                              |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ID     | Decision                                                                                                                                                                                                                     | Rationale                                                                                                                                                                                               |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | H2-D1  | Match ids are opaque, validated by `^[A-Za-z0-9_-]{10,40}$` before any query, and never derived from `room_code`/`match_number`. Recommendation to H1: 16 characters from `ROOM_CODE_ALPHABET`, minted in the DO (~80 bits). | A URL should not reveal the room code (invite links are shared and rooms outlive games), and public pages should not be enumerable. The tolerant regex means H2 does not care which id format H1 picks. |
-| H2-D2  | `/history` is keyed on the session only; no user/username parameter exists.                                                                          | `AGENTS.md`: never accept a user id from the browser. D8: history is owner-only.                                                                                                                                                                       |
-| H2-D3  | Opponent labels and links use the current `user.username` joined at read time; `username_snapshot` is only the label for deleted members.             | Alias-safe links by construction; a renamed opponent is still findable; the snapshot stays useful for A3 tombstones.                                                                                                                                   |
-| H2-D4  | Cursor pagination, forward-only, 20 rows, cursor = `base64url("<ended_at>:<match_id>")`, row-value comparison in SQL.                                 | Stable under inserts (new games only get newer `ended_at`), index-friendly, no offset scans. A row persisted late by an H1 retry appears on reload; accepted.                                                                                          |
-| H2-D5  | The summary header ignores the active filter.                                                                                                        | The header is the account's record; filters narrow the list. Filter-scoped counts would double the aggregate reads for little value.                                                                                                                    |
-| H2-D6  | Match pages set no explicit cache header; no edge caching in H2.                                                                                     | The response varies by session (top bar, `(Adiga)`), so shared caching needs work R3 will do properly. Six rows per view is cheap (§12).                                                                                                               |
-| H2-D7  | Dates are formatted server-side in UTC with `so-SO`, wrapped in `<time datetime>`; viewer-zone formatting is a Should.                                | Same formatter `/account` already ships; SSR cannot know the viewer's zone; the machine-readable timestamp makes the enhancement trivial.                                                                                                              |
-| H2-D8  | `ShareProfile` is generalised into `ShareLink`; `ShareProfile` stays as a wrapper.                                                                   | The brief asks to reuse the share component; a wrapper keeps the profile tests and call sites untouched.                                                                                                                                               |
-| H2-D9  | The overlay "view match" action is an in-app link, always secondary.                                                                                 | Rematch stays the primary flow; a new tab is hostile inside the installed PWA; the seat remains reclaimable through `/online?room=`.                                                                                                                    |
-| H2-D10 | H2 renders no replay control, only a documented insertion point.                                                                                     | A disabled "coming soon" button is dead UI; H3 lands the control with the viewer.                                                                                                                                                                      |
-| H2-D11 | H2 owns the `/legal` disclosure of stored, public matches.                                                                                            | H1 stores rows but exposes nothing; H2 is the first milestone that makes them visible.                                                                                                                                                                 |
-| H2-D12 | H2 adds no D1 write path and no migration unless a §3.2 index is missing.                                                                            | Keeps the milestone reviewable and the ledger's single writer in the DO (`shaxda-v2.md` §6.1).                                                                                                                                                         |
-| H2-D13 | `first_advantage = NULL` renders "not decided"; `first_advantage_how` uses neutral labels.                                                            | Games can end during placement; the page must not invent a value.                                                                                                                                                                                      |
-| H2-D14 | Streak and form come from the newest 20 rows; a full-window run shows `20+`.                                                                         | Bounded reads; a longer exact streak is a vanity number R4 can compute from aggregates.                                                                                                                                                                |
-| H2-D15 | Invalid `filter`/`after` values fall back to defaults instead of 400.                                                                                 | User-facing page reached by links; a stale or mistyped URL should still show the history.                                                                                                                                                              |
-| H2-D16 | When `online_end_reason` is set, its sentence replaces the engine reason everywhere.                                                                  | Claim-win is stored as a synthetic `resignation`; showing "a player resigned" would be false.                                                                                                                                                          |
-| H2-D17 | `/match/<id>` ignores all query parameters and reserves `?a=` for H3.                                                                                 | H3 deep links must not 404 on a deployment that is between H2 and H3.                                                                                                                                                                                  |
+| H2-D2  | `/history` is keyed on the session only; no user/username parameter exists.                                                                                                                                                  | `AGENTS.md`: never accept a user id from the browser. D8: history is owner-only.                                                                                                                        |
+| H2-D3  | Opponent labels and links use the current `user.username` joined at read time; `username_snapshot` is only the label for deleted members.                                                                                    | Alias-safe links by construction; a renamed opponent is still findable; the snapshot stays useful for A3 tombstones.                                                                                    |
+| H2-D4  | Cursor pagination, forward-only, 20 rows, cursor = `base64url("<ended_at>:<match_id>")`, row-value comparison in SQL.                                                                                                        | Stable under inserts (new games only get newer `ended_at`), index-friendly, no offset scans. A row persisted late by an H1 retry appears on reload; accepted.                                           |
+| H2-D5  | The summary header ignores the active filter.                                                                                                                                                                                | The header is the account's record; filters narrow the list. Filter-scoped counts would double the aggregate reads for little value.                                                                    |
+| H2-D6  | Match pages set no explicit cache header; no edge caching in H2.                                                                                                                                                             | The response varies by session (top bar, `(Adiga)`), so shared caching needs work R3 will do properly. Six rows per view is cheap (§12).                                                                |
+| H2-D7  | Dates are formatted server-side in UTC with `so-SO`, wrapped in `<time datetime>`; viewer-zone formatting is a Should.                                                                                                       | Same formatter `/account` already ships; SSR cannot know the viewer's zone; the machine-readable timestamp makes the enhancement trivial.                                                               |
+| H2-D8  | `ShareProfile` is generalised into `ShareLink`; `ShareProfile` stays as a wrapper.                                                                                                                                           | The brief asks to reuse the share component; a wrapper keeps the profile tests and call sites untouched.                                                                                                |
+| H2-D9  | The overlay "view match" action is an in-app link, always secondary.                                                                                                                                                         | Rematch stays the primary flow; a new tab is hostile inside the installed PWA; the seat remains reclaimable through `/online?room=`.                                                                    |
+| H2-D10 | H2 renders no replay control, only a documented insertion point.                                                                                                                                                             | A disabled "coming soon" button is dead UI; H3 lands the control with the viewer.                                                                                                                       |
+| H2-D11 | H2 owns the `/legal` disclosure of stored, public matches.                                                                                                                                                                   | H1 stores rows but exposes nothing; H2 is the first milestone that makes them visible.                                                                                                                  |
+| H2-D12 | H2 adds no D1 write path and no migration unless a §3.2 index is missing.                                                                                                                                                    | Keeps the milestone reviewable and the ledger's single writer in the DO (`shaxda-v2.md` §6.1).                                                                                                          |
+| H2-D13 | `first_advantage = NULL` renders "not decided"; `first_advantage_how` uses neutral labels.                                                                                                                                   | Games can end during placement; the page must not invent a value.                                                                                                                                       |
+| H2-D14 | Streak and form come from the newest 20 rows; a full-window run shows `20+`.                                                                                                                                                 | Bounded reads; a longer exact streak is a vanity number R4 can compute from aggregates.                                                                                                                 |
+| H2-D15 | Invalid `filter`/`after` values fall back to defaults instead of 400.                                                                                                                                                        | User-facing page reached by links; a stale or mistyped URL should still show the history.                                                                                                               |
+| H2-D16 | When `online_end_reason` is set, its sentence replaces the engine reason everywhere.                                                                                                                                         | Claim-win is stored as a synthetic `resignation`; showing "a player resigned" would be false.                                                                                                           |
+| H2-D17 | `/match/<id>` ignores all query parameters and reserves `?a=` for H3.                                                                                                                                                        | H3 deep links must not 404 on a deployment that is between H2 and H3.                                                                                                                                   |
 
 ---
 

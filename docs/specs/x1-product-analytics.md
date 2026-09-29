@@ -1,14 +1,14 @@
 # X1 — Product Analytics (Spec)
 
-| Field         | Value                                                      |
-| ------------- | ---------------------------------------------------------- |
-| Status        | Draft, not started                                         |
-| Brief         | `docs/shaxda-v2.md` §8 (X1), §7.2 (tables), §16 (D10)      |
-| Workspace     | `x1-product-analytics`                                     |
-| Depends on    | Nothing. Runs in parallel with H1.                         |
-| Unblocks      | S1/S2/S3 (numbers to sell against), every V2 success metric |
-| Touches       | `packages/shared`, `packages/db`, `packages/i18n`, `web/`  |
-| Does not touch | `worker/`, `packages/game-engine`, Turnstile, auth tables |
+| Field          | Value                                                       |
+| -------------- | ----------------------------------------------------------- |
+| Status         | Draft, not started                                          |
+| Brief          | `docs/shaxda-v2.md` §8 (X1), §7.2 (tables), §16 (D10)       |
+| Workspace      | `x1-product-analytics`                                      |
+| Depends on     | Nothing. Runs in parallel with H1.                          |
+| Unblocks       | S1/S2/S3 (numbers to sell against), every V2 success metric |
+| Touches        | `packages/shared`, `packages/db`, `packages/i18n`, `web/`   |
+| Does not touch | `worker/`, `packages/game-engine`, Turnstile, auth tables   |
 
 This spec refines the X1 brief; it does not widen it. Where it makes a choice
 the brief left open, the choice is recorded in §15 with its rationale. Read
@@ -71,19 +71,19 @@ Added by this spec (each is a deliberate non-goal, not an oversight):
 
 ## 2. Definitions
 
-| Term          | Definition                                                                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Day           | UTC calendar day as `YYYY-MM-DD`. The server assigns the day from its own clock; the client never sends one.                                     |
-| Anon id       | `base64url(HMAC-SHA-256(key = ANALYTICS_SALT, msg = "<kind>:<rawId>"))`. Kind is `guest` or `account`. 43 characters.                             |
-| Kind          | `account` when the beacon request carries a valid Better Auth session (complete or incomplete account); otherwise `guest`.                       |
-| Active user   | An anon id with an `active_user_day` row for that day.                                                                                            |
-| DAU(d)        | `COUNT(*) FROM active_user_day WHERE day = d`.                                                                                                    |
-| WAU(d)        | `COUNT(DISTINCT anon_id)` over `day BETWEEN d-6 AND d`.                                                                                           |
-| MAU(d)        | `COUNT(DISTINCT anon_id)` over `day BETWEEN d-29 AND d`.                                                                                          |
-| New guest(d)  | Guest anon ids active on `d` with no `active_user_day` row before `d` (within the 400-day window).                                                |
-| Counter event | A row in `event_daily` that is incremented by 1 per occurrence.                                                                                   |
-| Gauge event   | A row in `event_daily` whose `count` is a value computed for that day and replaced on each rollup.                                                |
-| Reporter      | For online events, the one client designated to send the beacon so a two-player game is counted once (§5.2).                                      |
+| Term          | Definition                                                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Day           | UTC calendar day as `YYYY-MM-DD`. The server assigns the day from its own clock; the client never sends one.               |
+| Anon id       | `base64url(HMAC-SHA-256(key = ANALYTICS_SALT, msg = "<kind>:<rawId>"))`. Kind is `guest` or `account`. 43 characters.      |
+| Kind          | `account` when the beacon request carries a valid Better Auth session (complete or incomplete account); otherwise `guest`. |
+| Active user   | An anon id with an `active_user_day` row for that day.                                                                     |
+| DAU(d)        | `COUNT(*) FROM active_user_day WHERE day = d`.                                                                             |
+| WAU(d)        | `COUNT(DISTINCT anon_id)` over `day BETWEEN d-6 AND d`.                                                                    |
+| MAU(d)        | `COUNT(DISTINCT anon_id)` over `day BETWEEN d-29 AND d`.                                                                   |
+| New guest(d)  | Guest anon ids active on `d` with no `active_user_day` row before `d` (within the 400-day window).                         |
+| Counter event | A row in `event_daily` that is incremented by 1 per occurrence.                                                            |
+| Gauge event   | A row in `event_daily` whose `count` is a value computed for that day and replaced on each rollup.                         |
+| Reporter      | For online events, the one client designated to send the beacon so a two-player game is counted once (§5.2).               |
 
 Counting caveats the founder must know when quoting numbers:
 
@@ -160,15 +160,15 @@ CREATE TABLE `event_daily` (
 
 Query coverage (every query in §10 and §9 hits one of these):
 
-| Query                                   | Index used                        |
-| --------------------------------------- | --------------------------------- |
-| DAU for a day, by kind                  | PK prefix `(day)`                 |
-| WAU/MAU distinct over a day range       | PK prefix `(day)` range scan      |
+| Query                                           | Index used                     |
+| ----------------------------------------------- | ------------------------------ |
+| DAU for a day, by kind                          | PK prefix `(day)`              |
+| WAU/MAU distinct over a day range               | PK prefix `(day)` range scan   |
 | New devices on a day (`NOT EXISTS` earlier row) | `active_user_day_anon_day_idx` |
-| Cohort lookups by anon id               | `active_user_day_anon_day_idx`    |
-| Trend rows for N days × M events        | PK prefix `(day)` range scan      |
-| Increment / gauge upsert                | PK                                |
-| Prune `day < ?`                         | PK prefix `(day)` range delete    |
+| Cohort lookups by anon id                       | `active_user_day_anon_day_idx` |
+| Trend rows for N days × M events                | PK prefix `(day)` range scan   |
+| Increment / gauge upsert                        | PK                             |
+| Prune `day < ?`                                 | PK prefix `(day)` range delete |
 
 Rules carried from `shaxda-v2.md` §7.2: no per-move or per-game rows; the game
 Worker never touches these tables; migrations stay hand-written.
@@ -193,12 +193,21 @@ export const clientCounterEvents = [
 export const serverCounterEvents = ["account_registered"] as const;
 
 export const gaugeEvents = [
-  "dau", "dau_guest", "dau_account",
-  "wau", "wau_guest", "wau_account",
-  "mau", "mau_guest", "mau_account",
-  "new_guest", "new_account",
+  "dau",
+  "dau_guest",
+  "dau_account",
+  "wau",
+  "wau_guest",
+  "wau_account",
+  "mau",
+  "mau_guest",
+  "mau_account",
+  "new_guest",
+  "new_account",
   // Should (§10.4): keyed by cohort day, not by the day they were computed.
-  "cohort_accounts", "retained_d7", "retained_d30",
+  "cohort_accounts",
+  "retained_d7",
+  "retained_d30",
 ] as const;
 ```
 
@@ -212,10 +221,10 @@ gets `400`.
 
 ### 5.1 Local (`/local`, `web/src/lib/game/localGame.svelte.ts`)
 
-| Event             | Fires when                                                                                      | Once-only guarantee                                                           |
-| ----------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `local_started`   | `apply()` succeeds and the *previous* state was the initial state (empty board, placement phase) | The state stops being initial after the first action; a resumed game never re-fires |
-| `local_completed` | `apply()` transitions `phase` to `gameOver`                                                     | `gameOver` is terminal and the saved game is cleared on it                    |
+| Event             | Fires when                                                                                       | Once-only guarantee                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `local_started`   | `apply()` succeeds and the _previous_ state was the initial state (empty board, placement phase) | The state stops being initial after the first action; a resumed game never re-fires |
+| `local_completed` | `apply()` transitions `phase` to `gameOver`                                                      | `gameOver` is terminal and the saved game is cleared on it                          |
 
 Helper `isInitialState(state)` goes in `packages/game-engine` only if a pure
 check does not already exist there; otherwise compare against
@@ -227,11 +236,11 @@ analytics concepts to the engine.
 Two clients see every online game. Exactly one is the **reporter** for each
 event, chosen from state alone so no client has to wait for another message:
 
-| Event                     | Fires when                                                                                              | Reporter                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `room_created`            | `OnlineGameClient.createRoom()` resolves with a room code                                               | The creating client                                                                             |
-| `room_joined`             | First `joined` message for a room this page did not create                                              | The joining client; deduped per room code for the page lifetime                                 |
-| `online_invite_started`   | `receiveState()` applies exactly one action (pending or inferred) and the previous state was initial     | The client whose `mySlot === state.startingPlayer` (it just moved, so it is present)             |
+| Event                     | Fires when                                                                                              | Reporter                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `room_created`            | `OnlineGameClient.createRoom()` resolves with a room code                                               | The creating client                                                                                    |
+| `room_joined`             | First `joined` message for a room this page did not create                                              | The joining client; deduped per room code for the page lifetime                                        |
+| `online_invite_started`   | `receiveState()` applies exactly one action (pending or inferred) and the previous state was initial    | The client whose `mySlot === state.startingPlayer` (it just moved, so it is present)                   |
 | `online_invite_completed` | `receiveState()` observes `phase` becoming `gameOver` by any path (action, inferred action, state sync) | The client whose `mySlot === state.winner`; on a draw (`winner === null`) the starting player's client |
 
 Why these reporters: the starting player is present at the first action by
@@ -256,15 +265,15 @@ spy.
 
 ### 5.3 Shell
 
-| Event           | Fires when                                                     | Where                                                       |
-| --------------- | -------------------------------------------------------------- | ----------------------------------------------------------- |
-| `pwa_installed` | `appinstalled` window event                                    | `web/src/lib/pwa/pwa.svelte.ts` `handleAppInstalled`, via an injected `report` |
+| Event           | Fires when                  | Where                                                                          |
+| --------------- | --------------------------- | ------------------------------------------------------------------------------ |
+| `pwa_installed` | `appinstalled` window event | `web/src/lib/pwa/pwa.svelte.ts` `handleAppInstalled`, via an injected `report` |
 
 ### 5.4 Server-side
 
-| Event                | Fires when                                                  | Where                                                                                   |
-| -------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `account_registered` | `claimUsername()` returns `{ kind: "claimed" }`             | `web/src/routes/register/+page.server.ts` `confirm` action, `platform.context.waitUntil(incrementDailyEvent(...))`, awaited when no context |
+| Event                | Fires when                                      | Where                                                                                                                                       |
+| -------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `account_registered` | `claimUsername()` returns `{ kind: "claimed" }` | `web/src/routes/register/+page.server.ts` `confirm` action, `platform.context.waitUntil(incrementDailyEvent(...))`, awaited when no context |
 
 Once per account by construction: the initial username claim succeeds exactly
 once. Failure outcomes (`taken`, `alreadyComplete`, `missing`) do not count.
@@ -293,8 +302,8 @@ web/src/lib/analytics/
   3. If an attempt is already in flight or failed on this page load, return
      (module-level flag; no retry loop, the next navigation retries).
   4. `fetch("/api/analytics/active", { method: "POST", keepalive: true,
-     credentials: "same-origin", headers: { "content-type": "application/json" },
-     body: { v: 1, guestId } })`.
+credentials: "same-origin", headers: { "content-type": "application/json" },
+body: { v: 1, guestId } })`.
   5. On `200`, store the `day` from the response body as the marker. On any
      other result, store nothing.
 - `ActiveUserBeacon.svelte` is rendered in `web/src/routes/+layout.svelte`
@@ -349,7 +358,7 @@ Handler:
 - `anonId = await anonIdFor(kind, rawId, env.ANALYTICS_SALT)`.
 - `recordActiveUser(db, { day: utcDay(now), anonId, kind, now })` runs
   `INSERT OR IGNORE INTO active_user_day (day, anon_id, kind, first_seen_at)
-  VALUES (?1, ?2, ?3, ?4)`. The unique primary key makes repeats a no-op.
+VALUES (?1, ?2, ?3, ?4)`. The unique primary key makes repeats a no-op.
 - Response `200 { day }`. The client stores that day.
 
 The session lookup in `hooks.server.ts` already runs for this route and is
@@ -392,16 +401,16 @@ The brief's test line is "counters are idempotent under retries". In X1:
 Raw D1 prepared statements on `AnyD1Database`, matching `queries/account.ts`.
 All exported from `@shaxda/db`.
 
-| Function                                       | Used by            |
-| ---------------------------------------------- | ------------------ |
-| `recordActiveUser(db, { day, anonId, kind, now })` | active route   |
-| `incrementDailyEvent(db, day, event, now)`     | event route, register action |
-| `setDailyGauge(db, day, event, value, now)`    | rollup             |
-| `rollupAnalyticsDay(db, day, now)`             | cron, catch-up     |
-| `pruneActiveUserDays(db, olderThanDay)`        | cron, catch-up     |
-| `readStats(db, { today, days: 30 })`           | `/admin/stats`     |
-| `readCohorts(db, { cohortDays })`              | `/admin/stats` (Should) |
-| `readEventDailyCsv(db, { from, to })`          | CSV export (Should) |
+| Function                                           | Used by                      |
+| -------------------------------------------------- | ---------------------------- |
+| `recordActiveUser(db, { day, anonId, kind, now })` | active route                 |
+| `incrementDailyEvent(db, day, event, now)`         | event route, register action |
+| `setDailyGauge(db, day, event, value, now)`        | rollup                       |
+| `rollupAnalyticsDay(db, day, now)`                 | cron, catch-up               |
+| `pruneActiveUserDays(db, olderThanDay)`            | cron, catch-up               |
+| `readStats(db, { today, days: 30 })`               | `/admin/stats`               |
+| `readCohorts(db, { cohortDays })`                  | `/admin/stats` (Should)      |
+| `readEventDailyCsv(db, { from, to })`              | CSV export (Should)          |
 
 `rollupAnalyticsDay(db, day)` computes, in one `db.batch()` of gauge upserts:
 
@@ -436,7 +445,7 @@ Gauge writes use `ON CONFLICT DO UPDATE SET count = excluded.count`
 2. Should: cohort gauges for cohort days `D - 8` (D7) and `D - 31` (D30),
    see §10.4.
 3. `pruneActiveUserDays(db, D - 400 days)`: `DELETE FROM active_user_day WHERE
-   day < ?1`. ISO days compare lexicographically. After the first 400 days this
+day < ?1`. ISO days compare lexicographically. After the first 400 days this
    deletes about one day of rows per night.
 
 Trigger: cron `15 0 * * *` (UTC, 00:15, after the day is complete). Somalia is
@@ -505,15 +514,15 @@ not in the sitemap.
 
 Data (`readStats`), all UTC:
 
-| Block              | Content                                                                                                   | Source                          |
-| ------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| Headline           | DAU / WAU / MAU for yesterday, each with guest and account split                                          | gauges                          |
-| Today so far       | Live DAU for today, by kind                                                                               | `COUNT(*)` on today             |
-| 30-day trend table | one row per day: `dau`, `wau`, `mau`, `new_guest`, `new_account`, all counter events                      | `event_daily` range read        |
-| Games              | started/completed per day for `local` and `online_invite`; completion rate over 7 and 30 days             | derived from the trend rows     |
-| Rooms              | `room_created`, `room_joined`, rooms → started ratio (30 days)                                            | derived                         |
-| Conversion         | `account_registered(30d) / new_guest(30d)`, labelled as an aggregate ratio                                | derived                         |
-| Freshness          | last rollup day present; a warning line when yesterday's gauges are missing                              | gauges                          |
+| Block              | Content                                                                                       | Source                      |
+| ------------------ | --------------------------------------------------------------------------------------------- | --------------------------- |
+| Headline           | DAU / WAU / MAU for yesterday, each with guest and account split                              | gauges                      |
+| Today so far       | Live DAU for today, by kind                                                                   | `COUNT(*)` on today         |
+| 30-day trend table | one row per day: `dau`, `wau`, `mau`, `new_guest`, `new_account`, all counter events          | `event_daily` range read    |
+| Games              | started/completed per day for `local` and `online_invite`; completion rate over 7 and 30 days | derived from the trend rows |
+| Rooms              | `room_created`, `room_joined`, rooms → started ratio (30 days)                                | derived                     |
+| Conversion         | `account_registered(30d) / new_guest(30d)`, labelled as an aggregate ratio                    | derived                     |
+| Freshness          | last rollup day present; a warning line when yesterday's gauges are missing                   | gauges                      |
 
 Presentation: Somali labels with metric codes (`DAU`, `WAU`, `MAU`), plain
 tables, mobile-first (the founder will read it on a phone). No chart library.
@@ -591,14 +600,14 @@ Admin page keys (`adminStats.*`): `title` "Tirakoobka isticmaalka",
 
 ## 12. Configuration by environment
 
-| Item                          | dev (`.dev.vars`)                 | e2e (`wrangler.e2e.jsonc`)                     | preview                          | production                       |
-| ----------------------------- | --------------------------------- | ---------------------------------------------- | -------------------------------- | -------------------------------- |
-| `ANALYTICS_SALT`              | example value in `.dev.vars.example` | committed test value; add it to the committed-secret list in `check-production-bundle.mjs` | `wrangler secret put`            | `wrangler secret put`            |
-| `ADMIN_USER_IDS`              | empty by default                  | e2e fixture user id if the harness has a signed-in fixture, else empty | secret                           | secret                           |
-| `ANALYTICS_RATE_LIMIT`        | declared; verify local support in the spike | declared or absent (fail-open)        | `ratelimits` binding, 120/60 s   | same                             |
-| Cron `15 0 * * *`             | `--test-scheduled` only           | none                                           | `triggers.crons`                 | `triggers.crons`                 |
-| `main`                        | unchanged for `vite dev`          | unchanged                                      | wrapper (§9.2)                   | wrapper (§9.2)                   |
-| D1 migration `000N_analytics` | Miniflare, applied by tests       | applied by the e2e harness like `0000`         | `wrangler d1 migrations apply --config wrangler.preview.jsonc` | `wrangler d1 migrations apply --config wrangler.jsonc` |
+| Item                          | dev (`.dev.vars`)                           | e2e (`wrangler.e2e.jsonc`)                                                                 | preview                                                        | production                                             |
+| ----------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------ |
+| `ANALYTICS_SALT`              | example value in `.dev.vars.example`        | committed test value; add it to the committed-secret list in `check-production-bundle.mjs` | `wrangler secret put`                                          | `wrangler secret put`                                  |
+| `ADMIN_USER_IDS`              | empty by default                            | e2e fixture user id if the harness has a signed-in fixture, else empty                     | secret                                                         | secret                                                 |
+| `ANALYTICS_RATE_LIMIT`        | declared; verify local support in the spike | declared or absent (fail-open)                                                             | `ratelimits` binding, 120/60 s                                 | same                                                   |
+| Cron `15 0 * * *`             | `--test-scheduled` only                     | none                                                                                       | `triggers.crons`                                               | `triggers.crons`                                       |
+| `main`                        | unchanged for `vite dev`                    | unchanged                                                                                  | wrapper (§9.2)                                                 | wrapper (§9.2)                                         |
+| D1 migration `000N_analytics` | Miniflare, applied by tests                 | applied by the e2e harness like `0000`                                                     | `wrangler d1 migrations apply --config wrangler.preview.jsonc` | `wrangler d1 migrations apply --config wrangler.jsonc` |
 
 `App.Platform["env"]` in `web/src/app.d.ts` gains `ANALYTICS_SALT?: string`,
 `ADMIN_USER_IDS?: string`, `ANALYTICS_RATE_LIMIT?: RateLimit`.
@@ -622,13 +631,13 @@ Preview and production migrations are operational deployment steps
 
 At the §15 traffic target of ~1,500 DAU / ~10,000 MAU:
 
-| Item                     | Per day                                              | Free tier            |
-| ------------------------ | ---------------------------------------------------- | -------------------- |
-| D1 rows written          | ~1.5k active + ≤ 15k event upserts ≈ 17k             | 100k                 |
-| D1 rows read             | cron ≈ 3 scans × 45k ≈ 135k; admin ≈ 2k per load     | 5M                   |
-| Storage                  | 1.5k rows × 400 days × ~100 B ≈ 60 MB                | 5 GB                 |
-| Worker requests          | +1 per device/day, + ~3 per game                     | 100k/day             |
-| Durable Object time      | none (game Worker untouched)                         | —                    |
+| Item                | Per day                                          | Free tier |
+| ------------------- | ------------------------------------------------ | --------- |
+| D1 rows written     | ~1.5k active + ≤ 15k event upserts ≈ 17k         | 100k      |
+| D1 rows read        | cron ≈ 3 scans × 45k ≈ 135k; admin ≈ 2k per load | 5M        |
+| Storage             | 1.5k rows × 400 days × ~100 B ≈ 60 MB            | 5 GB      |
+| Worker requests     | +1 per device/day, + ~3 per game                 | 100k/day  |
+| Durable Object time | none (game Worker untouched)                     | —         |
 
 Revisit when DAU passes ~10k (storage ≈ 400 MB, cron scans ≈ 1M rows/day):
 shorten retention or move `active_user_day` to Analytics Engine, which the
@@ -698,19 +707,19 @@ wrapper lands.
 
 ## 15. Decisions
 
-| ID     | Decision                                                                                                                                                                                                                                                              | Rationale                                                                                                                                                                                                       |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| X1-D1  | Game-funnel counts are client-reported. The game Worker is not modified.                                                                                                                                                                                             | The brief says "server-side where the event already passes through a Worker", but room/game events pass only through the game Worker, which has no D1 in X1 (§6.1 gives it match tables only, in H1). Keeping X1 independent is worth more than exact online counts; H1's ledger gives exact account-vs-account counts and calibrates these. If drift exceeds ~10%, add a signed game-Worker → web-Worker channel as a follow-up. |
-| X1-D2  | Reporter = starting player for `started`, winner for `completed`, starting player on draws.                                                                                                                                                                          | Chosen from state alone, always a present client, no race with `matchEnded`.                                                                                                                                    |
-| X1-D3  | Anon id = HMAC-SHA-256 keyed by `ANALYTICS_SALT`, base64url.                                                                                                                                                                                                         | Standard keyed hash; satisfies "salted SHA-256"; reuses the HMAC helper pattern in `packages/shared/identity`.                                                                                                   |
-| X1-D4  | Days are UTC; the server assigns them.                                                                                                                                                                                                                               | One clock; clients cannot back-date.                                                                                                                                                                             |
-| X1-D5  | DAU/WAU/MAU/new/cohort values are nightly **gauges in `event_daily`**; no third table.                                                                                                                                                                              | Trends become one indexed range read instead of 30 distinct-count scans per page load; history survives the 400-day prune.                                                                                       |
-| X1-D6  | Event beacons are sent at most once and never retried; no server idempotency keys.                                                                                                                                                                                  | Storing keys means a row per game. An occasional lost or duplicate beacon is within the tolerance of an internal funnel.                                                                                          |
-| X1-D7  | Cron via a wrapper worker entry; fallback is catch-up-on-read from `/admin/stats`.                                                                                                                                                                                  | The adapter output exports `fetch` only. The wrapper leaves the adapter and the e2e harness untouched.                                                                                                           |
-| X1-D8  | Admin allowlist = `ADMIN_USER_IDS` secret; no role column, no admin table.                                                                                                                                                                                          | One founder. Ids stay out of Git. S1 reuses the helper.                                                                                                                                                          |
-| X1-D9  | Rate limiting via the Workers Rate Limiting binding, fail-open when absent.                                                                                                                                                                                         | The web Worker has no Durable Object to count in; analytics is non-critical, so a missing binding must not break pages.                                                                                          |
-| X1-D10 | Same device signed-out then signed-in counts as two anon ids on that day.                                                                                                                                                                                            | Linking them would require storing the guest→account pair, which is exactly the identity join the brief forbids.                                                                                                 |
-| X1-D11 | `account` kind includes incomplete accounts (signed in, no username yet).                                                                                                                                                                                            | The session is the trust signal; username completion is a separate funnel step already counted by `account_registered`.                                                                                          |
+| ID     | Decision                                                                                    | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------ | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| X1-D1  | Game-funnel counts are client-reported. The game Worker is not modified.                    | The brief says "server-side where the event already passes through a Worker", but room/game events pass only through the game Worker, which has no D1 in X1 (§6.1 gives it match tables only, in H1). Keeping X1 independent is worth more than exact online counts; H1's ledger gives exact account-vs-account counts and calibrates these. If drift exceeds ~10%, add a signed game-Worker → web-Worker channel as a follow-up. |
+| X1-D2  | Reporter = starting player for `started`, winner for `completed`, starting player on draws. | Chosen from state alone, always a present client, no race with `matchEnded`.                                                                                                                                                                                                                                                                                                                                                      |
+| X1-D3  | Anon id = HMAC-SHA-256 keyed by `ANALYTICS_SALT`, base64url.                                | Standard keyed hash; satisfies "salted SHA-256"; reuses the HMAC helper pattern in `packages/shared/identity`.                                                                                                                                                                                                                                                                                                                    |
+| X1-D4  | Days are UTC; the server assigns them.                                                      | One clock; clients cannot back-date.                                                                                                                                                                                                                                                                                                                                                                                              |
+| X1-D5  | DAU/WAU/MAU/new/cohort values are nightly **gauges in `event_daily`**; no third table.      | Trends become one indexed range read instead of 30 distinct-count scans per page load; history survives the 400-day prune.                                                                                                                                                                                                                                                                                                        |
+| X1-D6  | Event beacons are sent at most once and never retried; no server idempotency keys.          | Storing keys means a row per game. An occasional lost or duplicate beacon is within the tolerance of an internal funnel.                                                                                                                                                                                                                                                                                                          |
+| X1-D7  | Cron via a wrapper worker entry; fallback is catch-up-on-read from `/admin/stats`.          | The adapter output exports `fetch` only. The wrapper leaves the adapter and the e2e harness untouched.                                                                                                                                                                                                                                                                                                                            |
+| X1-D8  | Admin allowlist = `ADMIN_USER_IDS` secret; no role column, no admin table.                  | One founder. Ids stay out of Git. S1 reuses the helper.                                                                                                                                                                                                                                                                                                                                                                           |
+| X1-D9  | Rate limiting via the Workers Rate Limiting binding, fail-open when absent.                 | The web Worker has no Durable Object to count in; analytics is non-critical, so a missing binding must not break pages.                                                                                                                                                                                                                                                                                                           |
+| X1-D10 | Same device signed-out then signed-in counts as two anon ids on that day.                   | Linking them would require storing the guest→account pair, which is exactly the identity join the brief forbids.                                                                                                                                                                                                                                                                                                                  |
+| X1-D11 | `account` kind includes incomplete accounts (signed in, no username yet).                   | The session is the trust signal; username completion is a separate funnel step already counted by `account_registered`.                                                                                                                                                                                                                                                                                                           |
 
 ---
 

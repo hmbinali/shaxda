@@ -1,12 +1,12 @@
 # H3 — Replay Viewer (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft, not started; implementation waits for H1 and H2 |
-| Brief | `docs/shaxda-v2.md` §9 (H3), §7.3, §14 |
-| Workspace | `h3-replay-viewer` |
-| Depends on | H1's saved compact replay and H2's public `/match/<id>` page |
-| Touches | `packages/db` (one read query), `packages/i18n`, `web/` |
+| Field          | Value                                                                                                                |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Status         | Draft, not started; implementation waits for H1 and H2                                                               |
+| Brief          | `docs/shaxda-v2.md` §9 (H3), §7.3, §14                                                                               |
+| Workspace      | `h3-replay-viewer`                                                                                                   |
+| Depends on     | H1's saved compact replay and H2's public `/match/<id>` page                                                         |
+| Touches        | `packages/db` (one read query), `packages/i18n`, `web/`                                                              |
 | Does not touch | The game Worker, D1 writes or migrations, replay storage format, game rules, `/local`, `/online`, auth, or Turnstile |
 
 This spec refines the H3 brief without expanding its Must scope. The rules in
@@ -75,8 +75,7 @@ with H1's shared compact-replay schema. Require the JSON `v` to agree with
 
 ```ts
 type PublicReplay =
-  | { kind: "ready"; value: CompactReplay }
-  | { kind: "unavailable" };
+  { kind: "ready"; value: CompactReplay } | { kind: "unavailable" };
 ```
 
 Do not return malformed raw JSON to the browser. The ready value contains
@@ -121,15 +120,15 @@ Store `{ before, action, after, events }` for each position `1..N` alongside
 the frames. Derive events from accepted actions and adjacent states, never
 from timers, CSS animation completion, or mutable server state:
 
-| Event | Rule | Position cue |
-| --- | --- | --- |
-| Placement | `place` | Mark the placed point and piece. |
-| Movement | `move` | Mark `from`, `to`, and the moved piece at `to`. |
-| Initial removal | `removeInitial` | Mark the now-empty removed point; label it as initial removal, not a capture. |
-| Capture | `capture` | Mark the now-empty captured point with the live capture visual. |
-| Jare | A `place` or `move` newly completes at least one line according to `formsNewJare(before.board, after.board, destination, action.player)` | Highlight the newly completed line(s); multiple lines from one action are one event. |
-| First advantage | `before.firstAdvantage === null` and `after.firstAdvantage !== null` | Name the awarded seat and use H1's `first_advantage_by` to distinguish placement jare from the no-jare fallback. |
-| Phase change | `before.phase !== after.phase` | Announce the entered phase; includes capture and game over. |
+| Event           | Rule                                                                                                                                     | Position cue                                                                                                     |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Placement       | `place`                                                                                                                                  | Mark the placed point and piece.                                                                                 |
+| Movement        | `move`                                                                                                                                   | Mark `from`, `to`, and the moved piece at `to`.                                                                  |
+| Initial removal | `removeInitial`                                                                                                                          | Mark the now-empty removed point; label it as initial removal, not a capture.                                    |
+| Capture         | `capture`                                                                                                                                | Mark the now-empty captured point with the live capture visual.                                                  |
+| Jare            | A `place` or `move` newly completes at least one line according to `formsNewJare(before.board, after.board, destination, action.player)` | Highlight the newly completed line(s); multiple lines from one action are one event.                             |
+| First advantage | `before.firstAdvantage === null` and `after.firstAdvantage !== null`                                                                     | Name the awarded seat and use H1's `first_advantage_by` to distinguish placement jare from the no-jare fallback. |
+| Phase change    | `before.phase !== after.phase`                                                                                                           | Announce the entered phase; includes capture and game over.                                                      |
 
 At position `0`, there is no last action or event cue. At other positions,
 event cues persist while paused or scrubbed; they are not the live board's
@@ -160,14 +159,14 @@ current public username or deleted-member label. There is no claim of who
 still-visible final board; it uses H2's public result and online-reason copy
 and disappears when the position moves back. A draw has no winner.
 
-| Control | Behavior |
-| --- | --- |
-| Play | Starts from the current position; from `N`, resets to `0` and starts. First advance occurs after one interval. |
-| Pause | Stops the timer at the current position. |
-| Previous / next | Pauses and moves exactly one position, clamped to `0..N`. |
-| Start / end | Pauses and jumps to `0` or `N`. |
-| Speed | Defaults to 1×. One action every 2,000 ms at 0.5×, 1,000 ms at 1×, or 500 ms at 2×. A change restarts the next interval at the new speed. |
-| End reached | Pauses, shows the final result, and leaves the board at `N`. |
+| Control         | Behavior                                                                                                                                  |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Play            | Starts from the current position; from `N`, resets to `0` and starts. First advance occurs after one interval.                            |
+| Pause           | Stops the timer at the current position.                                                                                                  |
+| Previous / next | Pauses and moves exactly one position, clamped to `0..N`.                                                                                 |
+| Start / end     | Pauses and jumps to `0` or `N`.                                                                                                           |
+| Speed           | Defaults to 1×. One action every 2,000 ms at 0.5×, 1,000 ms at 1×, or 500 ms at 2×. A change restarts the next interval at the new speed. |
+| End reached     | Pauses, shows the final result, and leaves the board at `N`.                                                                              |
 
 Use one cancellable client timer, cleared on pause, seek, navigation away,
 component destruction, and page visibility becoming hidden. A hidden page
@@ -288,13 +287,13 @@ Build one reviewable slice at a time:
 6. Add the Should timeline and event jumps only if time remains after the
    Must gate is green; they do not change the position contract.
 
-| ID | Decision | Reason |
-| --- | --- | --- |
-| H3-D1 | Position is the number of actions applied, from `0..N`. | It makes initial/final states and H4 event positions unambiguous. |
-| H3-D2 | The public H2 loader adds one primary-key replay read; no new endpoint. | The match is already public and the compact payload is small. |
-| H3-D3 | Invalid replay disables only the viewer. | Match metadata and sharing remain useful; invented playback is unacceptable. |
-| H3-D4 | Board cues are stable replay inputs, separate from live transient feedback. | Pausing and deep links must preserve the highlighted event. |
-| H3-D5 | URL updates replace history entries; autoplay starts only on command. | Links remain shareable without a browser-history entry per action or surprise playback. |
-| H3-D6 | Replay audio is opt-in and independent of live-game preference. | The H3 default is silent, even for players who enabled game audio. |
-| H3-D7 | Scrubber and event jumps remain Should. | The V2 brief makes the required controls the completion gate. |
-| H3-D8 | A real entry-level Android phone is required for final acceptance. | The brief's low-end phone criterion needs physical proof. |
+| ID    | Decision                                                                    | Reason                                                                                  |
+| ----- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| H3-D1 | Position is the number of actions applied, from `0..N`.                     | It makes initial/final states and H4 event positions unambiguous.                       |
+| H3-D2 | The public H2 loader adds one primary-key replay read; no new endpoint.     | The match is already public and the compact payload is small.                           |
+| H3-D3 | Invalid replay disables only the viewer.                                    | Match metadata and sharing remain useful; invented playback is unacceptable.            |
+| H3-D4 | Board cues are stable replay inputs, separate from live transient feedback. | Pausing and deep links must preserve the highlighted event.                             |
+| H3-D5 | URL updates replace history entries; autoplay starts only on command.       | Links remain shareable without a browser-history entry per action or surprise playback. |
+| H3-D6 | Replay audio is opt-in and independent of live-game preference.             | The H3 default is silent, even for players who enabled game audio.                      |
+| H3-D7 | Scrubber and event jumps remain Should.                                     | The V2 brief makes the required controls the completion gate.                           |
+| H3-D8 | A real entry-level Android phone is required for final acceptance.          | The brief's low-end phone criterion needs physical proof.                               |

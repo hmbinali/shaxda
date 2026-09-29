@@ -1,13 +1,13 @@
 # R3 — Leaderboard (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; specification only. R3 implementation waits for merged and activated R1/R2. |
-| Brief | `docs/shaxda-v2.md` §10 (R3), §7.1–7.2, §14 |
-| Depends on | R1 rating processor and `player_rating`; R2 confirmed rated-play policy; existing public profile and session contracts |
-| Workspace | `r3-leaderboard` (may share a review flow with R4) |
-| Unblocks | R4 public profile rank, R5 leaderboard form reuse, R6 exclusion tools |
-| Touches when implemented | `packages/db` migration and queries, web Worker routes, `packages/i18n`, navigation, tests |
+| Field                    | Value                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Status                   | Draft; specification only. R3 implementation waits for merged and activated R1/R2.                                     |
+| Brief                    | `docs/shaxda-v2.md` §10 (R3), §7.1–7.2, §14                                                                            |
+| Depends on               | R1 rating processor and `player_rating`; R2 confirmed rated-play policy; existing public profile and session contracts |
+| Workspace                | `r3-leaderboard` (may share a review flow with R4)                                                                     |
+| Unblocks                 | R4 public profile rank, R5 leaderboard form reuse, R6 exclusion tools                                                  |
+| Touches when implemented | `packages/db` migration and queries, web Worker routes, `packages/i18n`, navigation, tests                             |
 
 This spec refines the V2 R3 brief. It does not mark R3 active or shipped. The
 H1/R1/R2 specs in this checkout are drafts; names and columns below are
@@ -79,15 +79,15 @@ confirmed rated result. A skipped friendly, aborted, pair-cap, or daily-cap
 match does not increase rated-game count or change a rated streak. A later
 confirmed rated event continues or breaks the streak according to its result.
 
-| Rule | Exact treatment |
-| --- | --- |
-| Rating order | Sort by **full-precision** `player_rating.rating DESC`, then stable opaque `user_id ASC`. Do not sort by rounded display values, username, game volume, or RD. |
-| Rank | One-based ordinal position in that order among eligible accounts. Every eligible account has a unique position; equal full-precision ratings use the user-id tie break. The UI may show the same rounded number on adjacent rows. |
-| RD boundary | R1 effective RD at one server-captured `asOf` time must be `≤ 110`. Exactly 110 qualifies. Inactivity can make a previously ranked account provisional without a new match. |
-| Game-count boundary | `player_rating.rated_games ≥ 10`; exactly 10 qualifies. The count equals processed W/L/D events. |
-| Activity boundary | `last_rated_at ≥ asOf − 90 × 86,400,000 ms`; exactly 90 days qualifies. Use UTC instants, not calendar dates or the last friendly game. |
-| Exclusion | `excluded = true` removes a player from public rows, rank counts, neighbor rows, and profile rank. R6 will own who changes this flag. |
-| Profile | Join the current `user` row for username/avatar. Missing user or null username is ineligible, regardless of a historical snapshot. A rename changes the link/label, not the rating order. |
+| Rule                | Exact treatment                                                                                                                                                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rating order        | Sort by **full-precision** `player_rating.rating DESC`, then stable opaque `user_id ASC`. Do not sort by rounded display values, username, game volume, or RD.                                                                    |
+| Rank                | One-based ordinal position in that order among eligible accounts. Every eligible account has a unique position; equal full-precision ratings use the user-id tie break. The UI may show the same rounded number on adjacent rows. |
+| RD boundary         | R1 effective RD at one server-captured `asOf` time must be `≤ 110`. Exactly 110 qualifies. Inactivity can make a previously ranked account provisional without a new match.                                                       |
+| Game-count boundary | `player_rating.rated_games ≥ 10`; exactly 10 qualifies. The count equals processed W/L/D events.                                                                                                                                  |
+| Activity boundary   | `last_rated_at ≥ asOf − 90 × 86,400,000 ms`; exactly 90 days qualifies. Use UTC instants, not calendar dates or the last friendly game.                                                                                           |
+| Exclusion           | `excluded = true` removes a player from public rows, rank counts, neighbor rows, and profile rank. R6 will own who changes this flag.                                                                                             |
+| Profile             | Join the current `user` row for username/avatar. Missing user or null username is ineligible, regardless of a historical snapshot. A rename changes the link/label, not the rating order.                                         |
 
 Capture `asOf` once per public or private read and pass it to every eligibility
 calculation in that response. Evaluate the R1 whole-day inactivity adjustment
@@ -111,12 +111,12 @@ R1 provides `player_rating` with `user_id`, full-precision `rating`, `rd`,
 confirmed `rating_status` and authoritative seat result. R3 adds a small
 derived `leaderboard_stats` projection keyed by `user_id`:
 
-| Column | Meaning |
-| --- | --- |
-| `user_id` | Opaque PK; never sent to public clients. |
-| `rated_wins`, `rated_losses`, `rated_draws` | Nonnegative integer counts of processed events for this seat. Their sum must equal R1 `rated_games`. |
-| `streak_kind`, `streak_length` | Newest processed result kind and its exact positive run length; null/zero before the first processed event. |
-| `last_match_id` | Last processed event in R1 order, for idempotence and rebuild checks. |
+| Column                                      | Meaning                                                                                                     |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `user_id`                                   | Opaque PK; never sent to public clients.                                                                    |
+| `rated_wins`, `rated_losses`, `rated_draws` | Nonnegative integer counts of processed events for this seat. Their sum must equal R1 `rated_games`.        |
+| `streak_kind`, `streak_length`              | Newest processed result kind and its exact positive run length; null/zero before the first processed event. |
+| `last_match_id`                             | Last processed event in R1 order, for idempotence and rebuild checks.                                       |
 
 Extend R1's **same guarded event batch** to update each player's projection
 when a match becomes `processed`. A skipped or still-pending match changes
@@ -282,20 +282,20 @@ third-party scripts or tracking to the page.
 
 ### Data and Workers tests
 
-| Case | Expected |
-| --- | --- |
-| RD exactly 110, games exactly 10, last rated exactly 90 days ago | Eligible if not excluded and current profile exists |
-| RD just above 110, 9 games, or last rated just older than 90 days | Unranked with the correct reason |
-| Stored RD below 110 but effective RD above it after inactivity | Unranked without a write |
-| `excluded = true`, deleted account, or null current username | No public row, rank, or neighbor placement |
-| Pending, friendly, aborted, pair-cap, or daily-cap event | No rated W/L/D or streak change |
-| Processed win, loss, draw, then skipped event | Counts sum to rated games; newest rated-result streak is exact |
-| Same full-precision rating or same rounded rating | Stable ordering by full-precision rating then user id; pagination and rank agree |
-| More than 100 eligible players | Page one has 100, later pages reach the rest with no duplicates in an unchanged data set |
-| Viewer at rank 1, middle, last, and beyond rank 100 | Correct rank and at most three neighbors per side |
-| Ineligible or signed-out viewer | No invented rank, neighbors, or private data |
-| Username change and avatar change | Current public details appear without moving the rank |
-| Processor duplicate trigger, late ledger rebuild, or R6-style invalidation fixture | Projection and rating state rebuild to the same public order/counts |
+| Case                                                                               | Expected                                                                                 |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| RD exactly 110, games exactly 10, last rated exactly 90 days ago                   | Eligible if not excluded and current profile exists                                      |
+| RD just above 110, 9 games, or last rated just older than 90 days                  | Unranked with the correct reason                                                         |
+| Stored RD below 110 but effective RD above it after inactivity                     | Unranked without a write                                                                 |
+| `excluded = true`, deleted account, or null current username                       | No public row, rank, or neighbor placement                                               |
+| Pending, friendly, aborted, pair-cap, or daily-cap event                           | No rated W/L/D or streak change                                                          |
+| Processed win, loss, draw, then skipped event                                      | Counts sum to rated games; newest rated-result streak is exact                           |
+| Same full-precision rating or same rounded rating                                  | Stable ordering by full-precision rating then user id; pagination and rank agree         |
+| More than 100 eligible players                                                     | Page one has 100, later pages reach the rest with no duplicates in an unchanged data set |
+| Viewer at rank 1, middle, last, and beyond rank 100                                | Correct rank and at most three neighbors per side                                        |
+| Ineligible or signed-out viewer                                                    | No invented rank, neighbors, or private data                                             |
+| Username change and avatar change                                                  | Current public details appear without moving the rank                                    |
+| Processor duplicate trigger, late ledger rebuild, or R6-style invalidation fixture | Projection and rating state rebuild to the same public order/counts                      |
 
 Test the public loader and private endpoint separately: malformed cursor,
 anonymous/incomplete sessions, cookie isolation, root-layout/top-bar state on
@@ -342,8 +342,8 @@ on the healthy immediate-processing path. A saved spec alone is not shipment.
 
 ## 9. Decision to confirm
 
-| ID | Decision | Current specification |
-| --- | --- | --- |
+| ID    | Decision                                                                                                        | Current specification                                                                                                                                                                                                                                                      |
+| ----- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | R3-D1 | Do leaderboard W/L/D and streak include only confirmed rated games, or all completed competitive account games? | **Pending founder answer.** This draft uses confirmed rated games, because they explain the rating and match R1's `rated_games`. If the founder chooses all competitive games, change the projection, copy, rebuild fixture, and verification cases before implementation. |
 
 The V2 brief already fixes rating-based ordering, the provisional and 10-game

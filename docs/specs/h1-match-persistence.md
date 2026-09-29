@@ -1,14 +1,14 @@
 # H1 — Match Persistence Foundation (Spec)
 
-| Field          | Value                                                                                   |
-| -------------- | --------------------------------------------------------------------------------------- |
-| Status         | Draft, not started                                                                      |
-| Brief          | `docs/shaxda-v2.md` §9 (H1), §6.1, §6.5, §7.2, §7.3, §16 (D4, D5, D9)                    |
-| Workspace      | `h1-match-persistence`                                                                  |
-| Depends on     | V1.1-A2 (live). X1 is independent and may merge before or after.                        |
-| Unblocks       | H2, H3, H4, R1–R6, K1, A3 — everything in V2 except X and S                             |
-| Touches        | `packages/game-engine`, `packages/shared`, `packages/db`, `worker/`, `web/` (client compat only), Wrangler configs, `AGENTS.md`, PRD |
-| Freeze point   | The compact replay format and the `match` / `match_player` shape freeze when this merges (§14 of the brief) |
+| Field        | Value                                                                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Status       | Draft, not started                                                                                                                   |
+| Brief        | `docs/shaxda-v2.md` §9 (H1), §6.1, §6.5, §7.2, §7.3, §16 (D4, D5, D9)                                                                |
+| Workspace    | `h1-match-persistence`                                                                                                               |
+| Depends on   | V1.1-A2 (live). X1 is independent and may merge before or after.                                                                     |
+| Unblocks     | H2, H3, H4, R1–R6, K1, A3 — everything in V2 except X and S                                                                          |
+| Touches      | `packages/game-engine`, `packages/shared`, `packages/db`, `worker/`, `web/` (client compat only), Wrangler configs, `AGENTS.md`, PRD |
+| Freeze point | The compact replay format and the `match` / `match_player` shape freeze when this merges (§14 of the brief)                          |
 
 This spec refines the H1 brief; it does not widen it. Every choice the brief
 left open ("decisions to settle in the spec") is answered in §14 with its
@@ -76,17 +76,17 @@ Added by this spec:
 
 ## 2. Definitions
 
-| Term                | Definition                                                                                                                        |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Match               | One logical game inside a room, identified by `matchNumber` (1 for the first game, +1 per accepted rematch).                       |
-| Room instance       | One Durable Object lifetime for a room code: `(roomCode, createdAt)`. Room codes are recycled after cleanup; instances are not.     |
-| Action log          | The ordered `GameAction[]` applied to the current match, including the synthetic resign from claim-win.                           |
-| Compact replay      | The frozen wire/storage form of an action log: `{ v: 1, s: PlayerId, a: string[] }` (§4).                                          |
-| Persistable match   | A match whose two seats are both `account` kind and whose log holds at least one player action (§5.2).                            |
-| Started at          | Timestamp of the first accepted player action of the match (H1-D3).                                                               |
-| Ended at            | Timestamp of the action or claim that moved `phase` to `gameOver`.                                                                |
-| Online end reason   | `abandoned` or `idle` when the game ended by claim-win, else `NULL`. Mapped from `opponentAbandoned` / `opponentIdleTimeout`.       |
-| Persist state       | Room-storage record of where the ledger write stands: `idle`, `pending`, `saved`, `failed`, `skipped` (§6).                         |
+| Term              | Definition                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Match             | One logical game inside a room, identified by `matchNumber` (1 for the first game, +1 per accepted rematch).                    |
+| Room instance     | One Durable Object lifetime for a room code: `(roomCode, createdAt)`. Room codes are recycled after cleanup; instances are not. |
+| Action log        | The ordered `GameAction[]` applied to the current match, including the synthetic resign from claim-win.                         |
+| Compact replay    | The frozen wire/storage form of an action log: `{ v: 1, s: PlayerId, a: string[] }` (§4).                                       |
+| Persistable match | A match whose two seats are both `account` kind and whose log holds at least one player action (§5.2).                          |
+| Started at        | Timestamp of the first accepted player action of the match (H1-D3).                                                             |
+| Ended at          | Timestamp of the action or claim that moved `phase` to `gameOver`.                                                              |
+| Online end reason | `abandoned` or `idle` when the game ended by claim-win, else `NULL`. Mapped from `opponentAbandoned` / `opponentIdleTimeout`.   |
+| Persist state     | Room-storage record of where the ledger write stands: `idle`, `pending`, `saved`, `failed`, `skipped` (§6).                     |
 
 ---
 
@@ -94,16 +94,16 @@ Added by this spec:
 
 The brief requires these edits in the first commit of the milestone.
 
-| Document              | Change                                                                                                                                                                                   |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AGENTS.md` §Locked stack | "it must not gain Better Auth, D1, or session-cookie access" → "it may bind D1 for match-ledger writes only (V2 §6.1); it must not gain Better Auth or session-cookie access, and never reads `user`, `account`, `session`, or `verification`." |
-| `AGENTS.md` §Accounts / Identity | Same amendment on the "do not add Better Auth, D1, cookies…" line; add "Starting seat is random for a room's first game and alternates on rematch (V2 §6.5)."               |
-| `docs/shaxda_prd.md` §16.3 | "D1 is bound only to the SvelteKit web Worker" → "D1 is bound to the web Worker for auth/profile data and to the game Worker for match-ledger writes only."                        |
-| `docs/shaxda_prd.md` §15.2 | Add the §6.5 fairness rule and "the client never assumes a seat starts".                                                                                                           |
-| `docs/shaxda_prd.md` §17.4 | Point to this spec for the exact columns.                                                                                                                                          |
-| `docs/shaxda-v2.md` §7.3 | `R` becomes `R:<seat>` (§4.1 below); note the freeze applies at H1 merge.                                                                                                             |
-| `docs/shaxda-v2.md` §7.2 | `match` uniqueness becomes `(room_code, room_created_at, match_number)` (§6.2 below).                                                                                               |
-| `docs/shaxda-v2.md` §9  | Link this spec from the H1 heading (§18 of the brief).                                                                                                                                 |
+| Document                         | Change                                                                                                                                                                                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AGENTS.md` §Locked stack        | "it must not gain Better Auth, D1, or session-cookie access" → "it may bind D1 for match-ledger writes only (V2 §6.1); it must not gain Better Auth or session-cookie access, and never reads `user`, `account`, `session`, or `verification`." |
+| `AGENTS.md` §Accounts / Identity | Same amendment on the "do not add Better Auth, D1, cookies…" line; add "Starting seat is random for a room's first game and alternates on rematch (V2 §6.5)."                                                                                   |
+| `docs/shaxda_prd.md` §16.3       | "D1 is bound only to the SvelteKit web Worker" → "D1 is bound to the web Worker for auth/profile data and to the game Worker for match-ledger writes only."                                                                                     |
+| `docs/shaxda_prd.md` §15.2       | Add the §6.5 fairness rule and "the client never assumes a seat starts".                                                                                                                                                                        |
+| `docs/shaxda_prd.md` §17.4       | Point to this spec for the exact columns.                                                                                                                                                                                                       |
+| `docs/shaxda-v2.md` §7.3         | `R` becomes `R:<seat>` (§4.1 below); note the freeze applies at H1 merge.                                                                                                                                                                       |
+| `docs/shaxda-v2.md` §7.2         | `match` uniqueness becomes `(room_code, room_created_at, match_number)` (§6.2 below).                                                                                                                                                           |
+| `docs/shaxda-v2.md` §9           | Link this spec from the H1 heading (§18 of the brief).                                                                                                                                                                                          |
 
 ---
 
@@ -116,8 +116,8 @@ for the wire/storage form lives in `packages/shared`.
 ```ts
 export type CompactReplay = {
   v: 1;
-  s: PlayerId;            // starting player
-  a: readonly string[];   // ordered action codes
+  s: PlayerId; // starting player
+  a: readonly string[]; // ordered action codes
 };
 
 export function encodeCompactReplay(
@@ -136,25 +136,29 @@ export function decodeCompactReplay(replay: CompactReplay): DecodeResult;
 export type FirstAdvantageOrigin = "placementJare" | "noJareFallback";
 
 export function summarizeReplay(replay: CompactReplay):
-  | { ok: true; state: GameState; actionCount: number;
-      firstAdvantageBy: FirstAdvantageOrigin | null }
+  | {
+      ok: true;
+      state: GameState;
+      actionCount: number;
+      firstAdvantageBy: FirstAdvantageOrigin | null;
+    }
   | { ok: false; error: string; actionIndex: number };
 ```
 
 ### 4.1 Codes
 
-| Code            | Action                    | Player                                      |
-| --------------- | ------------------------- | ------------------------------------------- |
-| `P:<point>`     | `place`                   | acting player, derived from state           |
-| `X:<point>`     | `removeInitial`           | acting player, derived from state           |
-| `M:<from>><to>` | `move`                    | acting player, derived from state           |
-| `C:<point>`     | `capture`                 | acting player, derived from state           |
-| `R:<seat>`      | `resign` by `<seat>`      | **explicit**, see below                     |
+| Code            | Action               | Player                            |
+| --------------- | -------------------- | --------------------------------- |
+| `P:<point>`     | `place`              | acting player, derived from state |
+| `X:<point>`     | `removeInitial`      | acting player, derived from state |
+| `M:<from>><to>` | `move`               | acting player, derived from state |
+| `C:<point>`     | `capture`            | acting player, derived from state |
+| `R:<seat>`      | `resign` by `<seat>` | **explicit**, see below           |
 
 Refinement of the brief's `"R"`: the engine accepts a resignation from either
 player at any time (`reducer.ts` `applyResign` checks only the phase, and the
 shared `early-resignation` fixture has B resigning on A's turn). Claim-win
-applies a resign for the *opponent* of the claimant, who may or may not be the
+applies a resign for the _opponent_ of the claimant, who may or may not be the
 acting player. A bare `R` would therefore be ambiguous, so the seat is stored
 for resign only. Every other code still derives its player from state.
 
@@ -200,25 +204,39 @@ type RoomOptions = { mode: "invite" | "quick"; rated: boolean };
 
 type PersistState =
   | { status: "idle" }
-  | { status: "pending"; matchNumber: number; attempts: number;
-      nextAttemptAt: number; lastError: string | null }
+  | {
+      status: "pending";
+      matchNumber: number;
+      attempts: number;
+      nextAttemptAt: number;
+      lastError: string | null;
+    }
   | { status: "saved"; matchNumber: number; matchId: string; savedAt: number }
-  | { status: "failed"; matchNumber: number; reason: "replayMismatch" | "exhausted" | "noBinding";
-      failedAt: number; lastError: string | null }
-  | { status: "skipped"; matchNumber: number; reason: "guestSeat" | "noActions" | "logIncomplete" };
+  | {
+      status: "failed";
+      matchNumber: number;
+      reason: "replayMismatch" | "exhausted" | "noBinding";
+      failedAt: number;
+      lastError: string | null;
+    }
+  | {
+      status: "skipped";
+      matchNumber: number;
+      reason: "guestSeat" | "noActions" | "logIncomplete";
+    };
 
 type RoomState = {
   // …existing fields unchanged…
-  options: RoomOptions;                 // H1
-  matchStartedAt: number | null;        // first accepted player action of the current match
-  persist: PersistState;                // H1
+  options: RoomOptions; // H1
+  matchStartedAt: number | null; // first accepted player action of the current match
+  persist: PersistState; // H1
 };
 
 type MatchLog = {
   v: 1;
   matchNumber: number;
   s: PlayerId;
-  a: string[];                          // compact codes, appended per accepted action
+  a: string[]; // compact codes, appended per accepted action
 };
 ```
 
@@ -237,11 +255,11 @@ error log and no row (§6.4).
 
 ### 5.2 Where the log is written
 
-| Handler            | Log change                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------ |
-| `initializeRoom`   | `{ v: 1, matchNumber: 1, s: <random seat>, a: [] }`; `gameState = createInitialState(s)`                 |
-| `handleGameAction` | Append the accepted action's code; set `matchStartedAt = now` when `a` was empty                        |
-| `handleClaimWin`   | Append `R:<opponent seat>` (the synthetic resign)                                                       |
+| Handler            | Log change                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `initializeRoom`   | `{ v: 1, matchNumber: 1, s: <random seat>, a: [] }`; `gameState = createInitialState(s)`                     |
+| `handleGameAction` | Append the accepted action's code; set `matchStartedAt = now` when `a` was empty                             |
+| `handleClaimWin`   | Append `R:<opponent seat>` (the synthetic resign)                                                            |
 | `startRematch`     | `{ v: 1, matchNumber: n + 1, s: otherPlayer(previous s), a: [] }`; `matchStartedAt = null`; `persist = idle` |
 
 "At least one player action" (Must 5) means `log.a` held one or more codes
@@ -330,7 +348,7 @@ match can be inspected or re-driven later. No `setTimeout`, no `setInterval`;
 `persist.status === "saved"` for the current `matchNumber`, else `null`. It
 rides on the existing broadcast after a successful persist and on every
 join/reconnect, so a reconnecting client learns it without a new message.
-Old clients ignore the unknown key (Zod strips it); a new message *type* would
+Old clients ignore the unknown key (Zod strips it); a new message _type_ would
 instead make cached PWA clients throw in `serverMessageSchema.parse`
 (`onlineGameClient.ts`), which is why the brief's `matchSaved` message is not
 used (H1-D9).
@@ -344,24 +362,24 @@ used (H1-D9).
 Built once, in the DO, from room state and the log, and stored inside
 `persist.pending` so every retry writes identical values:
 
-| Field                     | Source                                                                                  |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| `id`                      | 20 characters from `ROOM_CODE_ALPHABET` via `crypto.getRandomValues` (100 bits)          |
-| `roomCode`, `roomCreatedAt`, `matchNumber` | room state                                                             |
-| `mode`, `rated`           | `room.options`, `rated` made effective per §5.4                                          |
-| `startingSeat`            | `log.s`                                                                                 |
-| `firstAdvantageSeat`, `firstAdvantageBy` | `state.firstAdvantage`; origin from `summarizeReplay` (§4.2)              |
-| `winnerSeat`              | `state.winner` (`null` on draws)                                                        |
-| `endReason`               | `state.endReason` (one of the six engine values)                                        |
-| `onlineEndReason`         | `room.onlineEndReason` mapped: `opponentAbandoned → "abandoned"`, `opponentIdleTimeout → "idle"`, else `null` |
-| `actionCount`             | `log.a.length`                                                                          |
-| `replay`                  | `JSON.stringify({ v: 1, s: log.s, a: log.a })`                                           |
-| `replayV`                 | `1`                                                                                     |
-| `startedAt`, `endedAt`    | `room.matchStartedAt`, `now` of the terminal handler                                    |
-| per seat: `userId`, `usernameSnapshot` | `room.seats[slot]` (account kind)                                          |
-| per seat: `result`        | `win` / `loss` from `winnerSeat`, `draw` when `null`                                     |
-| per seat: `piecesLeft`    | count of that seat's pieces on `state.board`                                            |
-| per seat: `captured`      | `state.players[slot].captured`                                                          |
+| Field                                      | Source                                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `id`                                       | 20 characters from `ROOM_CODE_ALPHABET` via `crypto.getRandomValues` (100 bits)                               |
+| `roomCode`, `roomCreatedAt`, `matchNumber` | room state                                                                                                    |
+| `mode`, `rated`                            | `room.options`, `rated` made effective per §5.4                                                               |
+| `startingSeat`                             | `log.s`                                                                                                       |
+| `firstAdvantageSeat`, `firstAdvantageBy`   | `state.firstAdvantage`; origin from `summarizeReplay` (§4.2)                                                  |
+| `winnerSeat`                               | `state.winner` (`null` on draws)                                                                              |
+| `endReason`                                | `state.endReason` (one of the six engine values)                                                              |
+| `onlineEndReason`                          | `room.onlineEndReason` mapped: `opponentAbandoned → "abandoned"`, `opponentIdleTimeout → "idle"`, else `null` |
+| `actionCount`                              | `log.a.length`                                                                                                |
+| `replay`                                   | `JSON.stringify({ v: 1, s: log.s, a: log.a })`                                                                |
+| `replayV`                                  | `1`                                                                                                           |
+| `startedAt`, `endedAt`                     | `room.matchStartedAt`, `now` of the terminal handler                                                          |
+| per seat: `userId`, `usernameSnapshot`     | `room.seats[slot]` (account kind)                                                                             |
+| per seat: `result`                         | `win` / `loss` from `winnerSeat`, `draw` when `null`                                                          |
+| per seat: `piecesLeft`                     | count of that seat's pieces on `state.board`                                                                  |
+| per seat: `captured`                       | `state.players[slot].captured`                                                                                |
 
 Nothing from any client message is used; the user id and username snapshot
 come from the verified seat identity only.
@@ -469,14 +487,17 @@ export type PersistMatchOutcome =
   | { ok: true; matchId: string; alreadyExisted: boolean }
   | { ok: false; error: string };
 
-export async function persistMatch(db: D1Database, payload: MatchPayload): Promise<PersistMatchOutcome>;
+export async function persistMatch(
+  db: D1Database,
+  payload: MatchPayload,
+): Promise<PersistMatchOutcome>;
 ```
 
 Algorithm:
 
 1. `SELECT id FROM match WHERE room_code = ?1 AND room_created_at = ?2 AND
-   match_number = ?3` — if a row exists, return `{ ok: true, matchId,
-   alreadyExisted: true }` (a previous attempt committed but the DO never
+match_number = ?3` — if a row exists, return `{ ok: true, matchId,
+alreadyExisted: true }` (a previous attempt committed but the DO never
    learned it).
 2. `db.batch([insert match, insert match_player A, insert match_player B])`.
    D1 runs a batch as one transaction: all three rows or none. Each insert
@@ -521,21 +542,21 @@ room, so the room is kept for inspection rather than "repaired".
 
 `skipped` states write no row and log nothing at error level:
 
-| Reason          | When                                                                        |
-| --------------- | --------------------------------------------------------------------------- |
-| `guestSeat`     | either seat is `guest` kind (D4)                                            |
-| `noActions`     | the log holds only the terminal resign (§5.2)                               |
+| Reason          | When                                                                         |
+| --------------- | ---------------------------------------------------------------------------- |
+| `guestSeat`     | either seat is `guest` kind (D4)                                             |
+| `noActions`     | the log holds only the terminal resign (§5.2)                                |
 | `logIncomplete` | the room was created before this deploy or the log key is missing/mismatched |
 
 ---
 
 ## 7. Configuration by environment
 
-| Item                          | dev / tests (`worker/wrangler.toml`)                           | e2e                                                        | preview (`wrangler.preview.toml`)               | production (`wrangler.production.toml`)          |
-| ----------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------ |
-| `[[d1_databases]]`            | `binding = "DB"`, `database_name = "shaxda-db"`, `database_id = "local-worker-database"`, `migrations_dir = "../packages/db/migrations"` | same binding; `scripts/start-worker-e2e.mjs` applies migrations into `test-results/wrangler-e2e` the way `start-web-e2e.mjs` does for the web | `database_id = 5a84ac83-…` (same DB as the web preview) | `database_id = b84cc232-…` (same DB as production web) |
-| Migration application         | Workers tests apply `TEST_MIGRATIONS` in a vitest `setupFiles` hook (`readD1Migrations("../packages/db/migrations")`), same as `packages/db`; `pnpm dev:worker` users run `wrangler d1 migrations apply DB --local` once | harness step                                        | `wrangler d1 migrations apply --config web/wrangler.preview.jsonc` (web stays the single operational authority; the worker config only declares the binding) | same, from `web/wrangler.jsonc`                     |
-| `MatchRoomEnv`                | `DB?: D1Database` added; absent binding → `failed:noBinding`, never a crash and never a guest downgrade |                                                            |                                                 |                                                  |
+| Item                  | dev / tests (`worker/wrangler.toml`)                                                                                                                                                                                     | e2e                                                                                                                                           | preview (`wrangler.preview.toml`)                                                                                                                            | production (`wrangler.production.toml`)                |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| `[[d1_databases]]`    | `binding = "DB"`, `database_name = "shaxda-db"`, `database_id = "local-worker-database"`, `migrations_dir = "../packages/db/migrations"`                                                                                 | same binding; `scripts/start-worker-e2e.mjs` applies migrations into `test-results/wrangler-e2e` the way `start-web-e2e.mjs` does for the web | `database_id = 5a84ac83-…` (same DB as the web preview)                                                                                                      | `database_id = b84cc232-…` (same DB as production web) |
+| Migration application | Workers tests apply `TEST_MIGRATIONS` in a vitest `setupFiles` hook (`readD1Migrations("../packages/db/migrations")`), same as `packages/db`; `pnpm dev:worker` users run `wrangler d1 migrations apply DB --local` once | harness step                                                                                                                                  | `wrangler d1 migrations apply --config web/wrangler.preview.jsonc` (web stays the single operational authority; the worker config only declares the binding) | same, from `web/wrangler.jsonc`                        |
+| `MatchRoomEnv`        | `DB?: D1Database` added; absent binding → `failed:noBinding`, never a crash and never a guest downgrade                                                                                                                  |                                                                                                                                               |                                                                                                                                                              |                                                        |
 
 `pnpm check:e2e-isolation` reads the web config's D1 bindings; extending it to
 the worker config is a Should. Either way it must keep passing.
@@ -549,13 +570,13 @@ references.
 
 ## 8. Cost model
 
-| Item                             | Per completed account game                          |
-| -------------------------------- | --------------------------------------------------- |
-| D1 rows written                  | 3 (one batch)                                       |
-| D1 rows read                     | 1 (`SELECT id`)                                     |
-| Durable Object storage           | one extra key (`log`), one extra `put` per accepted action, both within the existing per-action write |
-| Durable Object wall-clock        | one D1 round trip at game over; alarm wake-ups only on failure |
-| Storage per match                | ~1–2 KB typical, ≤ ~20 KB worst case                |
+| Item                      | Per completed account game                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| D1 rows written           | 3 (one batch)                                                                                         |
+| D1 rows read              | 1 (`SELECT id`)                                                                                       |
+| Durable Object storage    | one extra key (`log`), one extra `put` per accepted action, both within the existing per-action write |
+| Durable Object wall-clock | one D1 round trip at game over; alarm wake-ups only on failure                                        |
+| Storage per match         | ~1–2 KB typical, ≤ ~20 KB worst case                                                                  |
 
 At 10,000 completed account games/month: 30k rows written (D1 free tier is
 100k/day) and ≈ 20 MB/year of replay text. No per-move rows anywhere.
@@ -602,13 +623,13 @@ Worker (`worker/`, Workers pool, existing harness):
   `starting_seat`.
 - Guest-vs-guest and account-vs-guest → no row, `skipped: guestSeat`.
 - Claim-win (abandon and idle) rows carry `online_end_reason`, `end_reason =
-  'resignation'`, the synthetic `R:<seat>` as the last code, and validate.
+'resignation'`, the synthetic `R:<seat>` as the last code, and validate.
 - Zero-action claim → `skipped: noActions`, no row.
 - Corrupted stored log (via `runInDurableObject` storage) → `failed:
-  replayMismatch`, no row, room survives idle expiry until
+replayMismatch`, no row, room survives idle expiry until
   `FAILED_RETENTION_MS`, then cleanup runs.
 - Exhaustion: keep `match_player` dropped through all six delays → `failed:
-  exhausted`; the cleanup alarm did not delete the room while `pending`.
+exhausted`; the cleanup alarm did not delete the room while `pending`.
 - Legacy room (stored without `log` and `options`) normalises, plays, and
   ends as `skipped: logIncomplete`.
 - Starting seat: with `crypto.getRandomValues` mocked to each outcome the
@@ -655,7 +676,7 @@ test, `test:worker`, build) and `pnpm test:e2e`.
   clients.
 - Deploy order: apply the migration, deploy the game Worker, then the web
   Worker. Old web clients keep working against the new Worker; the new web
-  client only *reads* `savedMatchId`.
+  client only _reads_ `savedMatchId`.
 - A room that hibernates mid-match keeps `log` and `persist` in storage;
   instance rebuilds lose nothing.
 - Guest rooms gain the random starting seat immediately. No copy references
@@ -679,6 +700,7 @@ test, `test:worker`, build) and `pnpm test:e2e`.
    `decodeCompactReplay` and prints the final state's winner/endReason) agrees
    with the row. Play a rematch and confirm `match_number = 2` with the other
    `starting_seat`.
+
 3. Production: same steps; watch Workers logs for `matchReplayMismatch` and
    `matchPersistFailed` for a week.
 4. Add the D1 binding and the two log event names to
@@ -730,20 +752,20 @@ Additionally:
 
 ## 14. Decisions
 
-| ID     | Decision                                                                                                             | Rationale                                                                                                                                                                                                                              |
-| ------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| H1-D1  | The action log lives under its own storage key (`log`), written with `room` in one multi-key `put` when both change. | `persistRoom` rewrites the whole room on activity refreshes, connection changes, and rematch votes; keeping a growing log out of that value keeps those writes small. A single `put({ room, log })` keeps the pair consistent.        |
-| H1-D2  | Ledger uniqueness is `(room_code, room_created_at, match_number)`, not `(room_code, match_number)`.                  | Room codes are recycled after cleanup; `createdAt` identifies the room instance.                                                                                                                                                       |
-| H1-D3  | `started_at` = first accepted player action; `ended_at` = terminal action or claim.                                  | A room with two seats and no moves is not a game. Duration statistics (H4) want move time, not lobby time.                                                                                                                             |
-| H1-D4  | Matches with no player action are not persisted (`skipped: noActions`).                                              | They carry no replay value and would pollute history and ratings; K2 handles abandon-before-first-move cooldowns from the queue side.                                                                                                  |
-| H1-D5  | Six retries over ≈ 1 h 43 min, then `failed: exhausted`; failed rooms are retained 7 days with the payload.          | Bounded wake-ups, long enough for a D1 incident, and nothing is lost until an operator has had a week.                                                                                                                                 |
-| H1-D6  | `R:<seat>` carries the resigning seat; all other codes derive the player from state.                                 | Resignation is legal off-turn (engine and claim-win both do it), so a bare `R` is ambiguous.                                                                                                                                           |
-| H1-D7  | The random starting seat applies to every room, guest included, at room init.                                        | One rule and one code path; guests get fairness for free; seats are unknown at init so an account-only rule would need a second decision point.                                                                                       |
-| H1-D8  | The game Worker gets D1 through a dedicated `@shaxda/db/match` subpath with raw statements only.                     | Keeps Drizzle and the auth schema out of the game Worker bundle and makes "never reads auth tables" greppable.                                                                                                                         |
-| H1-D9  | `savedMatchId` is an optional field on `matchStatus`, not a new `matchSaved` message.                                | The client throws on unknown message types; cached PWA bundles would break. Optional fields are the established additive pattern from V1.1-A2.                                                                                         |
-| H1-D10 | `first_advantage_by` is derived at persist time by the engine, not stored in `GameState`.                            | Avoids an F1 contract change to `GameState`; the replay already has to run for validation.                                                                                                                                             |
-| H1-D11 | `match_player.user_id` has no foreign key to `user`.                                                                 | The ledger must survive A3 deletion semantics and the game Worker never touches `user`.                                                                                                                                                |
-| H1-D12 | Room options are accepted at `POST /rooms` and stored, but no client sends them in H1.                               | The brief wants the field; R2 owns the friendly toggle UI and K1 owns `quick`.                                                                                                                                                         |
+| ID     | Decision                                                                                                             | Rationale                                                                                                                                                                                                                      |
+| ------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| H1-D1  | The action log lives under its own storage key (`log`), written with `room` in one multi-key `put` when both change. | `persistRoom` rewrites the whole room on activity refreshes, connection changes, and rematch votes; keeping a growing log out of that value keeps those writes small. A single `put({ room, log })` keeps the pair consistent. |
+| H1-D2  | Ledger uniqueness is `(room_code, room_created_at, match_number)`, not `(room_code, match_number)`.                  | Room codes are recycled after cleanup; `createdAt` identifies the room instance.                                                                                                                                               |
+| H1-D3  | `started_at` = first accepted player action; `ended_at` = terminal action or claim.                                  | A room with two seats and no moves is not a game. Duration statistics (H4) want move time, not lobby time.                                                                                                                     |
+| H1-D4  | Matches with no player action are not persisted (`skipped: noActions`).                                              | They carry no replay value and would pollute history and ratings; K2 handles abandon-before-first-move cooldowns from the queue side.                                                                                          |
+| H1-D5  | Six retries over ≈ 1 h 43 min, then `failed: exhausted`; failed rooms are retained 7 days with the payload.          | Bounded wake-ups, long enough for a D1 incident, and nothing is lost until an operator has had a week.                                                                                                                         |
+| H1-D6  | `R:<seat>` carries the resigning seat; all other codes derive the player from state.                                 | Resignation is legal off-turn (engine and claim-win both do it), so a bare `R` is ambiguous.                                                                                                                                   |
+| H1-D7  | The random starting seat applies to every room, guest included, at room init.                                        | One rule and one code path; guests get fairness for free; seats are unknown at init so an account-only rule would need a second decision point.                                                                                |
+| H1-D8  | The game Worker gets D1 through a dedicated `@shaxda/db/match` subpath with raw statements only.                     | Keeps Drizzle and the auth schema out of the game Worker bundle and makes "never reads auth tables" greppable.                                                                                                                 |
+| H1-D9  | `savedMatchId` is an optional field on `matchStatus`, not a new `matchSaved` message.                                | The client throws on unknown message types; cached PWA bundles would break. Optional fields are the established additive pattern from V1.1-A2.                                                                                 |
+| H1-D10 | `first_advantage_by` is derived at persist time by the engine, not stored in `GameState`.                            | Avoids an F1 contract change to `GameState`; the replay already has to run for validation.                                                                                                                                     |
+| H1-D11 | `match_player.user_id` has no foreign key to `user`.                                                                 | The ledger must survive A3 deletion semantics and the game Worker never touches `user`.                                                                                                                                        |
+| H1-D12 | Room options are accepted at `POST /rooms` and stored, but no client sends them in H1.                               | The brief wants the field; R2 owns the friendly toggle UI and K1 owns `quick`.                                                                                                                                                 |
 
 ---
 

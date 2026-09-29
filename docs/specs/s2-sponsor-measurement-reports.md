@@ -1,11 +1,11 @@
 # S2 — Sponsor Measurement and Reports (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; specification only. S2 is not active or shipped. |
-| Brief | `docs/shaxda-v2.md` §6.3, §7.2, §12 (S1/S2), §14–§16 |
-| Depends on | S1 live bookings, four slot renderers, vetted HTTPS destinations and admin access; X1 anonymous browser id, rate limiting, and daily job |
-| Workspace | `s2-sponsor-reports` |
+| Field                    | Value                                                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status                   | Draft; specification only. S2 is not active or shipped.                                                                                                      |
+| Brief                    | `docs/shaxda-v2.md` §6.3, §7.2, §12 (S1/S2), §14–§16                                                                                                         |
+| Depends on               | S1 live bookings, four slot renderers, vetted HTTPS destinations and admin access; X1 anonymous browser id, rate limiting, and daily job                     |
+| Workspace                | `s2-sponsor-reports`                                                                                                                                         |
 | Touches when implemented | Web Worker routes and slot component; `packages/shared` validation; `packages/db` migration/queries; admin report and Somali copy; tests and operations docs |
 
 This spec refines S2 without activating it. The V2 brief wins on scope and
@@ -60,18 +60,18 @@ only when S1 actually renders a live sponsored creative.
 
 ## 2. Metric contract
 
-| Metric | Definition and display rule |
-| --- | --- |
-| Viewable impression | One accepted visibility event after the 50%/1-second test, subject to the rolling 30-minute gate for the same browser id, booking, and slot. Server receipt time assigns the UTC day. |
-| Estimated unique devices, daily | Distinct accepted browser ids for that booking and day. The same browser on two days counts once on each day. |
-| Estimated unique devices, booking | Distinct accepted browser ids across the entire booking. **Do not sum daily unique counts** to obtain this number. |
-| Click | One eligible navigation request to `/go/<bookingId>` that the server counts before redirecting. Repeated genuine navigations can count again; no JavaScript or impression is required. |
-| CTR | `clicks / viewable impressions × 100`, rounded only for display. When impressions are zero, show `—`, not 0%. Clicks may exceed impressions, so CTR may exceed 100%. |
+| Metric                            | Definition and display rule                                                                                                                                                            |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Viewable impression               | One accepted visibility event after the 50%/1-second test, subject to the rolling 30-minute gate for the same browser id, booking, and slot. Server receipt time assigns the UTC day.  |
+| Estimated unique devices, daily   | Distinct accepted browser ids for that booking and day. The same browser on two days counts once on each day.                                                                          |
+| Estimated unique devices, booking | Distinct accepted browser ids across the entire booking. **Do not sum daily unique counts** to obtain this number.                                                                     |
+| Click                             | One eligible navigation request to `/go/<bookingId>` that the server counts before redirecting. Repeated genuine navigations can count again; no JavaScript or impression is required. |
+| CTR                               | `clicks / viewable impressions × 100`, rounded only for display. When impressions are zero, show `—`, not 0%. Clicks may exceed impressions, so CTR may exceed 100%.                   |
 
 Each S1 booking owns one slot, so a booking report labels that slot; an admin
 comparison across bookings groups by slot. The `result` surface offers a view
 after each completed game, but the 30-minute gate can suppress additional
-*counted* impressions from the same browser. Do not claim one billable
+_counted_ impressions from the same browser. Do not claim one billable
 impression per completed game or use raw game completions as sponsor reach.
 
 Counts are first-party estimates, not proof of human attention. Private
@@ -190,11 +190,11 @@ the next migration number at implementation time. Keep S1's `sponsor` and
 `sponsor_booking` as the source for booked period, slot, and destination.
 Proposed S2 data shape:
 
-| Table | Key and fields | Purpose / index |
-| --- | --- | --- |
-| `sponsor_viewer_day` | PK `(booking_id, slot, day, viewer_hash)`; `last_counted_at`, `impressions` | One row per browser/booking/slot/UTC day that had an accepted impression. Indexed by `(booking_id, day)` for rollup and `(booking_id, viewer_hash)` for booking reach. No raw event log. |
-| `sponsor_stat_daily` | PK `(booking_id, day)`; `impressions`, `unique_devices`, `clicks`, `updated_at` | Aggregate report row. Daily impressions and unique devices are **replaced** by rollup; clicks are atomically incremented at redirect and preserved by rollup. Index the booking/day range. |
-| `sponsor_report_final` | PK `booking_id`; `unique_devices`, `finalized_at` | Frozen booking-wide distinct reach after the booking closes; keeps old reports accurate after pseudonymous rows are pruned. |
+| Table                  | Key and fields                                                                  | Purpose / index                                                                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sponsor_viewer_day`   | PK `(booking_id, slot, day, viewer_hash)`; `last_counted_at`, `impressions`     | One row per browser/booking/slot/UTC day that had an accepted impression. Indexed by `(booking_id, day)` for rollup and `(booking_id, viewer_hash)` for booking reach. No raw event log.   |
+| `sponsor_stat_daily`   | PK `(booking_id, day)`; `impressions`, `unique_devices`, `clicks`, `updated_at` | Aggregate report row. Daily impressions and unique devices are **replaced** by rollup; clicks are atomically incremented at redirect and preserved by rollup. Index the booking/day range. |
+| `sponsor_report_final` | PK `booking_id`; `unique_devices`, `finalized_at`                               | Frozen booking-wide distinct reach after the booking closes; keeps old reports accurate after pseudonymous rows are pruned.                                                                |
 
 No per-page-view row, sponsor cookie, raw IP, full URL, or user table join.
 All common reads begin with `booking_id` and a bounded day range; use
@@ -337,12 +337,12 @@ total report the founder can print or export and explain to the sponsor.
 
 ## 9. Decisions to confirm before implementation
 
-| ID | Proposed decision | Why it matters |
-| --- | --- | --- |
-| S2-D1 | Reach uses a browser-local anonymous id for every visitor and is labelled **estimated unique devices**. | X1's account anon id merges multiple devices and cannot support that label. |
-| S2-D2 | A 30-minute **rolling** gate uses the last accepted impression; it crosses UTC midnight. | Fixed half-hour buckets can count two views seconds apart. |
-| S2-D3 | Daily reports close at UTC midnight; finalized reach is snapshotted before viewer hashes expire. | Makes re-runs and historical exports consistent without retaining identifiers forever. |
-| S2-D4 | `/go` counts only eligible navigation requests, then redirects even when measurement fails. | Sponsor navigation remains usable; failures are disclosed. |
+| ID    | Proposed decision                                                                                       | Why it matters                                                                         |
+| ----- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| S2-D1 | Reach uses a browser-local anonymous id for every visitor and is labelled **estimated unique devices**. | X1's account anon id merges multiple devices and cannot support that label.            |
+| S2-D2 | A 30-minute **rolling** gate uses the last accepted impression; it crosses UTC midnight.                | Fixed half-hour buckets can count two views seconds apart.                             |
+| S2-D3 | Daily reports close at UTC midnight; finalized reach is snapshotted before viewer hashes expire.        | Makes re-runs and historical exports consistent without retaining identifiers forever. |
+| S2-D4 | `/go` counts only eligible navigation requests, then redirects even when measurement fails.             | Sponsor navigation remains usable; failures are disclosed.                             |
 
 S1's open product choices, including whether the `result` slot appears in
 local games, remain S1 decisions. If a S1 slot is absent, S2 neither invents

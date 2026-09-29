@@ -1,14 +1,14 @@
 # S1 — Sponsor Placements (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; specification only. S1 implementation has not started. |
-| Brief | `docs/shaxda-v2.md` §6.3, §7.1–7.2, §12 (S1), §14–17 |
-| Workspace | `s1-sponsor-placements` |
-| Depends on | X1 production audience numbers; `docs/shaxda_brd.md` created and approved before S1 implementation |
-| Unblocks | S2 sponsor measurement and reports; S3 sponsor page and rate card |
+| Field                    | Value                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Status                   | Draft; specification only. S1 implementation has not started.                                          |
+| Brief                    | `docs/shaxda-v2.md` §6.3, §7.1–7.2, §12 (S1), §14–17                                                   |
+| Workspace                | `s1-sponsor-placements`                                                                                |
+| Depends on               | X1 production audience numbers; `docs/shaxda_brd.md` created and approved before S1 implementation     |
+| Unblocks                 | S2 sponsor measurement and reports; S3 sponsor page and rate card                                      |
 | Touches when implemented | `AGENTS.md`, PRD, BRD, `packages/db`, `packages/i18n`, `web/`, web Wrangler configs, legal copy, tests |
-| Does not touch | Game Worker, rules engine, room protocol, account identity, X1 analytics tables |
+| Does not touch           | Game Worker, rules engine, room protocol, account identity, X1 analytics tables                        |
 
 This spec refines the V2 brief. The brief controls V2 scope; the PRD controls
 the stack and V1 architecture. S1 may start only after X1 provides production
@@ -69,12 +69,12 @@ status, but no card details, invoice file, or payment transaction.
 
 ## 2. Slot and display contract
 
-| Slot | Surface | Placement rule |
-| --- | --- | --- |
-| `home` | `/`, below the hero | One card after the primary play choices, outside the hero buttons. |
-| `lobby` | `/online` waiting screen and K1 quick-match waiting screen when K1 exists | Below room/wait controls. Never replaces the invite link or queue status. K1 integration is conditional on that milestone existing; no quick-match UI is built in S1. |
-| `result` | Game-over overlay on `/local` and `/online` | Below the result and its action buttons, inside the accessible dialog but outside the board hit area. No sponsor fetch blocks result display, rematch, or new game. |
-| `learn` | `/learn` between content sections | One inline card between complete sections, never inside a rule explanation or diagram. |
+| Slot     | Surface                                                                   | Placement rule                                                                                                                                                        |
+| -------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `home`   | `/`, below the hero                                                       | One card after the primary play choices, outside the hero buttons.                                                                                                    |
+| `lobby`  | `/online` waiting screen and K1 quick-match waiting screen when K1 exists | Below room/wait controls. Never replaces the invite link or queue status. K1 integration is conditional on that milestone existing; no quick-match UI is built in S1. |
+| `result` | Game-over overlay on `/local` and `/online`                               | Below the result and its action buttons, inside the accessible dialog but outside the board hit area. No sponsor fetch blocks result display, rematch, or new game.   |
+| `learn`  | `/learn` between content sections                                         | One inline card between complete sections, never inside a rule explanation or diagram.                                                                                |
 
 Use the same booked creative for every visitor to a given slot at the same
 instant. The endpoint does not accept user ids, account state, room codes, or
@@ -115,10 +115,10 @@ The server clock decides public eligibility; browser time is used only to
 avoid displaying a response after its included `endsAt`. The admin UI shows
 the stored UTC interval and a local-time explanation before confirmation.
 
-| Choice | Duration rule |
-| --- | --- |
-| `7d` | `ends_at = starts_at + 7 × 24 hours`. |
-| `14d` | `ends_at = starts_at + 14 × 24 hours`. |
+| Choice  | Duration rule                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `7d`    | `ends_at = starts_at + 7 × 24 hours`.                                                                              |
+| `14d`   | `ends_at = starts_at + 14 × 24 hours`.                                                                             |
 | `month` | One calendar month: starts at 00:00 UTC on the first day and ends at 00:00 UTC on the first day of the next month. |
 
 The founder may book future time, never backdate a new confirmation. A draft
@@ -153,10 +153,10 @@ Use a hand-written migration after the migrations that have actually merged
 when S1 starts, with matching Drizzle definitions. Do not reserve a migration
 number from the draft specs in this checkout. Keep auth tables unchanged.
 
-| Record | Required fields |
-| --- | --- |
-| `sponsor` | Opaque id; display name; one-line tagline; approved CTA URL and destination host; nullable R2 logo key; `draft`/`approved`/`archived` vetting status; vetting policy version and founder approval actor/time; created/updated actor/time. No email or contact person in public DTOs. |
-| `sponsor_booking` | Opaque id; sponsor id; slot enum; period enum; `starts_at`, `ends_at`; agreed price in integer minor units and ISO currency; `draft`/`confirmed`/`cancelled` state; created/updated actor/time; payment-confirmed actor/time; nullable cancellation actor/time/reason. |
+| Record            | Required fields                                                                                                                                                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sponsor`         | Opaque id; display name; one-line tagline; approved CTA URL and destination host; nullable R2 logo key; `draft`/`approved`/`archived` vetting status; vetting policy version and founder approval actor/time; created/updated actor/time. No email or contact person in public DTOs. |
+| `sponsor_booking` | Opaque id; sponsor id; slot enum; period enum; `starts_at`, `ends_at`; agreed price in integer minor units and ISO currency; `draft`/`confirmed`/`cancelled` state; created/updated actor/time; payment-confirmed actor/time; nullable cancellation actor/time/reason.               |
 
 Required constraints: nonblank bounded text; known slot/period/status;
 `starts_at < ends_at`; nonnegative agreed price; supported currency; approved
@@ -344,15 +344,15 @@ numbers; S2 adds those definitions and instrumentation.
 
 ## 9. Founder decisions to lock before implementation
 
-| Decision | Draft choice | Why it matters |
-| --- | --- | --- |
-| S1-D1 | Show `result` after both local and online games. | V2 §15 models the result slot on both modes; confirm the experience is acceptable. |
-| S1-D2 | Put `home` below the hero. | Matches the S1 slot table in the brief. |
-| S1-D3 | `month` means a UTC calendar month. | Removes ambiguity at month boundaries. |
-| S1-D4 | Use the suggested BRD content exclusions in §7. | Founder must approve the actual policy. |
-| S1-D5 | Label paid placements `Waxaa kafaala qaaday`. | Somali wording needs founder/language review. |
-| S1-D6 | Render nothing in an unbooked slot until S3 adds `/sponsor`. | Avoids a broken sales link or an S3 page built early. |
-| S1-D7 | Persist only `draft`/`confirmed`/`cancelled`; derive `live`/`ended`. | Scheduled delivery needs no cron and cannot drift from the clock. |
+| Decision | Draft choice                                                         | Why it matters                                                                     |
+| -------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| S1-D1    | Show `result` after both local and online games.                     | V2 §15 models the result slot on both modes; confirm the experience is acceptable. |
+| S1-D2    | Put `home` below the hero.                                           | Matches the S1 slot table in the brief.                                            |
+| S1-D3    | `month` means a UTC calendar month.                                  | Removes ambiguity at month boundaries.                                             |
+| S1-D4    | Use the suggested BRD content exclusions in §7.                      | Founder must approve the actual policy.                                            |
+| S1-D5    | Label paid placements `Waxaa kafaala qaaday`.                        | Somali wording needs founder/language review.                                      |
+| S1-D6    | Render nothing in an unbooked slot until S3 adds `/sponsor`.         | Avoids a broken sales link or an S3 page built early.                              |
+| S1-D7    | Persist only `draft`/`confirmed`/`cancelled`; derive `live`/`ended`. | Scheduled delivery needs no cron and cannot drift from the clock.                  |
 
 The first five choices are pending founder confirmation. Until then they are
 explicit draft assumptions, not launch approval.

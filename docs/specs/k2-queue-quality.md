@@ -1,11 +1,11 @@
 # K2 — Queue Quality (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; specification only. K2 is not active or shipped. |
-| Brief | `docs/shaxda-v2.md` §3, §6.4, §7, §11 (K1/K2), §14 |
-| Depends on | Merged K1 queue and frozen queue protocol; H1 match lifecycle; R1 rating snapshots; R2 rated-play policy; X1 aggregate analytics |
-| Workspace | `k2-queue-quality` |
+| Field                    | Value                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status                   | Draft; specification only. K2 is not active or shipped.                                                                                                 |
+| Brief                    | `docs/shaxda-v2.md` §3, §6.4, §7, §11 (K1/K2), §14                                                                                                      |
+| Depends on               | Merged K1 queue and frozen queue protocol; H1 match lifecycle; R1 rating snapshots; R2 rated-play policy; X1 aggregate analytics                        |
+| Workspace                | `k2-queue-quality`                                                                                                                                      |
 | Touches when implemented | Queue DO, trusted MatchRoom/queue handoff, web Worker, `/online` and quick-game result UI, shared schemas/i18n, X1 reporting, Workers and browser tests |
 
 This refines the K2 brief without activating it. K1 has no spec or queue
@@ -69,12 +69,12 @@ or automatic return after an opponent no-show preserves it; an explicit cancel
 followed by a new join gets a new time.
 
 | Elapsed wait for an account | Maximum absolute rating gap |
-| --- | ---: |
-| 0–29,999 ms | 100 |
-| 30,000–59,999 ms | 200 |
-| 60,000–89,999 ms | 300 |
-| 90,000–119,999 ms | 400 |
-| 120,000 ms or more | No gap limit |
+| --------------------------- | --------------------------: |
+| 0–29,999 ms                 |                         100 |
+| 30,000–59,999 ms            |                         200 |
+| 60,000–89,999 ms            |                         300 |
+| 90,000–119,999 ms           |                         400 |
+| 120,000 ms or more          |                No gap limit |
 
 For two candidates, use the **larger** of their two windows. This lets the
 longer-waiting player receive the broad match promised by the brief, even if
@@ -198,13 +198,13 @@ only counters and buckets and can be retained indefinitely, like X1's
 service-binding layout differs, preserve these data semantics and the
 game-Worker D1 write boundary.
 
-| Measure | Definition |
-| --- | --- |
-| `queue_joins` | Accepted **new** queue attempts, grouped by server UTC join day. Tab replacement and automatic no-show return are not new joins. |
-| `queue_pairs` | Successfully pre-claimed room pairs, grouped by server UTC pair day. A failed room creation is not a pair. |
-| `queue_starts` | Queue attempts whose quick room reached the first accepted game action, grouped by the original join day; each game contributes two starts. |
-| `queue_abandons` | Verified pre-action incidents, grouped by pair day; each responsible account contributes at most one per room. |
-| Wait distribution | One sample per player in a successful pair: `pairedAt - joinedAt` in nonnegative milliseconds, grouped by pair day. |
+| Measure           | Definition                                                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `queue_joins`     | Accepted **new** queue attempts, grouped by server UTC join day. Tab replacement and automatic no-show return are not new joins.            |
+| `queue_pairs`     | Successfully pre-claimed room pairs, grouped by server UTC pair day. A failed room creation is not a pair.                                  |
+| `queue_starts`    | Queue attempts whose quick room reached the first accepted game action, grouped by the original join day; each game contributes two starts. |
+| `queue_abandons`  | Verified pre-action incidents, grouped by pair day; each responsible account contributes at most one per room.                              |
+| Wait distribution | One sample per player in a successful pair: `pairedAt - joinedAt` in nonnegative milliseconds, grouped by pair day.                         |
 
 The internal `/admin/stats` view shows joins, pairs, median wait, abandon
 rate, and the share of queue joins that reach a started game. A daily join
@@ -300,14 +300,14 @@ outcomes. Mark K2 shipped in `docs/shaxda-v2.md` only after that verification.
 
 ## 8. Decisions and open choice
 
-| ID | Draft decision | Reason |
-| --- | --- | --- |
+| ID    | Draft decision                                                                                     | Reason                                                                                      |
+| ----- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | K2-D1 | Window grows by 100 rating points every 30 seconds to ±400, then becomes unbounded at 120 seconds. | Makes the brief's example deterministic and ensures the longest waiter can eventually pair. |
-| K2-D2 | The older account's wider window is sufficient for a pair. | Gives the long waiter a real benefit when new players arrive. |
-| K2-D3 | Presence is a 10-second cached count, visible only to signed-in accounts. | Small, anonymous, low-cost signal; never a live roster. |
-| K2-D4 | Re-queue is an explicit new attempt with a fresh ticket. | Avoids surprising automatic entry and stale rating snapshots. |
-| K2-D5 | Only attributable no-action room failures count as incidents. | Normal cancellation and uncertain outages should not punish players. |
-| K2-D6 | Queue metrics are server-owned daily aggregates; median is a labelled histogram estimate. | Avoids raw per-game analytics rows and makes repeated X1 rollups safe. |
+| K2-D2 | The older account's wider window is sufficient for a pair.                                         | Gives the long waiter a real benefit when new players arrive.                               |
+| K2-D3 | Presence is a 10-second cached count, visible only to signed-in accounts.                          | Small, anonymous, low-cost signal; never a live roster.                                     |
+| K2-D4 | Re-queue is an explicit new attempt with a fresh ticket.                                           | Avoids surprising automatic entry and stale rating snapshots.                               |
+| K2-D5 | Only attributable no-action room failures count as incidents.                                      | Normal cancellation and uncertain outages should not punish players.                        |
+| K2-D6 | Queue metrics are server-owned daily aggregates; median is a labelled histogram estimate.          | Avoids raw per-game analytics rows and makes repeated X1 rollups safe.                      |
 
 The founder's cooldown severity choice is pending. The conservative 5/30
 minute schedule in §4 is the default for implementation planning until that

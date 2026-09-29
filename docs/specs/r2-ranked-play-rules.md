@@ -1,13 +1,13 @@
 # R2 — Ranked Play Rules (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; policy and room UI are not implemented. Resolve the founder decisions in §10 before freezing the contract. |
-| Brief | `docs/shaxda-v2.md` §10 (R2), §7.2, §14, §16 (D2), §17 |
-| Depends on | H1 match ledger and room options; R1 rating event schema and processor |
-| Workspace | `r1-rating-system` (R1 and R2 are activated together) |
-| Unblocks | R3 leaderboard and K1 quick match |
-| Touches | `packages/shared` policy/copy contracts, `packages/db` additive migration and queries, `worker/` room outcome, `web/` online lobby and rating processor, `packages/i18n`, `/learn` |
+| Field      | Value                                                                                                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | Draft; policy and room UI are not implemented. Resolve the founder decisions in §10 before freezing the contract.                                                                  |
+| Brief      | `docs/shaxda-v2.md` §10 (R2), §7.2, §14, §16 (D2), §17                                                                                                                             |
+| Depends on | H1 match ledger and room options; R1 rating event schema and processor                                                                                                             |
+| Workspace  | `r1-rating-system` (R1 and R2 are activated together)                                                                                                                              |
+| Unblocks   | R3 leaderboard and K1 quick match                                                                                                                                                  |
+| Touches    | `packages/shared` policy/copy contracts, `packages/db` additive migration and queries, `worker/` room outcome, `web/` online lobby and rating processor, `packages/i18n`, `/learn` |
 
 This spec defines **which persisted games change ratings**, not the Glicko-2
 calculation. R1 owns the arithmetic, processor, rating event and rebuild. H1
@@ -69,14 +69,14 @@ games with one account cannot produce unlimited rated events.
 
 ## 2. Terms and immutable inputs
 
-| Term | Meaning |
-| --- | --- |
-| Rated intent | H1 `match.rated = 1`, captured from server-owned room options when the match ends. This is a request, not proof that the rating changed. |
-| Confirmed rated | R1 `rating_status = processed`: both seat events were committed. |
-| Friendly | An invite room created with `rated = false`; its persisted result is skipped with `friendly`. A guest room also plays without ratings but writes no match. |
-| Cap-skipped | A rated-intent match retained in the ledger with `rating_status = skipped` and `pairCap` or `dailyCap`. It has no rating event values and is labelled friendly/unrated, with the cap reason, in history/results. |
-| Aborted | A claim-win that does not meet the movement and two-started-seats rule. The game engine's terminal state and replay stay intact, but competitive W/L/D and ratings exclude it. |
-| Player action | An accepted `place`, `removeInitial`, `move`, or `capture` by that seat. A synthetic claim-win resignation and a manual resignation are terminal events, not evidence that the claimant or opponent started. |
+| Term            | Meaning                                                                                                                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rated intent    | H1 `match.rated = 1`, captured from server-owned room options when the match ends. This is a request, not proof that the rating changed.                                                                         |
+| Confirmed rated | R1 `rating_status = processed`: both seat events were committed.                                                                                                                                                 |
+| Friendly        | An invite room created with `rated = false`; its persisted result is skipped with `friendly`. A guest room also plays without ratings but writes no match.                                                       |
+| Cap-skipped     | A rated-intent match retained in the ledger with `rating_status = skipped` and `pairCap` or `dailyCap`. It has no rating event values and is labelled friendly/unrated, with the cap reason, in history/results. |
+| Aborted         | A claim-win that does not meet the movement and two-started-seats rule. The game engine's terminal state and replay stay intact, but competitive W/L/D and ratings exclude it.                                   |
+| Player action   | An accepted `place`, `removeInitial`, `move`, or `capture` by that seat. A synthetic claim-win resignation and a manual resignation are terminal events, not evidence that the claimant or opponent started.     |
 
 The policy reads `match.id`, `ended_at`, `mode`, `rated`, `winner_seat`,
 `end_reason`, `online_end_reason`, `replay`, `replay_v`, `competition_status`,
@@ -100,14 +100,14 @@ Evaluate these rows in order. A malformed ledger row is an error, never a
 friendly game. `competition_status` is independent of rating eligibility:
 an aborted friendly match is still aborted.
 
-| Authoritative end | Stored competitive result | Rating decision if both accounts and rated intent | Notes |
-| --- | --- | --- | --- |
-| Engine win by pieces, or engine draw | Engine W/L/D | Candidate; apply caps | The engine is the authority for the outcome. |
-| Manual `resign` (`online_end_reason = NULL`) | Winner/loser | Candidate; apply caps | Counts in placement, initial removal or movement, even as the first action. |
-| Claim-win, pre-claim movement, each seat has acted | Winner/loser | Candidate; apply caps | Covers abandonment and idle claims; losing seat is the absent/idle seat. |
-| Claim-win in placement or initial removal | `aborted` | Skip `aborted` | Save the replay and terminal engine outcome for audit; do not count a competitive win/loss. |
-| Claim-win in movement before either seat's first action | `aborted` | Skip `aborted` | Defensive rule for legacy or malformed rooms. |
-| Cleanup with no terminal result | No match row | No rating event | An expired lobby or abandoned room is not a draw. |
+| Authoritative end                                       | Stored competitive result | Rating decision if both accounts and rated intent | Notes                                                                                       |
+| ------------------------------------------------------- | ------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Engine win by pieces, or engine draw                    | Engine W/L/D              | Candidate; apply caps                             | The engine is the authority for the outcome.                                                |
+| Manual `resign` (`online_end_reason = NULL`)            | Winner/loser              | Candidate; apply caps                             | Counts in placement, initial removal or movement, even as the first action.                 |
+| Claim-win, pre-claim movement, each seat has acted      | Winner/loser              | Candidate; apply caps                             | Covers abandonment and idle claims; losing seat is the absent/idle seat.                    |
+| Claim-win in placement or initial removal               | `aborted`                 | Skip `aborted`                                    | Save the replay and terminal engine outcome for audit; do not count a competitive win/loss. |
+| Claim-win in movement before either seat's first action | `aborted`                 | Skip `aborted`                                    | Defensive rule for legacy or malformed rooms.                                               |
+| Cleanup with no terminal result                         | No match row              | No rating event                                   | An expired lobby or abandoned room is not a draw.                                           |
 
 If `rated = false`, a non-aborted completed match is `friendly` before caps
 are considered. A valid `quick` match must have `rated = true`; the future K1
@@ -151,7 +151,7 @@ R2 brief's early-claim record. Resolve this before rating activation:
    `competition_status` belongs to the ledger and is written by the DO;
    `rating_*` fields are rebuildable projections written by the web Worker.
 5. H2 history, match detail, summary and filters use `competition_status =
-   aborted` as an aborted outcome, exclude it from competitive W/L/D and win
+aborted` as an aborted outcome, exclude it from competitive W/L/D and win
    rate, and show confirmed rating status rather than treating `match.rated`
    alone as confirmation. R4/R5 must follow the same semantics. An early
    claim may still show which seat the engine declared winner in the replay
@@ -265,21 +265,21 @@ page is required for R2.
 
 ### Policy table: parameterised Workers/D1 tests
 
-| Case | Expected |
-| --- | --- |
-| Two accounts, invite rated, normal win/draw | `processed` for both, subject to caps |
-| Two accounts, invite friendly | `skipped:friendly`; no rating event values |
-| Account plus guest, local game, or uncompleted room | No ledger rating event |
-| Manual resign in each phase, including first action | Persisted, candidate for rating; resigning seat loses |
-| Claim in placement or initial removal, zero or one seat started | Persisted `aborted`, `skipped:aborted`, no competitive W/L/D |
-| Claim in movement, both seats started | Candidate for rating; absent/idle seat loses |
-| Claim in movement with a missing first action | `aborted` and skipped, even if a legacy row says game over |
-| Same pair's fourth candidate within 24 hours | `skipped:pairCap`; fifth also skips until a slot expires |
-| First candidate exactly 24 hours after oldest counted game | Counts again |
-| Same accounts with A/B swapped, new room, or rematch | Same unordered pair cap |
-| Two matches with equal `ended_at` | `match.id` determines cap winner and rebuild order |
-| Cap-skipped match followed by a new candidate | Skipped match consumes no cap slot |
-| Daily cap enabled: 31st game for either account on UTC day | Both players skipped; next UTC day resets |
+| Case                                                                  | Expected                                                      |
+| --------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Two accounts, invite rated, normal win/draw                           | `processed` for both, subject to caps                         |
+| Two accounts, invite friendly                                         | `skipped:friendly`; no rating event values                    |
+| Account plus guest, local game, or uncompleted room                   | No ledger rating event                                        |
+| Manual resign in each phase, including first action                   | Persisted, candidate for rating; resigning seat loses         |
+| Claim in placement or initial removal, zero or one seat started       | Persisted `aborted`, `skipped:aborted`, no competitive W/L/D  |
+| Claim in movement, both seats started                                 | Candidate for rating; absent/idle seat loses                  |
+| Claim in movement with a missing first action                         | `aborted` and skipped, even if a legacy row says game over    |
+| Same pair's fourth candidate within 24 hours                          | `skipped:pairCap`; fifth also skips until a slot expires      |
+| First candidate exactly 24 hours after oldest counted game            | Counts again                                                  |
+| Same accounts with A/B swapped, new room, or rematch                  | Same unordered pair cap                                       |
+| Two matches with equal `ended_at`                                     | `match.id` determines cap winner and rebuild order            |
+| Cap-skipped match followed by a new candidate                         | Skipped match consumes no cap slot                            |
+| Daily cap enabled: 31st game for either account on UTC day            | Both players skipped; next UTC day resets                     |
 | Malformed seats, replay, `competition_status`, or quick `rated=false` | Processor stops with operator error; no partial rating update |
 
 Also test room creation defaults and creator choice, guest fallback, server
@@ -322,12 +322,12 @@ not mark R2 shipped.
 
 ## 10. Founder decisions and specification defaults
 
-| ID | Decision | Current treatment |
-| --- | --- | --- |
-| R2-D1 | Invite rooms rated by default or friendly by default? | **Pending founder answer.** H1 and V2 currently propose rated by default. Do not freeze the creation default until confirmed. Explicit creator choice is required either way. |
-| R2-D2 | Pair cap of 3 rated games per unordered pair in rolling 24 hours? | Proposed by V2; used in this spec pending founder confirmation. |
-| R2-D3 | Enable the Should daily cap of 30 rated games per account per UTC day? | Pending founder answer. If declined, omit `dailyCap` from active policy v1 and copy. |
-| R2-D4 | Somali terms for rated, friendly, quick match and leaderboard? | Pending founder wording; implementation must use approved Somali copy. |
+| ID    | Decision                                                               | Current treatment                                                                                                                                                             |
+| ----- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R2-D1 | Invite rooms rated by default or friendly by default?                  | **Pending founder answer.** H1 and V2 currently propose rated by default. Do not freeze the creation default until confirmed. Explicit creator choice is required either way. |
+| R2-D2 | Pair cap of 3 rated games per unordered pair in rolling 24 hours?      | Proposed by V2; used in this spec pending founder confirmation.                                                                                                               |
+| R2-D3 | Enable the Should daily cap of 30 rated games per account per UTC day? | Pending founder answer. If declined, omit `dailyCap` from active policy v1 and copy.                                                                                          |
+| R2-D4 | Somali terms for rated, friendly, quick match and leaderboard?         | Pending founder wording; implementation must use approved Somali copy.                                                                                                        |
 
 The first three decisions affect policy, onboarding copy or replayable
 backfills and must be recorded before production activation. Any later change

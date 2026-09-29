@@ -1,11 +1,11 @@
 # R6 — Ranking Integrity and Tools (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; specification only. R6 is not active or shipped. |
-| Brief | `docs/shaxda-v2.md` §6.2, §7.2, §10 (R6), §14 |
-| Depends on | Merged H1 ledger, R1 rebuild/processor, R2 rating policy, R3 leaderboard and its derived projections |
-| Workspace | `r6-ranking-integrity` |
+| Field                    | Value                                                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status                   | Draft; specification only. R6 is not active or shipped.                                                                                    |
+| Brief                    | `docs/shaxda-v2.md` §6.2, §7.2, §10 (R6), §14                                                                                              |
+| Depends on               | Merged H1 ledger, R1 rebuild/processor, R2 rating policy, R3 leaderboard and its derived projections                                       |
+| Workspace                | `r6-ranking-integrity`                                                                                                                     |
 | Touches when implemented | `packages/db`, web Worker scheduled handler, repo admin scripts, rating rebuild, public read projections, tests; optionally `/admin/flags` |
 
 This refines the V2 R6 brief without activating it. The V2 brief controls scope,
@@ -133,12 +133,12 @@ and durations. Initial thresholds are conservative review triggers, not
 claims of fraud. Store `rule_v = 1`; threshold or window changes require a
 version increment and fixture review before running on historical data.
 
-| Reason code | Version 1 candidate condition | Evidence |
-| --- | --- | --- |
-| `winTrading` | Same pair has at least four rated games in a rolling 7 days, with winners alternating for four consecutive games, and at least three of those four games last at most 5 minutes. Draws break the run. | Four ordered ids, winner seats mapped to account ids, and durations. |
-| `instantResignations` | One account manually resigns in at least three rated games in a rolling 24 hours, each within 60 seconds and no more than two accepted actions. A claim-win's synthetic resign does not count. | Three ids, durations, action counts, and `online_end_reason = NULL`. |
-| `oneWayFeeding` | Same pair has at least five rated games in a rolling 7 days; one account loses at least four, and at least three of those losses are manual resignations or end within 5 minutes. | Five ordered ids, loss direction, reasons, and durations. |
-| `abnormalRate` | One account completes at least 20 rated games in a rolling 24 hours against at least three distinct opponents. If R2's optional daily cap makes this unreachable, lower the trigger only through a rule-version change grounded in measured data. | First and last qualifying ids, total count, distinct-opponent count, and an indexed way to inspect the full bounded window. |
+| Reason code           | Version 1 candidate condition                                                                                                                                                                                                                     | Evidence                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `winTrading`          | Same pair has at least four rated games in a rolling 7 days, with winners alternating for four consecutive games, and at least three of those four games last at most 5 minutes. Draws break the run.                                             | Four ordered ids, winner seats mapped to account ids, and durations.                                                        |
+| `instantResignations` | One account manually resigns in at least three rated games in a rolling 24 hours, each within 60 seconds and no more than two accepted actions. A claim-win's synthetic resign does not count.                                                    | Three ids, durations, action counts, and `online_end_reason = NULL`.                                                        |
+| `oneWayFeeding`       | Same pair has at least five rated games in a rolling 7 days; one account loses at least four, and at least three of those losses are manual resignations or end within 5 minutes.                                                                 | Five ordered ids, loss direction, reasons, and durations.                                                                   |
+| `abnormalRate`        | One account completes at least 20 rated games in a rolling 24 hours against at least three distinct opponents. If R2's optional daily cap makes this unreachable, lower the trigger only through a rule-version change grounded in measured data. | First and last qualifying ids, total count, distinct-opponent count, and an indexed way to inspect the full bounded window. |
 
 Duration is `max(0, ended_at - started_at)` from the stored server
 timestamps. A negative or missing duration is a ledger consistency error,
@@ -164,13 +164,13 @@ Write a hand-authored migration numbered after the merged R1/R3 migrations,
 with matching Drizzle schema. The exact SQL names must be reconciled at
 implementation. Keep these logical records and invariants:
 
-| Record | Required fields and constraint |
-| --- | --- |
-| `rating_flag` | Opaque id; reason code; rule version; subject type and canonical private subject key; first/last evidence times; bounded JSON array of match ids and numeric evidence; `open`/`dismissed`/`stale`/`actioned` review state; created/updated times. A manual invalidation also writes a `manualInvalidation` flag tied to one match and its stated reason, satisfying the V2 `rating_flag` contract. |
-| `rating_invalidation` | `match_id` primary key; linked manual flag id; reason text/code; actor id; created time. Its existence is the authoritative exclusion input to the rating rebuild. It is append-only in R6; no implicit un-invalidate command. |
-| `rating_account_exclusion` | `user_id` primary key; current excluded boolean, reason, actor id, and change time. This is the administrative source for R3's `player_rating.excluded` projection and survives even if a rebuild removes the player's last rated event. |
-| `rating_admin_audit` | Monotonic id; actor id; environment; operation; target id; UTC time; reason; plan/diff digest; prior and resulting state; outcome (`planned`, `applied`, `failed`). Append, never update or delete. No password, token, email, or copied replay. |
-| Detection cursor | Rule version and last `(ended_at, match.id)` examined, plus updated time. It is operational state only; rerunning a chunk is safe. |
+| Record                     | Required fields and constraint                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rating_flag`              | Opaque id; reason code; rule version; subject type and canonical private subject key; first/last evidence times; bounded JSON array of match ids and numeric evidence; `open`/`dismissed`/`stale`/`actioned` review state; created/updated times. A manual invalidation also writes a `manualInvalidation` flag tied to one match and its stated reason, satisfying the V2 `rating_flag` contract. |
+| `rating_invalidation`      | `match_id` primary key; linked manual flag id; reason text/code; actor id; created time. Its existence is the authoritative exclusion input to the rating rebuild. It is append-only in R6; no implicit un-invalidate command.                                                                                                                                                                     |
+| `rating_account_exclusion` | `user_id` primary key; current excluded boolean, reason, actor id, and change time. This is the administrative source for R3's `player_rating.excluded` projection and survives even if a rebuild removes the player's last rated event.                                                                                                                                                           |
+| `rating_admin_audit`       | Monotonic id; actor id; environment; operation; target id; UTC time; reason; plan/diff digest; prior and resulting state; outcome (`planned`, `applied`, `failed`). Append, never update or delete. No password, token, email, or copied replay.                                                                                                                                                   |
+| Detection cursor           | Rule version and last `(ended_at, match.id)` examined, plus updated time. It is operational state only; rerunning a chunk is safe.                                                                                                                                                                                                                                                                 |
 
 Add indexes for: rated events in `(ended_at, id)` order; player event windows
 through `match_player(user_id, ended_at, match_id)`; pair windows via the two
@@ -202,16 +202,16 @@ Wrangler's D1 access rather than a public mutation HTTP route. Scripts must
 avoid shell interpolation of user input; validate opaque ids, reason codes,
 limits, and flags before preparing any query.
 
-| Command | Output or effect |
-| --- | --- |
-| `flags` | Paginated open/stale/recent flags with reason, subject, time window, and evidence ids; no private identity export by default. |
-| `inspect-match <id>` | Immutable row, both seats, replay version, room mode, stored result/reasons, rating status and both current event rows, invalidation and audit links. Private ids are shown only to the operator. |
-| `verify-replay <id>` | Decode/replay through the frozen H1 engine, compare final state/result/starting seat and relevant stored counts; nonzero exit on unsupported or divergent replay. No mutation. |
-| `inspect-rating <id>` | Show R1/R2 policy and algorithm versions, ordered prior states, cap decision, computed simultaneous event, stored before/after/delta, and first divergence. Accept a match id; account lookup is an optional bounded filter. |
-| `check-consistency` | Bounded or explicit full check of stored result versus replay, seat results, processed/skipped fields, rating events and projections; report first mismatch and exit nonzero. It does not repair. |
-| `invalidate-match <id>` | Require a nonempty operator reason. Plan the new invalidation, full rebuild, changed statuses and ratings, then apply only the reviewed plan. Repeating an identical applied request is a no-op; a conflicting reason fails. |
-| `exclude-account <id>` / `include-account <id>` | Require a reason and show the before/after public eligibility. Change only R3 exclusion metadata and refresh/invalidate leaderboard cache or snapshot. Repeated same-state requests are no-ops, still audited as attempts. |
-| `rebuild-ratings` | Dry-run/diff by default using R1's exact oracle. Explicit apply follows the guarded procedure below; no deploy hook or test invokes remote apply. |
+| Command                                         | Output or effect                                                                                                                                                                                                             |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flags`                                         | Paginated open/stale/recent flags with reason, subject, time window, and evidence ids; no private identity export by default.                                                                                                |
+| `inspect-match <id>`                            | Immutable row, both seats, replay version, room mode, stored result/reasons, rating status and both current event rows, invalidation and audit links. Private ids are shown only to the operator.                            |
+| `verify-replay <id>`                            | Decode/replay through the frozen H1 engine, compare final state/result/starting seat and relevant stored counts; nonzero exit on unsupported or divergent replay. No mutation.                                               |
+| `inspect-rating <id>`                           | Show R1/R2 policy and algorithm versions, ordered prior states, cap decision, computed simultaneous event, stored before/after/delta, and first divergence. Accept a match id; account lookup is an optional bounded filter. |
+| `check-consistency`                             | Bounded or explicit full check of stored result versus replay, seat results, processed/skipped fields, rating events and projections; report first mismatch and exit nonzero. It does not repair.                            |
+| `invalidate-match <id>`                         | Require a nonempty operator reason. Plan the new invalidation, full rebuild, changed statuses and ratings, then apply only the reviewed plan. Repeating an identical applied request is a no-op; a conflicting reason fails. |
+| `exclude-account <id>` / `include-account <id>` | Require a reason and show the before/after public eligibility. Change only R3 exclusion metadata and refresh/invalidate leaderboard cache or snapshot. Repeated same-state requests are no-ops, still audited as attempts.   |
+| `rebuild-ratings`                               | Dry-run/diff by default using R1's exact oracle. Explicit apply follows the guarded procedure below; no deploy hook or test invokes remote apply.                                                                            |
 
 The operator must identify themself through the established admin allowlist
 or an equally strong non-user service identity. A Cloudflare API token by
@@ -345,12 +345,12 @@ alone does not mark R6 shipped.
 
 ## 9. Decisions recorded by this draft
 
-| ID | Draft decision | Reason |
-| --- | --- | --- |
-| R6-D1 | Fixed, conservative, versioned detection thresholds; flags are review-only. | Avoid automatic penalties and keep false positives inspectable. |
-| R6-D2 | `rating_invalidation` is the rebuild input; the H1 match result/replay stays immutable. | A correction must remain traceable and reproducible. |
-| R6-D3 | Full rebuild after invalidation; preserve separate leaderboard exclusion metadata. | Pair caps and later opponents can change beyond the two seats. |
-| R6-D4 | Remote writes require explicit environment, actor, plan digest, backup, audit, and preview rehearsal. | Prevent applying a stale correction or publishing mixed state. |
+| ID    | Draft decision                                                                                        | Reason                                                          |
+| ----- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| R6-D1 | Fixed, conservative, versioned detection thresholds; flags are review-only.                           | Avoid automatic penalties and keep false positives inspectable. |
+| R6-D2 | `rating_invalidation` is the rebuild input; the H1 match result/replay stays immutable.               | A correction must remain traceable and reproducible.            |
+| R6-D3 | Full rebuild after invalidation; preserve separate leaderboard exclusion metadata.                    | Pair caps and later opponents can change beyond the two seats.  |
+| R6-D4 | Remote writes require explicit environment, actor, plan digest, backup, audit, and preview rehearsal. | Prevent applying a stale correction or publishing mixed state.  |
 
 ## 10. Founder choices to confirm
 

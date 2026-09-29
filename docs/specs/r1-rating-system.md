@@ -1,13 +1,13 @@
 # R1 — Rating System (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; implementation blocked on the H1 ledger. R1 activation is coordinated with R2. |
-| Brief | `docs/shaxda-v2.md` §6.2, §7.2, §10 (R1), §14 |
-| Depends on | H1 match and match_player ledger, including an additive saved-match id on room status for the result overlay |
-| Workspace | `r1-rating-system` (the V2 brief recommends implementing R2 in the same workspace) |
-| Unblocks | R2 eligibility enforcement, R3 leaderboard, R4/R5 rating displays, K1 skill pairing, R6 rebuild and correction tools |
-| Freeze point | R1 event order, rating policy version, status, and before/after/delta semantics freeze on merge |
+| Field        | Value                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Status       | Draft; implementation blocked on the H1 ledger. R1 activation is coordinated with R2.                                |
+| Brief        | `docs/shaxda-v2.md` §6.2, §7.2, §10 (R1), §14                                                                        |
+| Depends on   | H1 match and match_player ledger, including an additive saved-match id on room status for the result overlay         |
+| Workspace    | `r1-rating-system` (the V2 brief recommends implementing R2 in the same workspace)                                   |
+| Unblocks     | R2 eligibility enforcement, R3 leaderboard, R4/R5 rating displays, K1 skill pairing, R6 rebuild and correction tools |
+| Freeze point | R1 event order, rating policy version, status, and before/after/delta semantics freeze on merge                      |
 
 This is an implementation spec for **R1 only**. R2 owns friendly-room controls,
 the full eligibility and claim policy, pair caps, and rated-play explanation.
@@ -82,16 +82,16 @@ zero when player uncertainties differ.
 
 Defaults, frozen as `algorithm_v = 1`:
 
-| Parameter | Value | Interpretation |
-| --- | --- | --- |
-| Initial rating | 1500 | Internal full-precision value |
-| Initial RD | 350 | Maximum effective RD |
-| Initial volatility | 0.06 | Glicko-2 scale |
-| τ | 0.5 | Volatility constraint |
-| Scale | 173.7178 | `(rating - 1500) / scale`, `RD / scale` |
-| Solver tolerance | 0.000001 | Corrected Illinois iteration from the 2022 paper |
-| Inactivity period | 24 elapsed hours | A completed period with no match increases RD |
-| Provisional cutoff | effective RD > 110 | Exactly 110 is not provisional |
+| Parameter          | Value              | Interpretation                                   |
+| ------------------ | ------------------ | ------------------------------------------------ |
+| Initial rating     | 1500               | Internal full-precision value                    |
+| Initial RD         | 350                | Maximum effective RD                             |
+| Initial volatility | 0.06               | Glicko-2 scale                                   |
+| τ                  | 0.5                | Volatility constraint                            |
+| Scale              | 173.7178           | `(rating - 1500) / scale`, `RD / scale`          |
+| Solver tolerance   | 0.000001           | Corrected Illinois iteration from the 2022 paper |
+| Inactivity period  | 24 elapsed hours   | A completed period with no match increases RD    |
+| Provisional cutoff | effective RD > 110 | Exactly 110 is not provisional                   |
 
 The pure package exposes `updatePeriod(player, opponents[])` to test the
 published multi-opponent example and `updateMatch(preA, preB, result)` to
@@ -132,12 +132,12 @@ and the published 1500/200 example ending near 1464.06/151.52.
 Use an additive, hand-written migration numbered after merged H1. Names here
 are a contract to reconcile with R2 before migration is committed.
 
-| Table | Added fields | Rules |
-| --- | --- | --- |
-| `match` | `rating_status` (`pending`, `processed`, `skipped`), `rating_skip_reason` nullable, `rating_policy_v` integer nullable, `rating_algorithm_v` integer nullable, `rated_processed_at` integer nullable | `rating_status` is NOT NULL DEFAULT `pending` so future H1 inserts enter the queue. `processed` and `skipped` are terminal projections. `rated` stays the immutable room intent. |
-| `match_player` | `rating_before`, `rd_before`, `volatility_before`, `rating_after`, `rd_after`, `volatility_after`, `rating_delta` (nullable REALs) | Both seats populated together for `processed`; all null for `pending`/`skipped`. `rating_delta = rating_after - rating_before` at full precision. `rd_before` is after inactivity adjustment. |
-| `player_rating` | `user_id` PK, `rating`, `rd`, `volatility`, `rated_games`, `peak_rating`, `last_rated_at`, `last_match_id`, `version`, `excluded` | One row after the first rated game. `excluded` defaults false and is administrative metadata, preserved across rebuild. No foreign key to `user`, matching H1's deletion-safe ledger. |
-| `rating_processor_state` | singleton key, `last_ended_at`, `last_match_id`, `version`, `lease_token`, `lease_expires_at` | Global processed cursor and short lease for serialized processing. Cursor starts before the first event. |
+| Table                    | Added fields                                                                                                                                                                                         | Rules                                                                                                                                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `match`                  | `rating_status` (`pending`, `processed`, `skipped`), `rating_skip_reason` nullable, `rating_policy_v` integer nullable, `rating_algorithm_v` integer nullable, `rated_processed_at` integer nullable | `rating_status` is NOT NULL DEFAULT `pending` so future H1 inserts enter the queue. `processed` and `skipped` are terminal projections. `rated` stays the immutable room intent.              |
+| `match_player`           | `rating_before`, `rd_before`, `volatility_before`, `rating_after`, `rd_after`, `volatility_after`, `rating_delta` (nullable REALs)                                                                   | Both seats populated together for `processed`; all null for `pending`/`skipped`. `rating_delta = rating_after - rating_before` at full precision. `rd_before` is after inactivity adjustment. |
+| `player_rating`          | `user_id` PK, `rating`, `rd`, `volatility`, `rated_games`, `peak_rating`, `last_rated_at`, `last_match_id`, `version`, `excluded`                                                                    | One row after the first rated game. `excluded` defaults false and is administrative metadata, preserved across rebuild. No foreign key to `user`, matching H1's deletion-safe ledger.         |
+| `rating_processor_state` | singleton key, `last_ended_at`, `last_match_id`, `version`, `lease_token`, `lease_expires_at`                                                                                                        | Global processed cursor and short lease for serialized processing. Cursor starts before the first event.                                                                                      |
 
 Add an index on `match(rating_status, ended_at, id)` for the bounded pending
 scan; H1 already proposes `match(rated, ended_at)`. Add indexes on
@@ -315,12 +315,12 @@ shipped from a spec or local fixture alone.
 
 ## 8. Decisions to confirm with the founder
 
-| ID | Proposed decision | Why it matters |
-| --- | --- | --- |
-| R1-D1 | Ship R1 and R2 together and activate live ratings only after R2 policy is enforced. | H1's `rated = true` is intent, not the complete anti-farming/claim policy. |
-| R1-D2 | Use per-game Glicko-2 with τ 0.5, 24-hour empty periods, RD > 110 provisional. | Rebuild needs one stable arithmetic contract; τ can change only with a versioned rebuild. |
-| R1-D3 | Show an optional immediate estimate, then confirmed movement. | Gives timely feedback while retaining the ledger as authority. |
-| R1-D4 | Late historical matches pause normal publication until a guarded rebuild. | Tail processing would make all affected subsequent ratings wrong. |
+| ID    | Proposed decision                                                                   | Why it matters                                                                            |
+| ----- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| R1-D1 | Ship R1 and R2 together and activate live ratings only after R2 policy is enforced. | H1's `rated = true` is intent, not the complete anti-farming/claim policy.                |
+| R1-D2 | Use per-game Glicko-2 with τ 0.5, 24-hour empty periods, RD > 110 provisional.      | Rebuild needs one stable arithmetic contract; τ can change only with a versioned rebuild. |
+| R1-D3 | Show an optional immediate estimate, then confirmed movement.                       | Gives timely feedback while retaining the ledger as authority.                            |
+| R1-D4 | Late historical matches pause normal publication until a guarded rebuild.           | Tail processing would make all affected subsequent ratings wrong.                         |
 
 R1-D1 and R1-D3 are pending founder preference. All other choices are
 implementation defaults within the V2 brief and can be refined before the

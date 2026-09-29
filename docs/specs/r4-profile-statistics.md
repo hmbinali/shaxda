@@ -1,13 +1,13 @@
 # R4 — Profile Statistics (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; specification only. R4 is not active or shipped. |
-| Brief | `docs/shaxda-v2.md` §10 (R4), §5, §7.2, §16 D8 |
-| Depends on | H2 public match/history reads; H4 versioned match stats and backfill; R1 confirmed rating events; R3 shared public-rank query; R2 competition status |
-| Workspace | `r4-profile-statistics` (may share a review flow with R3) |
-| Unblocks | R5 head-to-head and rating-history presentation |
-| Touches when implemented | `packages/db` read queries, `web/src/routes/u/[username]`, `packages/i18n`, profile components, tests |
+| Field                    | Value                                                                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status                   | Draft; specification only. R4 is not active or shipped.                                                                                              |
+| Brief                    | `docs/shaxda-v2.md` §10 (R4), §5, §7.2, §16 D8                                                                                                       |
+| Depends on               | H2 public match/history reads; H4 versioned match stats and backfill; R1 confirmed rating events; R3 shared public-rank query; R2 competition status |
+| Workspace                | `r4-profile-statistics` (may share a review flow with R3)                                                                                            |
+| Unblocks                 | R5 head-to-head and rating-history presentation                                                                                                      |
+| Touches when implemented | `packages/db` read queries, `web/src/routes/u/[username]`, `packages/i18n`, profile components, tests                                                |
 
 This document refines the R4 brief without activating the milestone. The V2
 brief wins on scope and order, the PRD on the stack, and `docs/shaxda_game.md`
@@ -73,16 +73,16 @@ become a win, loss, draw, streak result, fastest win, or Shaxda aggregate.
 Guest-involved and local games have no ledger row. This is the draft choice in
 R4-D1; confirm it with the founder before implementation.
 
-| Value | Source and exact rule |
-| --- | --- |
-| Games and W/L/D | Count competitive `match_player.result` rows for this account, including friendly and rating-skipped games. `games = wins + losses + draws`. Never count an R2 aborted row as a loss/win despite the engine's terminal state. |
-| Win rate | `wins / games × 100`, displayed to a whole percent; for zero games show an unavailable mark, not `0%`. Draws remain in the denominator. |
-| Current streak | Consecutive newest competitive results of the **same** kind (`win`, `loss`, or `draw`), ordered by `(ended_at DESC, match.id DESC)`. A friendly or cap-skipped result participates; an aborted row is ignored. Show result kind and length. Zero games has no streak. |
-| Best streak | Longest consecutive **win** run across the same ordered competitive results; `0` before any win. Draws/losses break it. The current streak can therefore be a draw/loss while best streak remains a win run. |
-| Recent form | Up to five newest competitive results in time order, oldest to newest. Use H2's form component/copy so the marks and accessibility labels agree. |
-| Rating | R1 `player_rating.rating` rounded only for display; R1 effective RD at one captured `asOf` decides the `?` marker. No row after zero rated games means “not rated yet”, not a fabricated 1500 current rating. |
-| Peak | R1 `peak_rating` rounded for display, only when a `player_rating` row exists. The R1 initial 1500 floor applies even if later ratings fall below it. |
-| Rank | `readPublicRankForUser(db, userId, asOf)` from R3. Show a number only when R3's effective-RD, rated-game-count, recent-activity, exclusion, and current-profile tests all pass. Otherwise show “not ranked yet”; do not publish operator exclusion details. |
+| Value           | Source and exact rule                                                                                                                                                                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Games and W/L/D | Count competitive `match_player.result` rows for this account, including friendly and rating-skipped games. `games = wins + losses + draws`. Never count an R2 aborted row as a loss/win despite the engine's terminal state.                                         |
+| Win rate        | `wins / games × 100`, displayed to a whole percent; for zero games show an unavailable mark, not `0%`. Draws remain in the denominator.                                                                                                                               |
+| Current streak  | Consecutive newest competitive results of the **same** kind (`win`, `loss`, or `draw`), ordered by `(ended_at DESC, match.id DESC)`. A friendly or cap-skipped result participates; an aborted row is ignored. Show result kind and length. Zero games has no streak. |
+| Best streak     | Longest consecutive **win** run across the same ordered competitive results; `0` before any win. Draws/losses break it. The current streak can therefore be a draw/loss while best streak remains a win run.                                                          |
+| Recent form     | Up to five newest competitive results in time order, oldest to newest. Use H2's form component/copy so the marks and accessibility labels agree.                                                                                                                      |
+| Rating          | R1 `player_rating.rating` rounded only for display; R1 effective RD at one captured `asOf` decides the `?` marker. No row after zero rated games means “not rated yet”, not a fabricated 1500 current rating.                                                         |
+| Peak            | R1 `peak_rating` rounded for display, only when a `player_rating` row exists. The R1 initial 1500 floor applies even if later ratings fall below it.                                                                                                                  |
+| Rank            | `readPublicRankForUser(db, userId, asOf)` from R3. Show a number only when R3's effective-RD, rated-game-count, recent-activity, exclusion, and current-profile tests all pass. Otherwise show “not ranked yet”; do not publish operator exclusion details.           |
 
 R3's leaderboard W/L/D and streak are **confirmed rated events only** in its
 current draft. R4's broader record is explicitly labelled as all competitive
@@ -123,17 +123,17 @@ profile request. Select the seat's H4 values by `match_player.seat`, not by a
 username or historical avatar. All general Shaxda aggregates use the same
 competitive-match set as §2; rating status does not filter them.
 
-| Display | Calculation |
-| --- | --- |
-| Total captures | Sum H4 `capturesMade` over included matches. Reconcile against H1 `match_player.captured` during verification. |
-| Average captures per game | Total captures divided by included competitive games, including zero-capture games; show one decimal. |
-| Jare / repeated jare | Sum H4 `jareEvents` and `repeatedJareEvents`; repeated is a subset, never an extra capture count. |
-| Average duration | Mean of `ended_at - started_at` for included games; use H2's duration formatter. Wall time includes connection delays, so label it as game duration. |
-| Fastest win | Minimum nonnegative duration among included **normal board wins** (`opponentBelowThree` or `opponentCapturedAll`), excluding resignations and online abandoned/idle claims. Show unavailable if none. This is R4-D2, pending founder confirmation. |
-| Wins as starter / non-starter | Count included wins where `match_player.seat` equals / differs from H1 `match.starting_seat`. These two counts sum to total wins. |
-| Wins with / without first advantage | Count included wins where `first_advantage_seat` equals / differs from the player's seat. If advantage was never decided (`NULL`), show a separate “undecided” count so no win disappears from the total. |
-| Comeback wins | Count included wins whose own H4 `comeback` is true, using H4's two-capture-deficit definition. Do not infer a comeback from final score. |
-| Draws by type | Group included draws by the authoritative engine `end_reason`: `bothBlocked`, `forcedJareSpaceMaking`, and `drawTermination`. The last engine reason covers repetition and the 80-turn clock in H1; do not claim that these are separately known unless H1 later stores an explicit subtype. The grouped sum equals draw count. |
+| Display                             | Calculation                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Total captures                      | Sum H4 `capturesMade` over included matches. Reconcile against H1 `match_player.captured` during verification.                                                                                                                                                                                                                  |
+| Average captures per game           | Total captures divided by included competitive games, including zero-capture games; show one decimal.                                                                                                                                                                                                                           |
+| Jare / repeated jare                | Sum H4 `jareEvents` and `repeatedJareEvents`; repeated is a subset, never an extra capture count.                                                                                                                                                                                                                               |
+| Average duration                    | Mean of `ended_at - started_at` for included games; use H2's duration formatter. Wall time includes connection delays, so label it as game duration.                                                                                                                                                                            |
+| Fastest win                         | Minimum nonnegative duration among included **normal board wins** (`opponentBelowThree` or `opponentCapturedAll`), excluding resignations and online abandoned/idle claims. Show unavailable if none. This is R4-D2, pending founder confirmation.                                                                              |
+| Wins as starter / non-starter       | Count included wins where `match_player.seat` equals / differs from H1 `match.starting_seat`. These two counts sum to total wins.                                                                                                                                                                                               |
+| Wins with / without first advantage | Count included wins where `first_advantage_seat` equals / differs from the player's seat. If advantage was never decided (`NULL`), show a separate “undecided” count so no win disappears from the total.                                                                                                                       |
+| Comeback wins                       | Count included wins whose own H4 `comeback` is true, using H4's two-capture-deficit definition. Do not infer a comeback from final score.                                                                                                                                                                                       |
+| Draws by type                       | Group included draws by the authoritative engine `end_reason`: `bothBlocked`, `forcedJareSpaceMaking`, and `drawTermination`. The last engine reason covers repetition and the 80-turn clock in H1; do not claim that these are separately known unless H1 later stores an explicit subtype. The grouped sum equals draw count. |
 
 For zero competitive games, display zero counts and dashes for averages and
 fastest win; no empty denominator is formatted as `NaN` or `0.0`. If any
@@ -298,11 +298,11 @@ preview privacy/cost verification pass. A saved draft is not shipment.
 
 ## 7. Decisions to confirm
 
-| ID | Decision | Draft treatment |
-| --- | --- | --- |
+| ID    | Decision                                              | Draft treatment                                                                                                                                                                   |
+| ----- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | R4-D1 | Which games enter the public W/L/D and Shaxda totals? | All persisted competitive account matches, rated and friendly; exclude R2-aborted rows from competitive totals but show them neutrally in recent matches. Pending founder answer. |
-| R4-D2 | What counts as the fastest win? | Shortest elapsed normal board win, excluding resignation and abandoned/idle claims. Pending founder answer. |
-| R4-D3 | Does best streak mean best win streak? | Yes; current streak can be a win, loss, or draw run, while best is a win run. Confirm during copy review. |
+| R4-D2 | What counts as the fastest win?                       | Shortest elapsed normal board win, excluding resignation and abandoned/idle claims. Pending founder answer.                                                                       |
+| R4-D3 | Does best streak mean best win streak?                | Yes; current streak can be a win, loss, or draw run, while best is a win run. Confirm during copy review.                                                                         |
 
 These decisions affect labels and aggregate tests. They do not reopen the V2
 R4 scope, R3 rank eligibility, R1 arithmetic, or H4 event definitions.

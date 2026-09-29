@@ -1,11 +1,11 @@
 # A3 — Account Deletion (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft specification; A3 is optional and is not activated or shipped by this document. |
-| Brief | `docs/shaxda-v2.md` §13 (A3), §7.2, §14, §17 question 5 |
-| Depends on | H1 match ledger; reconcile R1–R6, H2–H4, and K1/K2 if they have shipped before A3 starts |
-| Workspace | `a3-account-deletion` |
+| Field                    | Value                                                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Status                   | Draft specification; A3 is optional and is not activated or shipped by this document.                                      |
+| Brief                    | `docs/shaxda-v2.md` §13 (A3), §7.2, §14, §17 question 5                                                                    |
+| Depends on               | H1 match ledger; reconcile R1–R6, H2–H4, and K1/K2 if they have shipped before A3 starts                                   |
+| Workspace                | `a3-account-deletion`                                                                                                      |
 | Touches when implemented | `packages/db`, `web/`, `packages/i18n`, account and online-room tests, runbooks; `worker/` only for active-seat revocation |
 
 The V2 brief controls A3 scope. The older PRD also has an unrelated engine task
@@ -98,11 +98,11 @@ Add `user.deletion_requested_at`, `user.deletion_due_at`, and
 `user.deleted_at` as nullable epoch-millisecond columns with an indexed due
 time for the sweep. States are:
 
-| State | Predicate | Access and public display |
-| --- | --- | --- |
-| Active | all three columns null | Existing account behavior. |
+| State   | Predicate                         | Access and public display                                                                              |
+| ------- | --------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Active  | all three columns null            | Existing account behavior.                                                                             |
 | Pending | request and due set, deleted null | Only cancellation/status/logout; profile 404; neutral match label; no leaderboard or new account game. |
-| Final | deleted set | No valid session/provider link; profile 404; neutral match label; username claims held until release. |
+| Final   | deleted set                       | No valid session/provider link; profile 404; neutral match label; username claims held until release.  |
 
 Use a hand-written D1 migration, numbered after the merged migrations. Better
 Auth's generated schema is CLI-owned: add non-client-writable, non-returned
@@ -221,17 +221,17 @@ tests for owner checks and rendered output; Worker tests for active seats and
 hibernation; and a Playwright flow for confirmation, cancellation, and final
 state. Fixed clocks cover the exact due-time and 30-day boundaries.
 
-| Case | Required result |
-| --- | --- |
-| Wrong/missing session, stale confirmation, wrong typed value, or cross-origin POST | No state change or private-data disclosure. |
-| Repeat request or concurrent request/cancel/finalize | One deadline and one final outcome; no partly scrubbed account. |
-| Pending account signs in | Can cancel or log out; cannot mutate settings, mint a ticket, queue, or see its public profile. |
-| Cancel just before/at due time | Before: account returns intact. At due: cancel fails even if sweep is late. |
-| Finalize account with many matches and aliases | Both opponents' history and rating results stay; every deleted-seat snapshot is neutral; all aliases 404 and blocked for 30 days. |
-| Late match write or rating rebuild | No old username reappears; match persists once; opponents' ratings reproduce exactly. |
-| Active or hibernated room, valid old ticket, queued user | No new seat or rematch; current match may finish; final cutoff removes live name and follows existing game outcome rules. |
-| Hold expires | Old usernames become claimable; a newly claimed one belongs only to the new account. |
-| New Google sign-in after finalization | New account id, no old matches/rating, no restoration of provider link. |
+| Case                                                                               | Required result                                                                                                                   |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Wrong/missing session, stale confirmation, wrong typed value, or cross-origin POST | No state change or private-data disclosure.                                                                                       |
+| Repeat request or concurrent request/cancel/finalize                               | One deadline and one final outcome; no partly scrubbed account.                                                                   |
+| Pending account signs in                                                           | Can cancel or log out; cannot mutate settings, mint a ticket, queue, or see its public profile.                                   |
+| Cancel just before/at due time                                                     | Before: account returns intact. At due: cancel fails even if sweep is late.                                                       |
+| Finalize account with many matches and aliases                                     | Both opponents' history and rating results stay; every deleted-seat snapshot is neutral; all aliases 404 and blocked for 30 days. |
+| Late match write or rating rebuild                                                 | No old username reappears; match persists once; opponents' ratings reproduce exactly.                                             |
+| Active or hibernated room, valid old ticket, queued user                           | No new seat or rematch; current match may finish; final cutoff removes live name and follows existing game outcome rules.         |
+| Hold expires                                                                       | Old usernames become claimable; a newly claimed one belongs only to the new account.                                              |
+| New Google sign-in after finalization                                              | New account id, no old matches/rating, no restoration of provider link.                                                           |
 
 Before release, run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm
 test:worker`, `pnpm test:e2e`, `pnpm build`, and the schema/migration checks.
@@ -243,11 +243,11 @@ backup or re-expose a historical snapshot.
 
 ## 7. Decisions and implementation gate
 
-| ID | Decision | Basis |
-| --- | --- | --- |
-| A3-D1 | Seven-day cancelable grace period. | Founder answer, 2026-09-25. |
-| A3-D2 | Username and all its aliases become claimable 30 days after finalization. | Founder answer, 2026-09-25; applies the V2 brief's 30-day hold. |
-| A3-D3 | Keep a tombstone and private ledger/rating ids; scrub all public identity snapshots. | V2 §13 and opponent-history integrity. |
+| ID    | Decision                                                                                                 | Basis                                                              |
+| ----- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| A3-D1 | Seven-day cancelable grace period.                                                                       | Founder answer, 2026-09-25.                                        |
+| A3-D2 | Username and all its aliases become claimable 30 days after finalization.                                | Founder answer, 2026-09-25; applies the V2 brief's 30-day hold.    |
+| A3-D3 | Keep a tombstone and private ledger/rating ids; scrub all public identity snapshots.                     | V2 §13 and opponent-history integrity.                             |
 | A3-D4 | A current game may finish during grace; no new room/rematch; active seat is neutralized by finalization. | Provisional pending the founder's answer about already-open games. |
 
 Activation remains a founder roadmap decision because V2 §17 explicitly

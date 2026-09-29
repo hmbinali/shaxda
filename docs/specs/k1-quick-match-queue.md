@@ -1,14 +1,14 @@
 # K1 — Quick Match Queue (Spec)
 
-| Field | Value |
-| --- | --- |
-| Status | Draft; specification only. H1 and R1/R2 contracts must be merged and reconciled before implementation. |
-| Brief | `docs/shaxda-v2.md` §6.4, §7, §11 (K1), §14 |
-| Depends on | H1 match persistence and quick-room fields; R1 rating state; R2 rated-play policy |
-| Workspace | `k1-quick-match-queue` |
-| Unblocks | K2 queue quality |
-| Touches | `packages/shared` ticket and queue schemas, web Worker ticket endpoint and rating read, game Worker and Wrangler configs, new queue Durable Object, MatchRoom/RoomCoordinator, `/online`, `packages/i18n`, tests and hibernation check |
-| Freeze point | Additive queue wire messages freeze when K1 merges; later changes require an explicit contract-change commit. |
+| Field        | Value                                                                                                                                                                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status       | Draft; specification only. H1 and R1/R2 contracts must be merged and reconciled before implementation.                                                                                                                                 |
+| Brief        | `docs/shaxda-v2.md` §6.4, §7, §11 (K1), §14                                                                                                                                                                                            |
+| Depends on   | H1 match persistence and quick-room fields; R1 rating state; R2 rated-play policy                                                                                                                                                      |
+| Workspace    | `k1-quick-match-queue`                                                                                                                                                                                                                 |
+| Unblocks     | K2 queue quality                                                                                                                                                                                                                       |
+| Touches      | `packages/shared` ticket and queue schemas, web Worker ticket endpoint and rating read, game Worker and Wrangler configs, new queue Durable Object, MatchRoom/RoomCoordinator, `/online`, `packages/i18n`, tests and hibernation check |
+| Freeze point | Additive queue wire messages freeze when K1 merges; later changes require an explicit contract-change commit.                                                                                                                          |
 
 The V2 brief controls scope. The PRD controls the stack and infrastructure; the
 game rules document controls play. K1 finds two account players and hands them
@@ -209,13 +209,13 @@ aborted handoff. Do not use D1 for queue membership or per-move records.
 Add queue-specific Zod schemas beside the existing `v: 1` room protocol;
 do not change existing invite message meanings. Suggested messages:
 
-| Direction | Message | Meaning |
-| --- | --- | --- |
-| Client to queue | `joinQueue { v: 1, identityTicket }` | Authenticate and enter once; ticket action must be `queue`. |
-| Client to queue | `cancelQueue { v: 1 }` | Remove this socket's current entry, if its epoch still owns it. |
-| Queue to client | `queueStatus { v: 1, state: "waiting" \| "handoff", joinedAt }` | Authoritative status after join/reconnect and rollback. |
-| Queue to client | `matched { v: 1, roomCode, pairId }` | Both seats are already reserved. |
-| Queue to client | `queueError { v: 1, code }` | Typed authentication, capacity, rate, or retryable handoff failure. |
+| Direction       | Message                                                         | Meaning                                                             |
+| --------------- | --------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Client to queue | `joinQueue { v: 1, identityTicket }`                            | Authenticate and enter once; ticket action must be `queue`.         |
+| Client to queue | `cancelQueue { v: 1 }`                                          | Remove this socket's current entry, if its epoch still owns it.     |
+| Queue to client | `queueStatus { v: 1, state: "waiting" \| "handoff", joinedAt }` | Authoritative status after join/reconnect and rollback.             |
+| Queue to client | `matched { v: 1, roomCode, pairId }`                            | Both seats are already reserved.                                    |
+| Queue to client | `queueError { v: 1, code }`                                     | Typed authentication, capacity, rate, or retryable handoff failure. |
 
 Bound every message and reject unknown/malformed variants without mutating
 membership. No queue message carries another player's private id, rating, or
@@ -295,12 +295,12 @@ operational decision.
 
 ## 7. Decisions and contract checks
 
-| ID | Decision | Treatment |
-| --- | --- | --- |
+| ID    | Decision                                            | Treatment                                                                           |
+| ----- | --------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | K1-D1 | Broaden new/provisional pairing after a short wait? | **Founder answered yes.** K1 uses the 30/90-second basic window above; K2 tunes it. |
-| K1-D2 | No-show grace after `matched`? | **Pending founder answer.** 45 seconds is the spec default until confirmed. |
-| K1-D3 | H1/R1/R2 merged field and message names | Reconcile before coding. Do not assume the current drafts are deployed. |
-| K1-D4 | Final Somali wording for quick match/rated intent | Reuse R2's approved terms; do not ship English placeholders. |
+| K1-D2 | No-show grace after `matched`?                      | **Pending founder answer.** 45 seconds is the spec default until confirmed.         |
+| K1-D3 | H1/R1/R2 merged field and message names             | Reconcile before coding. Do not assume the current drafts are deployed.             |
+| K1-D4 | Final Somali wording for quick match/rated intent   | Reuse R2's approved terms; do not ship English placeholders.                        |
 
 The queue protocol freezes at K1 merge. Threshold changes in K2 can be
 configuration/policy changes if the wire shape stays intact; message-shape

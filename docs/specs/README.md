@@ -47,7 +47,7 @@ Register IDs are defined in the tables below. "Wave" is the build wave in
 | R4  | [Profile statistics](r4-profile-statistics.md)                                 | revised | 4     | H2, H4, R1, R3; A3 if shipped                                         | P8 P9                              |
 | R5  | [Head-to-head and rating history](r5-head-to-head-rating-history.md)           | revised | 4     | R4 (with H2, R1, R3); A3 if shipped                                   | P8                                 |
 | S1  | [Sponsor placements](s1-sponsor-placements.md)                                 | revised | Pilot | X1 (≥ 30 days of data), BRD, S2-min                                   | F3 P14 Q2 Q5                       |
-| S2  | [Sponsor measurement](s2-sponsor-measurement-reports.md) (S2-min with S1)      | draft   | Pilot | S1, X1                                                                | F3 P12 P14                         |
+| S2  | [Sponsor measurement](s2-sponsor-measurement-reports.md) (S2-min with S1)      | revised | Pilot | S1, X1                                                                | F3 P12 P14                         |
 | S3  | [Sponsor page](s3-sponsor-page.md) (S3a pilot page, S3b rate card)             | draft   | Pilot | S1, S2-min; S3b after a delivered report                              | F3 P14 Q3 Q5                       |
 | K2  | [Queue quality](k2-queue-quality.md)                                           | revised | L     | K1                                                                    | P13 P15 P16                        |
 

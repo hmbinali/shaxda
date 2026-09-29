@@ -1,324 +1,415 @@
 # R5 — Head-to-Head and Rating History (Spec)
 
-| Field                    | Value                                                                                                                                                                      |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status                   | Draft; specification only. R5 is not active or shipped.                                                                                                                    |
-| Brief                    | `docs/shaxda-v2.md` §10 (R5), §5, §7.2, §14, §16 D8                                                                                                                        |
-| Depends on               | R4 public profile record; H2 match links and owner-indexed ledger reads; R1 confirmed rating events; R2 competition status; R3 leaderboard rows and rated-result semantics |
-| Workspace                | `r5-head-to-head`                                                                                                                                                          |
-| Touches when implemented | `packages/db` read queries and, if needed, the R3 derived form projection; `web/src/routes/u/[username]`; `/leaderboard`; `packages/i18n`; tests                           |
+| Field      | Value                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | `revised` (see [README](README.md#spec-index))                                                                                                                                                                                                                                                                                                                                                                                           |
+| Wave       | 4, after R4                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Depends on | [R4](r4-profile-statistics.md), the profile page (README row). R4 already needs [H2](h2-history-match-detail.md), [R1](r1-rating-system.md), and [R3](r3-leaderboard.md); R5 also reads their contracts, and [A3](a3-account-deletion.md)'s, directly (§2).                                                                                                                                                                              |
+| Register   | P8 (README row); §2 also cites P2, P4, P5, P9, P18                                                                                                                                                                                                                                                                                                                                                                                       |
+| Contracts  | Consumes [§2.1](v2-contracts.md#21-h1-tables), [§2.3](v2-contracts.md#23-public-match-id), [§2.5](v2-contracts.md#25-r1-extension), [§4.3](v2-contracts.md#43-canonical-sample-matches), [§5](v2-contracts.md#5-access-matrix), [§7.3](v2-contracts.md#73-arithmetic-and-reads), [§7.4](v2-contracts.md#74-corrections), [§8](v2-contracts.md#8-deletion), E6 in [§12](v2-contracts.md#12-evidence). Owns the reads and page data in §3. |
+| Brief      | `docs/shaxda-v2.md` §10 (R5)                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Touches    | `packages/db` read queries (no migration), `web/src/routes/u/[username]`, the leaderboard row markup, `web/src/lib/profile`, `packages/i18n`, tests. No game-Worker change.                                                                                                                                                                                                                                                              |
 
-This spec refines the R5 brief without activating the milestone. The V2 brief
-wins on scope and order, the PRD on stack and infrastructure, and
-`docs/shaxda_game.md` on game rules. The H2/R1/R2/R3/R4 specs in this checkout
-are drafts; reconcile these proposed interfaces and the founder decisions
-below with merged code before implementation. R5 does not change match
-outcomes, rating arithmetic, eligibility, or leaderboard rank.
+R5 adds three read-only views over rows that H1 and R1 already write: a
+private head-to-head card, a public rating-history chart, and a leaderboard
+form strip. It adds no write, table, index, projection, backfill, binding, or
+route. R4 keeps the profile and its public record, R3 the leaderboard rows
+and caching, R1 rating arithmetic, peak, and form, and H2 the match pages.
 
----
+## 1. Outcome and non-goals
 
-## 1. Outcome and scope
+### Outcome
 
-A signed-in player viewing another account's public profile can see their
-record against that opponent. Every public account profile gains a readable
-rating trend. Leaderboard rows gain a compact recent-form strip whose meaning
-matches their rated W/L/D counts.
+A signed-in player sees their private record against the player whose
+profile they open; anyone sees how a rated player's rating moved over 7, 30,
+or 90 days; leaderboard rows show each player's last five rated results.
 
 ### Must
 
-1. On `/u/<username>`, show a head-to-head card **only** to a signed-in,
-   complete account viewing another current account: games between them,
-   viewer wins, opponent wins, draws, last meeting, and current rating
-   difference. Source the viewer from the server session and the target from
-   the resolved public profile, never from browser-supplied user ids.
-2. Show each account's confirmed rating history on its public profile as a
-   simple chart for rolling 7-, 30-, and 90-day windows. Use R1's stored
-   `match_player` rating-before/after events. Mark the lifetime peak when its
-   attaining event is visible, and state the peak value when it is outside the
-   selected window.
-3. Add up to five recent results to each visible leaderboard row. Reuse the
-   R4/H2 form visual and accessibility labels, while using the final R3
-   leaderboard result set for the **data**. Keep list and signed-in context
-   free of private identity fields and N+1 match queries.
-4. Handle zero matches, no rated events, pending rating processing, renamed or
-   deleted opponents, alias redirects, and R6-style rating rebuilds truthfully.
-   Do not turn missing or skipped rating events into zero deltas.
-5. Keep reads indexed and bounded to the two players or the selected profile
-   and selected time window. Add no rating-snapshot table or game-Worker write.
+1. **Head-to-head card** (§4.1), private, for an active complete account on
+   another account's profile: rated and friendly rows, the last meeting, and
+   the current rating difference. `no-store`; no user id reaches the page.
+2. **Rating-history chart** (§4.2), public, from processed events only (P8):
+   7/30/90-day windows ending at one `asOf`, bounds inclusive; a start point;
+   at most 100 points; an honest peak; a text alternative; no JavaScript.
+3. **Leaderboard form strip** (§4.3) rendering the `form` R3 returns
+   (`player_rating.form`), in words as well as marks. No projection,
+   migration, or backfill.
+4. Indexed, bounded reads (§3.1, §6) and Somali-only copy (§7).
 
 ### Should
 
-- A “play again” action on the head-to-head card may create a normal invite
-  room and copy its link. Reuse R4's optional challenge action if it shipped;
-  the other player is not automatically invited or placed in the room.
+- **Play again** on the card, through R4's challenge link to the normal
+  invite flow (§4.1).
 
-### Out of scope
+### Not in R5
 
-- Comparisons of Shaxda statistics between arbitrary players, public
-  opponent-search/comparison routes, friends, followers, direct challenges,
-  matchmaking, seasons, tiers, or new rating calculations.
-- Guest/local match records, private profiles, hidden public history, a new
-  rating-snapshot table, or a second replay/chart data store.
-- R6 invalidation tools. R5 reads the currently published derived rating
-  events and updates when R6 rebuilds them.
+- Rating snapshots, projections, writes, migrations, backfills, or
+  game-Worker changes.
+- Head-to-head for anyone but the two players; Shaxda-statistics comparisons;
+  opponent search, friends, follows, notifications, or direct challenges.
+- Friendly games in public numbers; estimates for pending games (P18); new
+  rating arithmetic, eligibility, or rank; R6 tools; English.
 
----
+## 2. Decisions and dependencies
 
-## 2. Head-to-head contract
+### Register
 
-Use the same **completed competitive account matches** that R4 currently
-proposes for its public W/L/D: persisted account-vs-account matches with R2
-`competition_status = completed`, including friendly, pending, and rating-
-skipped games. Exclude R2 `aborted` rows even though their engine replay is
-terminal. This is R5-D1, pending the founder's answer. If R4-D1 resolves
-differently, settle both definitions together before coding; do not publish
-two incompatible labels for the same public record.
+| ID  | How R5 applies it                                                                                                                                                                                                                                                                      |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P8  | The chart and the strip are public numbers, so they use processed rated events only: `match_player_rating` rows and `player_rating.form`. The card is the participant-only case P8 names: it counts every saved game between the two players.                                          |
+| P2  | Applies F2. A friendly game never gets a `match_player_rating` row, so the public chart cannot show one. The card may count friendly games because the viewer played every game it counts; for the same reason its match links open for the viewer.                                    |
+| P4  | R1 applies events in `seq` order, and inactivity changes only RD ([§7.3](v2-contracts.md#73-arithmetic-and-reads)), so an event's `rating_before` is the `rating_after` of the player's previous processed event. The start point relies on that chain; §4.2 states the display order. |
+| P5  | The ledger holds no names. The card names the target by the profile's current username; the chart and strip name no opponent. Pending and deleted accounts have no profile (A3), so R5 never renders the neutral label; `/match/<id>` does.                                            |
+| P9  | The peak is `player_rating.peak_rating`, the highest post-event rating, with no 1500 floor. No `player_rating` row: no chart and no peak.                                                                                                                                              |
+| P18 | Provisional means effective RD > 110 at the response's `asOf`. A pending game has no estimate; it appears once processed.                                                                                                                                                              |
 
-| Field                               | Exact rule                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Games                               | Count completed competitive ledger matches containing both distinct permanent account ids. A rematch is another match. Count each `match.id` once.                                                                                                                                                                                                                                                                         |
-| Viewer wins / opponent wins / draws | Read the two authoritative `match_player.result` values from the viewer's perspective. Their sum equals games; a contradictory pair is a data error, not a draw.                                                                                                                                                                                                                                                           |
-| Last meeting                        | The newest included match by `(ended_at DESC, match.id DESC)`, with date, viewer-perspective result, and link to H2's public `/match/<id>` page. A later aborted encounter does not replace the last competitive meeting.                                                                                                                                                                                                  |
-| Rating difference                   | `viewer.currentRating − opponent.currentRating` from R1 `player_rating`, in full precision before display rounding. Show a signed whole-number difference calculated as `round(viewer) − round(opponent)`; label whose rating is higher. Use R1 effective RD at one `asOf` to mark either rating provisional. If either has no confirmed rated match, show “rating comparison unavailable”, not a fabricated 1500 or zero. |
+### Dependencies
 
-The card labels game results as **all completed account games** and rating
-difference as **confirmed rated-game rating**. A friendly or pair-capped game
-still changes the head-to-head record but not the rating difference. If an R1
-event is pending, the card may show the last confirmed rating with an explicit
-pending note; it must not claim the pending game's rating effect is included.
-An R6 excluded player may still have a public profile and head-to-head record;
-do not expose the exclusion reason or invent a public rank.
+| Milestone | What R5 uses                                                                                                                                                                                                      |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1        | `match.rated`, `match_player`, the owner index `match_player_owner_idx`, the public match id.                                                                                                                     |
+| R1        | `match_player_rating` (both seats of each processed match), `player_rating` (`rating`, `rd`, `volatility`, `last_rated_at`, `rated_games`, `form`, `peak_rating`, `peak_seq`), `isProvisional`, correction swaps. |
+| H2        | `/match/<id>` access (a participant opens a friendly match), `formatMatchDate`, form chips, outcome words.                                                                                                        |
+| R3        | Leaderboard rows (public and around-you) that already return `form`, on a session-independent, edge-cached page.                                                                                                  |
+| R4        | The `/u/<username>` loader, `resolveProfile`'s server-only `userId`, `asOf`, rating rounding, the page's `ratingsUpdating`, its `private, no-store` header, and its challenge link (Should).                      |
+| A3        | Pending and deleted accounts: profile 404, restricted pending session. M10 checks run once A3 is live (Q1).                                                                                                       |
+| E6        | Head-to-head and rating-window plans and rows read at 5,000 matches, recorded before implementation.                                                                                                              |
 
-Resolve the target through R4's existing username/alias flow. A missing or
-deleted target follows that route's 404/tombstone policy. A renamed account
-uses the current canonical username; the comparison key remains the permanent
-server-only id. A signed-out or incomplete-account visitor sees the normal
-public profile and rating chart, with no head-to-head card or empty “you vs
-them” placeholder. An owner viewing their own profile also sees no card.
-For zero meetings, show a short Somali empty state and no fake last meeting.
+## 3. Contracts
 
-### Query and DTO
+R5 owns the reads and page data below and the rendering of R3's `form`. The
+tables they read are in [v2-contracts §2](v2-contracts.md#2-ledger-schema).
 
-`readHeadToHead(db, { viewerUserId, targetUserId, asOf })` is a web-Worker,
-server-only read. Validate that the two ids differ. Start with H1's
-`match_player(user_id, ended_at, match_id)` owner index, join the paired seat
-by `(match_id, seat)`, and filter its `user_id = targetUserId` and the joined
-match's R2 competition status. Aggregate counts and select the last meeting
-using the same predicate and total order. Do not rely on username snapshots,
-room codes, a browser query parameter, or `match.rated` to define the pair.
-Check the actual merged index and `EXPLAIN QUERY PLAN`; add a hand-written
-index only if this owner-bounded plan proves insufficient. There is no
-default pair table or full-ledger scan.
+### 3.1 Reads
 
-The loader may hold ids while it computes the read. It returns a display DTO
-with counts, a public match URL/date/result, rounded public rating values,
-provisional/pending flags, and `isViewer`, but **no** permanent user id,
-email, provider id, session, ticket, room code, or raw ledger row. The server
-determines `isViewer`; the client cannot request a comparison for a different
-account.
+In `packages/db`, called only by the web Worker with ids the server resolved:
+the viewer from `locals.user.id`, the target from R4's resolution. Equal ids
+are rejected before any query.
 
----
+```sql
+-- readHeadToHead: CROSS JOIN pins the plan to the viewer's owner-index range.
+SELECT v.match_id, v.ended_at, v.result, m.rated
+FROM match_player AS v
+CROSS JOIN match_player AS t
+CROSS JOIN match AS m
+WHERE v.user_id = ?1                                        -- viewer
+  AND t.match_id = v.match_id
+  AND t.seat = CASE v.seat WHEN 'A' THEN 'B' ELSE 'A' END
+  AND t.user_id = ?2                                        -- target
+  AND m.id = v.match_id
+ORDER BY v.ended_at DESC, v.match_id DESC;
 
-## 3. Rating-history contract
+-- readRatingHistory: the inner join keeps processed events only.
+SELECT mp.match_id, mp.ended_at, mp.result, r.rating_before, r.rating_after
+FROM match_player AS mp
+JOIN match_player_rating AS r ON r.match_id = mp.match_id AND r.seat = mp.seat
+WHERE mp.user_id = ?1 AND mp.ended_at >= ?2                 -- no upper bound
+ORDER BY mp.ended_at ASC, mp.match_id ASC;
+```
 
-The chart is public on `/u/<username>` for the resolved account, including
-when the visitor is signed out. This follows the V2 public-profile/history
-decision D8. It is a view of **confirmed rated events only**:
-`match.rating_status = processed`, valid numeric
-`match_player.rating_before` and `rating_after`, and the event's rating
-algorithm/policy version. Pending, friendly, aborted, pair-cap, and daily-cap
-events create no chart point. If a row claims `processed` but lacks valid
-values, report a server data error and show an unavailable chart state; do
-not draw a misleading gap or zero.
+Each read is one D1 batch and so sees one state; a correction swap is one
+batch too. The batches add only primary-key reads; the maintenance flag comes
+from R4's batch (`ratingsUpdating`).
 
-Capture one UTC `asOf` per profile load. Windows are rolling durations ending
-at that instant: `[asOf − N × 86,400,000 ms, asOf]` for `N = 7, 30, 90`.
-An event exactly on either boundary is included. Order events by
-`(ended_at ASC, match.id ASC)`, matching R1's processor and tie-break. Use
-the before/after values from **the same match_player event**; never derive a
-change from two rounded neighboring points or recompute Glicko-2 in a web
-request. Show dates in the site's established Somali date format, with UTC
-instants in machine-readable data.
+| Statement                                                                                                             | Card              | Chart  |
+| --------------------------------------------------------------------------------------------------------------------- | ----------------- | ------ |
+| `player_rating` by `user_id`: `rating`, `rd`, `volatility`, `last_rated_at`, `rated_games`, `peak_rating`, `peak_seq` | viewer and target | target |
+| `SELECT id, ended_at FROM match WHERE seq = (SELECT peak_seq FROM player_rating WHERE user_id = ?1)`                  | —                 | target |
 
-The visual line starts at the rating after the most recent processed event
-_before_ the window, if one exists, as a context point at the window start.
-When there is no earlier event, the first in-window event starts with its
-stored `rating_before` at that event time. Plot its `rating_after` at the same
-time so a player can see the first change; order same-time before/after
-points explicitly. Never extend the line to `asOf` as if another game
-occurred. A window with no processed event has a “no rated games in this
-period” state and may show the separately labelled current rating; do not
-draw a fabricated flat history.
+### 3.2 Page data
 
-R1 `peak_rating` is the lifetime value. Mark the **first processed event in
-the selected window whose `rating_after` equals that value** at stored
-precision, if any. If the peak came earlier, or the initial 1500 floor remains
-the peak without an attaining event, show the peak as a textual caption
-without placing a false marker in the window. If R1's peak and event series
-disagree, log a data diagnostic; never silently substitute a window maximum
-for the lifetime peak. Peak, current rating, and chart point values are
-rounded only at display time. The chart label distinguishes a historical
-post-match rating from the current R1 rating, whose RD/provisional status can
-change through inactivity while the rating number stays fixed.
+The profile's page data gains `headToHead` (`null` means no card) and
+`ratingHistory`. A failed read turns either into `{ kind: "unavailable" }`.
 
-`readRatingHistory(db, { userId, days, asOf })` uses the owner's
-`match_player(user_id, ended_at, match_id)` range plus keyed `match` joins.
-Read only the selected 7/30/90-day range and at most one preceding processed
-event for the context point. Do not load a lifetime array and filter it in
-the browser. The server produces a narrow public DTO of time, before/after
-rounded display values, signed displayed delta, and peak-marker flag. No
-match ids are required by the chart; the series never exposes permanent user
-ids or raw rating-state fields. Recompute from the currently published R1
-projection after a guarded rebuild; never cache a separate historical
-snapshot as truth.
+| `headToHead` field  | Content                                                                                                                                 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `rated`, `friendly` | `{ games, viewerWins, targetWins, draws }`; the row is chosen by `match.rated` alone                                                    |
+| `lastMeeting`       | `{ matchId, endedAt, result, rated }` from the viewer's side, or `null`                                                                 |
+| `rating`            | `{ viewer, target, difference, viewerProvisional, targetProvisional }`, or `unavailable` when either account has no `player_rating` row |
 
-The default selected window is 30 days; changing the selector updates only
-the profile chart. A server-rendered 30-day initial view remains useful without
-JavaScript. The other windows may load through same-origin, validated,
-read-only requests or normal navigation; use R4's session-sensitive cache
-rules. Validate `days` as exactly 7, 30, or 90. A D1 failure is an unavailable
-state or error, not an empty series.
+| `ratingHistory` field         | Content                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `kind`                        | `notRated` (no `player_rating` row; no chart section), `unavailable`, or `window`                    |
+| `days`, `windowStart`, `asOf` | The window: `days` is 7, 30, or 90                                                                   |
+| `games`, `high`, `low`        | Over every processed event in the window, drawn or not; `high` and `low` are `null` when it is empty |
+| `start`                       | `{ rating, at, beforeWindow }` (§4.2), or `null` for an empty window                                 |
+| `points`                      | At most 99 `{ matchId, endedAt, result, before, after, change, peak }`, in display order             |
+| `peak`                        | `{ rating, endedAt, inWindow }`; `endedAt` is `null` after a mismatch (§4.2)                         |
 
----
+`result` is H2's outcome type; `matchId` is the public id
+([§2.3](v2-contracts.md#23-public-match-id)). Numbers are whole, rounded as
+R4 rounds ratings; `change` (`after − before`) and `difference` (`viewer −
+target`) use the rounded values, so the page adds up.
 
-## 4. Leaderboard recent form
+### 3.3 Leaderboard row
 
-R3 rows currently define W/L/D and streak from **confirmed rated events**.
-R5's leaderboard strip uses the same result set: the newest five processed
-`match_player.result` values in `(ended_at, match.id)` order, displayed oldest
-to newest. A skipped or pending game does not occupy a slot or change the
-strip. Zero processed events gives a labelled empty state. If R3-D1 changes
-before implementation, update the strip, its label, and all projection tests
-to the final R3 definition. R4's form component can be reused visually, but
-R4's all-competitive-game data must not be passed into a row labelled as
-rated form.
+R3's rows (public list and around-you) already return `form`; R5 adds no
+field or statement. It maps the letters to outcomes as R4 does (oldest first,
+at most five); a value not matching `^[WLD]{0,5}$` renders no strip and logs
+a diagnostic without ids.
 
-Extend R3's rebuildable `leaderboard_stats` projection with a compact,
-validated five-result `recent_form` value. Append each newly **processed**
-result for each seat and keep only five, in the **same guarded R1 event batch**
-that updates rating and R3 counts/streak. A skipped event does nothing. An
-R1/R6 rebuild recreates it in global event order and compares it in dry-run
-drift checks. Backfill existing processed events in bounded pages before
-publishing the strip. This adds one additive, hand-written migration and no
-game-Worker write. If the merged R3 implementation omitted the projection,
-use a measured batched indexed read for at most the visible 100 rows instead;
-do not create an N+1 query or an independent asynchronous form writer.
+## 4. Behaviour and failure handling
 
-Pass the five display outcomes as part of R3's public row DTO. Keep its
-existing 60-second public cache and private signed-in context separation.
-Check root-layout/session leakage and direct/client navigation again after
-adding the strip. The form has text and accessible result names; color or a
-single-letter glyph alone is insufficient. On narrow screens it may wrap
-below rank, player, and rating without horizontal scrolling.
+Profile order: R4 overview, rating history, head-to-head card (when shown), R4
+rated matches, R4 Shaxda statistics.
 
----
+### 4.1 Head-to-head card
 
-## 5. UI, privacy, and performance
+| Viewer                                         | Result                             |
+| ---------------------------------------------- | ---------------------------------- |
+| Signed out, or an incomplete account           | No card and no placeholder         |
+| Pending deletion                               | No card (A3 restricts the session) |
+| The profile's own account                      | No card                            |
+| Another active complete account                | The card                           |
+| Anyone, when the profile is pending or deleted | Profile 404 (A3)                   |
 
-Place the head-to-head card on another player's profile after R4's overview
-and before recent matches. Place rating history on every public profile near
-the rating summary; keep R4's recent matches and Shaxda stats in their
-existing order. The chart uses a simple SVG line and points with visible
-axes, labelled dates and ratings, a peak marker/caption, and a text summary
-of first-to-last change for the selected window. Provide a keyboard-readable
-event list or equivalent accessible description; honor reduced motion and
-do not add a charting service or third-party tracking. All visible copy lives
-in `packages/i18n` and remains Somali-only. Reuse confirmed R1/R2/R3/R4
-terms once founder wording is settled; do not introduce an English toggle.
+- **Counting**: each shared game once, by the viewer's `result`. A pending,
+  held, pair-capped, or invalidated rated game stays in the rated row: the
+  card counts games played, not rating effects. With none, an empty-state
+  sentence replaces the rows; the rating line and play link remain.
+- **Last meeting**: the first row of `readHeadToHead`, rated or friendly,
+  with its date (H2's formatter), result, label, and `/match/<id>`.
+- **Rating line**: both rounded ratings, each with the `?` when R1's
+  `isProvisional` holds at the page's `asOf` (P18), and the difference in
+  words; otherwise the unavailable sentence, never 1500 or 0. An R6-excluded
+  account keeps its card, and no exclusion reason appears.
+- **Play again** (Should): when the card shows, R4's challenge link (the
+  normal `/online` invite flow, friendly unless both consent to rated, P3)
+  sits in the card instead of beside it, so the page has one such link.
+  Nothing is sent to the target or prefilled.
+- **Caching**: R4 sends `Cache-Control: private, no-store` on every profile
+  response (HTML and `__data.json`); a response with a card must keep it. If
+  R4 makes the profile shared-cacheable, the card moves to a private request
+  like R3's `/api/leaderboard/me`.
 
-R4's profile loader is session-aware, so do not set shared edge-cache headers
-on a response that contains the viewer's head-to-head data, `isViewer`, or
-parent-layout session state. A private on-demand comparison response, if used,
-requires the current server session and `Cache-Control: private, no-store`.
-The public chart can be cached only behind a response proven independent of
-session data; the simplest initial path is the profile's existing no-shared-
-cache behavior. No route accepts a viewer id from the client. Rate-limit any
-new read endpoint and use Zod at its input boundary.
+### 4.2 Rating-history chart
 
-Run `EXPLAIN QUERY PLAN` and record D1 rows read and p95 latency for a new
-account, an account with hundreds of matches, and a prolific account with
-thousands, including a pair with many rematches and a dense 90-day chart.
-Every request uses the owner index and keyed joins; no full `match_player`
-scan. If the 90-day chart is too large for the page, reduce **rendered** SVG
-points deterministically while retaining first, last, local extrema, and
-the visible peak, and provide the full event values through a paged accessible
-list. Do not omit ledger events from the underlying calculation or create a
-rating-snapshot table. Record the measured threshold and reduction rule in
-the implementation review before enabling it.
+- **Window**: `[asOf − days × 86,400,000, asOf]`, both bounds inclusive, with
+  the one `asOf` R4 captures per response. `days` comes from `?days=7`, `30`,
+  or `90`, validated with Zod; anything else gives the default, 30. A row
+  with `ended_at > asOf` (it ended during the request) is not drawn.
+- **Order**: `(ended_at, match_id)` ascending, the owner-index order of
+  `/history` and the profile match list. It equals R1's `seq` order (P4)
+  except after a late save (a game saved after one that ended later). R5
+  never re-sorts or recomputes: each value comes from its own
+  `match_player_rating` row, so a late save can leave a point's `before`
+  different from its left neighbour's `after`.
+- **Start point**: if `player_rating.rated_games` exceeds the rows the window
+  statement returned (same batch), a processed game ended before the window,
+  and the line starts at `windowStart` at the first point's `before` (P4):
+  the rating after the last earlier game, barring a late save. Otherwise the
+  window holds the first rated game; the line starts at it, so labelled.
+- **Drawing**: a step line, flat between games (RD growth is not drawn), with
+  a step and a dot at each game; it stops at the last game and is never
+  extended to `asOf`. An empty window shows a sentence and no line.
+- **Reduction**: with more than 99 events, draw the first and last, the peak
+  event if in the window, and the lowest and highest `after` in each of 48
+  equal-count buckets (the earlier event on a tie), plus the start point:
+  never more than 100 points. `games`, `high`, and `low` still cover all.
+- **Peak**: the `match` row with `seq = player_rating.peak_seq`. When its id
+  is among the window rows, that point has `peak: true`, survives reduction,
+  and gets a labelled marker; otherwise a caption gives the lifetime peak and
+  its date. If the match is missing, or the marked point's full-precision
+  `rating_after` differs from `peak_rating`, R5 logs
+  `ratingHistoryPeakMismatch` without ids and shows only the caption. The
+  window's high is never called the lifetime peak.
+- **Text alternative**: a summary (games, start to end with the signed
+  change, window high and low, lifetime peak) labels the SVG (`role="img"`).
+  A table lists the drawn events newest first (date, result word, before and
+  after, change in words, `/match/<id>`) and says "N of M" when reduced.
+- **Selector and layout**: three links with `aria-current`; ordinary
+  navigation that keeps the scroll position. Canonical and Open Graph URLs
+  omit `days`; the alias redirect keeps it. No animation is required, any
+  transition is off under `prefers-reduced-motion: reduce`, and the chart
+  fits 320 px; markers and changes carry text, never colour alone.
 
----
+### 4.3 Leaderboard form strip
 
-## 6. Verification and rollout
+Up to five chips per row, oldest to newest in R1's counting (`seq`) order,
+with H2's form marks, each chip named by its full outcome word, under a label
+saying they are rated games; an empty `form` renders nothing. R3's caching
+and session independence are unchanged.
 
-### Tests
+### 4.4 Failures and corrections
 
-- Head-to-head symmetry: swapping viewer and target swaps wins/losses and
-  reverses rating difference, while games/draws/last match agree. Include
-  rematches, same `ended_at` values, friendly, cap-skipped, pending, and
-  aborted rows. The three result counts must always sum to games.
-- Signed-out, incomplete-account, self-profile, and missing/deleted target
-  cases expose no comparison. Alias and renamed profiles keep the same record
-  and canonical link. A deleted opponent elsewhere still follows H2's neutral
-  public label; no old username snapshot leaks.
-- Rating-history fixtures cover 7/30/90-day boundaries, same-time event
-  ordering, a preceding context event, first-ever rated match, no event in a
-  window, pending/skipped rows, peak inside/outside the window, an initial-
-  floor peak, malformed processed values, and an R1/R6 rebuild. Chart points
-  equal the ledger's before/after values after display rounding.
-- Leaderboard form covers five-plus processed events, draws, a skipped latest
-  game, zero events, backfill, duplicate processor trigger, late event/rebuild,
-  and projection drift. R3 counts, streak, and form use the same final
-  eligibility/result definition and update atomically.
-- Loader/HTML privacy tests search for permanent ids, emails, provider ids,
-  identity tickets, sessions, room codes, raw ledger rows, and public-cache
-  headers on viewer-specific output. Test owner, other signed-in, and anonymous
-  requests, plus client navigation from a cached leaderboard page.
-- Mobile and keyboard checks cover all three chart windows, chart text/event
-  access, peak indication, recent-form result labels, reduced motion, and a
-  no-meetings/no-rated-games state. Query-plan tests prove indexed pair and
-  time-range reads; preview records p95 and D1 rows read.
+| Situation                                                  | Behaviour                                                                                                                                      |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1 error in the card or chart batch                        | That section shows its unavailable state, never zeros, an empty chart, or "not rated". R4's own reads keep R4's error rule.                    |
+| `maintenance = 1` ([§7.4](v2-contracts.md#74-corrections)) | Last published values; R4's `ratingsUpdating` note also covers the card's rating line and the chart.                                           |
+| A correction swap lands (M8)                               | The next read shows rebuilt values: the invalidated event leaves the chart; later points, peak, and form may change; the card's counts do not. |
+| Pending game (no `match_rating` row yet)                   | In the card's rated row; absent from the chart until processed.                                                                                |
 
-For implementation run `pnpm lint`, `pnpm typecheck`, `pnpm test`,
-`pnpm test:worker`, `pnpm build`, and relevant `pnpm test:e2e` cases. Keep
-`pnpm check:e2e-isolation` passing. These use local fixtures/Miniflare D1;
-remote migrations and backfills are explicit release operations. A spec-only
-edit needs document/link/consistency checks, not an application build.
+## 5. Privacy and access
 
-### Implementation and release order
+R5 implements these rows of [v2-contracts §5](v2-contracts.md#5-access-matrix):
 
-1. Reconcile merged H2/R1/R2/R3/R4 schema and the founder decisions below.
-   Resolve R3-D1/R4-D1 before writing shared form or head-to-head copy.
-2. Add failing ledger/query fixtures, indexed head-to-head and rating-history
-   reads, and public DTO/privacy tests. Measure dense accounts before adding
-   any index beyond the merged H1 owner index.
-3. Add the R3 form projection extension, bounded backfill, atomic update, and
-   rebuild/diff coverage; or document the measured no-projection read path.
-4. Add Somali copy, the profile card/chart, and leaderboard strip. Reuse
-   existing invite flow for the optional play-again action only after the Must
-   path works.
-5. Apply any additive migration/backfill explicitly in preview. Check real
-   completed, friendly, skipped and pending matches; an alias; a no-game
-   account; a dense chart; and profile/leaderboard cache privacy. Repeat in
-   production after counts and drift checks. A rollback hides the R5 views
-   without deleting match or rating rows.
+| Row                               | R5 behaviour                                                                                                                                               |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Head-to-head card                 | Hidden when signed out or unrelated. For a participant: viewer vs target over all shared saved games. Private, `no-store`.                                 |
+| `/u/<username>` numbers           | The chart and the strip are the public record (P8): processed rated events only.                                                                           |
+| `/leaderboard`                    | The strip joins R3's public, edge-cached, session-independent rows; the private around-you rows use the same field.                                        |
+| `/match/<id>`, rated and friendly | Chart links point only at processed, public matches. Card links point at games the viewer played; a friendly one opens for the viewer and 404s for others. |
+| Pending/deleted account           | Profile 404, so no card and no chart; off the leaderboard (R3).                                                                                            |
 
-R5 is done when two account players can see a symmetric, truthful record on
-each other's profile; public 7/30/90-day charts reproduce confirmed ledger
-events and mark peak honestly; visible leaderboard rows show the correct
-five-result form; privacy, performance, migration/backfill, local checks, and
-preview verification pass. Saving this spec alone does not ship R5.
+- Ids come only from the session and R4's resolution (§3.1); no parameter
+  selects another pair. Page data and HTML carry display values only: no
+  user id, email, provider id, session, ticket, room code, `seq`, `peak_seq`,
+  RD, volatility, or raw row. Logs carry no user id or username.
+- Friendly data reaches only the card, and only for a viewer who played every
+  game it counts.
 
----
+## 6. Resource budget
 
-## 7. Decisions to confirm
+| Item                                                                            | Cost                                                                                                                  |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| D1 writes, migrations, backfills; Durable Object wake-ups; game-Worker requests | None                                                                                                                  |
+| New bindings, routes, endpoints, cron jobs                                      | None                                                                                                                  |
+| Card, per view by a signed-in viewer                                            | One batch: the viewer's owner-index walk (a few rows per viewer game, one per shared game) and 2 `player_rating` rows |
+| Chart, per profile view                                                         | One batch: the target's walk from the window start (a few rows per game, friendly included) and 2 primary-key rows    |
+| Window switch                                                                   | One `__data.json` request that reruns the profile load (R4's reads, the card, the chart)                              |
+| Leaderboard strip                                                               | Nothing extra: R3 already reads and returns `form`                                                                    |
 
-| ID    | Decision                                        | Draft treatment                                                                                                                                               |
-| ----- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R5-D1 | Which games count in head-to-head?              | All persisted **completed competitive account matches**, including friendly and rating-skipped; exclude R2-aborted. Pending founder answer and tied to R4-D1. |
-| R5-D2 | Is rating history public on an account profile? | Yes, following V2 D8's public profile/match decision. Only confirmed rating event values are exposed.                                                         |
-| R5-D3 | What does “rating difference” mean?             | Current confirmed R1 rating of viewer minus target, displayed as the difference of rounded ratings. Unavailable until both have a rating.                     |
-| R5-D4 | What does the leaderboard form mean?            | Match final R3 W/L/D semantics; its current draft uses confirmed rated games. Reuse R4's visual, not its broader form data.                                   |
+Estimates at up to 4 rows per game walked, until E6 and preview replace
+them: the card reads about 800 rows for a 200-game viewer and 20,000 at 5,000
+games, plus one per shared game; the chart about 160 rows for 40 games in the
+window and 7,200 for 1,800. E6 must show owner-index ranges and key probes
+only, never a `SCAN` of `match_player`, `match_player_rating`, or `match`.
 
-The V2 brief already fixes the three windows, ledger-derived chart, peak,
-signed-in opponent comparison, and no rating-snapshot table. These decisions
-refine display and counting without expanding R5's scope.
+Revisit when preview p95 for the card read exceeds 100 ms or window switches
+become a visible share of profile D1 reads: serve the chart from its own
+read-only request, and weigh a pair index in a separate, measured change.
+
+## 7. Somali copy
+
+Keys under `siteContent.so.pages`, each marked `TODO(translation-review)`,
+using the [glossary drafts](README.md#somali-glossary-drafts-q4) (Tartan,
+Saaxiibtinimo, Darajo). Reused, not redefined: H2's outcome words and form
+marks; R4's `challenge.action`, `overview.ratingsUpdating`, `overview.peak`,
+and `matches.rating.up` / `down` / `same` for the table's change words.
+
+| Key                                                                   | Draft                                                                                                                                | Meaning (for reviewers)                           |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| `profile.headToHead.title`                                            | Adiga iyo @{username}                                                                                                                | You and @username                                 |
+| `profile.headToHead.privacy`                                          | Adiga keliya ayaa arka. Waxaa ku jira dhammaan ciyaarihii la kaydiyay ee aad wada ciyaarteen, kuwa saaxiibtinimo ah oo ay ku jiraan. | Only you see this; every saved game, friendly too |
+| `profile.headToHead.rated` / `friendly` / `games`                     | Tartan / Saaxiibtinimo / {n} ciyaarood                                                                                               | Rated / Friendly / n games                        |
+| `profile.headToHead.viewerWins` / `targetWins` / `draws`              | Guulahaaga / Guulaha @{username} / Barbaro                                                                                           | Your wins / Their wins / Draws                    |
+| `profile.headToHead.empty`                                            | Weli ma aydaan wada ciyaarin.                                                                                                        | You have not played each other yet                |
+| `profile.headToHead.lastMeeting` / `viewMatch`                        | Ciyaartii u dambaysay: {date} / Eeg ciyaarta                                                                                         | Last game: date / View the game                   |
+| `profile.headToHead.lastResult.win` / `loss` / `draw`                 | Waad guuleysatay / Waad khasaartay / Barbaro                                                                                         | You won / You lost / Draw                         |
+| `profile.headToHead.rating.above` / `below`                           | Darajadaadu waa {n} dhibcood ka sarraysaa / Darajadaadu waa {n} dhibcood ka hoosaysaa                                                | Your rating is n points higher / lower            |
+| `profile.headToHead.rating.equal`                                     | Darajadiinnu waa isku mid                                                                                                            | Your ratings are equal                            |
+| `profile.headToHead.rating.unavailable`                               | Farqiga darajada wuxuu soo muuqan doonaa marka labadiinnuba darajo yeeshaan.                                                         | Shown once you both have a rating                 |
+| `profile.ratingHistory.title` / `windowLabel`                         | Taariikhda darajada / Muddada                                                                                                        | Rating history / Period                           |
+| `profile.ratingHistory.window.7` / `30` / `90`                        | 7 maalmood / 30 maalmood / 90 maalmood                                                                                               | 7 / 30 / 90 days                                  |
+| `profile.ratingHistory.summary`                                       | {games} ciyaarood oo tartan ah: {from} ilaa {to} ({change})                                                                          | n rated games: from X to Y (change)               |
+| `profile.ratingHistory.highLow`                                       | Muddadan: ugu sarreysay {high}, ugu hooseysay {low}                                                                                  | This period: highest, lowest                      |
+| `profile.ratingHistory.peakCaption`                                   | Darajada ugu sarreysay abid: {rating} ({date})                                                                                       | Highest rating ever: rating (date)                |
+| `profile.ratingHistory.firstGame`                                     | Ciyaartii tartanka ee ugu horraysay                                                                                                  | First rated game                                  |
+| `profile.ratingHistory.empty`                                         | Muddadan ma jirto ciyaar tartan ah oo darajo lagu xisaabiyay.                                                                        | No counted rated games in this period             |
+| `profile.ratingHistory.listTitle` / `listPartial`                     | Ciyaaraha jaantuska ku jira / {shown} ka mid ah {games} ciyaarood                                                                    | Games in the chart / shown of n                   |
+| `profile.ratingHistory.columns.date` / `result` / `rating` / `change` | Taariikh / Natiijo / Darajo / Isbeddel                                                                                               | Date / Result / Rating / Change                   |
+| `profile.headToHead.unavailable` / `ratingHistory.unavailable`        | Isbarbardhigga hadda lama heli karo. / Taariikhda darajada hadda lama heli karo.                                                     | Comparison / history unavailable now              |
+| `leaderboard.form.label`                                              | Shanta ciyaarood ee tartanka ah ee ugu dambeysay                                                                                     | Last five rated games                             |
+
+## 8. Implementation slices
+
+Prerequisites: R1, R3, and R4 merged; E6 recorded. Tests come first where a
+slice has logic.
+
+1. `test(db): add R5 sample-match fixtures and query-plan checks`
+2. `feat(db): read head-to-head records from the viewer's owner index`
+3. `feat(db): read rating-history windows from match_player_rating`
+4. `feat(web): add rating-history window, start, reduction, and peak helpers`
+5. `feat(web): show the private head-to-head card on profiles`
+6. `feat(web): chart rating history on public profiles`
+7. `feat(web): show recent rated form on leaderboard rows`
+8. `test(e2e): cover head-to-head and rating history between two accounts`
+9. Should: `feat(web): move the challenge link into the head-to-head card`
+
+## 9. Acceptance tests
+
+### Unit (web helpers)
+
+- Window bounds inclusive at `asOf − days × 86,400,000` and at `asOf`; 1 ms
+  earlier excluded; a row after `asOf` not drawn but counted for the start
+  test. Start at `windowStart` when `rated_games` exceeds the rows, else at
+  the first game.
+- Reduction: 99 events all drawn; 100 and 5,000 give at most 100 points with
+  first, last, peak, and bucket extremes kept, deterministically.
+- Rounded `change` and `difference` with signed words; `days` and `form`
+  parsing, malformed values included.
+
+### Workers and D1 (`packages/db`, Miniflare, H1 and R1 migrations)
+
+- Symmetry: swapping viewer and target swaps the win counts, keeps games,
+  draws, and the last meeting's id and date, inverts its result, negates the
+  difference, and swaps provisional flags; rematches and equal `ended_at`
+  values (match id breaks the tie) included.
+- M1 and M9 in the friendly row, M4 in the rated row, all absent from both
+  charts; after R1's rebuild M8 leaves the chart and later points equal the
+  rebuilt rows, while the card still counts it.
+- Pending and held rated games: rated row, no point. A late save keeps
+  `(ended_at, match_id)` order, each point equal to its stored row.
+- Peak inside (marker survives reduction), outside (caption with date),
+  moved by a rebuild, mismatched (caption, diagnostic); with
+  `maintenance = 1` the card and chart keep the last published values.
+- `EXPLAIN QUERY PLAN` at 5,000 games: the card starts at
+  `match_player_owner_idx` for the viewer, the chart at it for the target;
+  other accesses are key searches; no `SCAN` of the three tables.
+
+### Web (loaders, routes, components)
+
+- No card and no card markup for signed-out, incomplete, pending-deletion,
+  and self views; a card for another active account, with
+  `Cache-Control: private, no-store` on HTML and `__data.json`. A pending or
+  deleted target is a 404 (once A3 is live). With a card, the page has
+  exactly one challenge link, inside the card.
+- Privacy scan of load output, HTML, and `__data.json` for both user ids,
+  emails, provider ids, sessions, tickets, room codes, `seq` values, RD, and
+  volatility; no friendly match id in a signed-out response.
+- The strip appears in public and around-you rows; the public leaderboard
+  stays session-independent and keeps R3's cache header.
+- The selector works without JavaScript; alias redirects keep `days`. The
+  keyboard reaches the selector and table; chips, peak, and changes have text
+  names; reduced motion; 320 px without horizontal scrolling.
+
+### E2E (shared local D1, [§10.4](v2-contracts.md#104-shared-local-d1-in-e2e))
+
+- Two accounts play a friendly and a rated game. Each sees the other's card
+  with rated 1 and friendly 1, mirrored; signed out, no card; each chart has
+  one point; the friendly last-meeting link opens for the player. A seeded
+  leaderboard fixture shows the strip.
+
+### Sample matches
+
+| ID     | Head-to-head card (A views B)                                           | Rating charts (A and B)                       | Leaderboard form                    |
+| ------ | ----------------------------------------------------------------------- | --------------------------------------------- | ----------------------------------- |
+| M1     | Friendly row: A win                                                     | No point                                      | Unchanged                           |
+| M2     | Rated row: A win                                                        | A up, B down                                  | A gains W, B gains L                |
+| M3     | Rated row: A loss                                                       | A down, B up                                  | A gains L, B gains W                |
+| M4     | Rated row: counted                                                      | No point                                      | Unchanged                           |
+| M5     | Rated row: draw                                                         | A point, B point                              | Both gain D                         |
+| M6, M7 | Nothing (no row)                                                        | Nothing                                       | Nothing                             |
+| M8     | Rated row, before and after the rebuild                                 | A point until the swap; absent after it       | Rebuilt without it                  |
+| M9     | Friendly row                                                            | No point                                      | Unchanged                           |
+| M10    | B's profile 404s: no card for any viewer; B's pending session sees none | A's M2 point unchanged; B's chart unreachable | B off the board; A's form unchanged |
+
+## 10. Rollout and rollback
+
+| Environment | Steps                                                                                                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dev         | Miniflare D1 with the H1 and R1 migrations and the §9 fixtures.                                                                                                                                                                 |
+| e2e         | The shared local D1; the §9 end-to-end test.                                                                                                                                                                                    |
+| preview     | After R1, R3, and R4 run on preview and E6 is recorded: deploy the web Worker; check signed-out, participant, self, and pending-target views, a dense 90-day chart, headers, and leaderboard caching; record rows read and p95. |
+| production  | Web Worker deploy only. The release record lists what was checked; nothing is called verified without it.                                                                                                                       |
+
+- **Deploy order**: web Worker only, the last step of
+  [§6.5](v2-contracts.md#65-deploy-order); no migration, game-Worker change,
+  or binding ([§10.3](v2-contracts.md#103-bindings-flags-and-rollout-by-milestone)).
+- **Kill switch**: none. Rollback redeploys the previous web Worker version;
+  R5 writes nothing, so no data changes either way.
+- **Done when**: the card is symmetric and seen only by the two players; the
+  chart reproduces stored `match_player_rating` values in all three windows
+  with an honest peak; strips equal `player_rating.form`; §9 passes; E6 and
+  preview figures are recorded.

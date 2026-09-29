@@ -49,7 +49,7 @@ Register IDs are defined in the tables below. "Wave" is the build wave in
 | S1  | [Sponsor placements](s1-sponsor-placements.md)                                 | draft   | Pilot | X1 (≥ 30 days of data), BRD, S2-min                                   | F3 P14 Q2 Q5                       |
 | S2  | [Sponsor measurement](s2-sponsor-measurement-reports.md) (S2-min with S1)      | draft   | Pilot | S1, X1                                                                | F3 P12 P14                         |
 | S3  | [Sponsor page](s3-sponsor-page.md) (S3a pilot page, S3b rate card)             | draft   | Pilot | S1, S2-min; S3b after a delivered report                              | F3 P14 Q3 Q5                       |
-| K2  | [Queue quality](k2-queue-quality.md)                                           | draft   | L     | K1                                                                    | P13 P15 P16                        |
+| K2  | [Queue quality](k2-queue-quality.md)                                           | revised | L     | K1                                                                    | P13 P15 P16                        |
 
 Wave `L` is "later in V2": it ships only with evidence that it is needed.
 

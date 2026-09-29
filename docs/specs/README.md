@@ -4,10 +4,9 @@ This folder holds one implementation spec per V2 milestone, the shared
 contracts every spec links to, and this index. Read in this order:
 
 1. [`docs/shaxda-v2.md`](../shaxda-v2.md) — V2 scope, goals, and waves.
-2. `v2-contracts.md` (this folder; added in revision step 5) — the
-   canonical schema, lifecycle, policy, access matrix, protocol, jobs, and
-   proof evidence. Specs link to it and never restate competing SQL, enums,
-   or message shapes.
+2. [`v2-contracts.md`](v2-contracts.md) — the canonical schema, lifecycle,
+   policy, access matrix, protocol, jobs, and proof evidence. Specs link to
+   it and never restate competing SQL, enums, or message shapes.
 3. The milestone spec you are implementing.
 
 `docs/shaxda_game.md` still wins for game rules. Document precedence is set
@@ -143,10 +142,11 @@ additive for cached PWA clients (`v2-contracts.md` §6).
 
 ## Change log
 
-| Date       | Commit    | Change                                                                                |
-| ---------- | --------- | ------------------------------------------------------------------------------------- |
-| 2026-09-25 | `e7ea9fb` | V2 brief and 17 milestone spec drafts added.                                          |
-| 2026-09-29 | `33df8b9` | Spec revision plan rewritten (`docs/specs-revision-plan.md`).                         |
-| 2026-09-29 | `c701d7b` | Spec drafts formatted with Prettier.                                                  |
-| 2026-09-29 | `caf614e` | `/legal` describes the live accounts and D1 storage (revision step 1).                |
-| 2026-09-29 | —         | This index and register created (step 2). P3 states the rematch rule it implies (M9). |
+| Date       | Commit    | Change                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-25 | `e7ea9fb` | V2 brief and 17 milestone spec drafts added.                                                                                                                                                                                                                                                                                                                                                                    |
+| 2026-09-29 | `33df8b9` | Spec revision plan rewritten (`docs/specs-revision-plan.md`).                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-09-29 | `c701d7b` | Spec drafts formatted with Prettier.                                                                                                                                                                                                                                                                                                                                                                            |
+| 2026-09-29 | `caf614e` | `/legal` describes the live accounts and D1 storage (revision step 1).                                                                                                                                                                                                                                                                                                                                          |
+| 2026-09-29 | —         | This index and register created (step 2). P3 states the rematch rule it implies (M9).                                                                                                                                                                                                                                                                                                                           |
+| 2026-09-29 | —         | `v2-contracts.md` added (step 5) with proofs E1–E4. Refinements (contracts §13): `rateConsent.disclosureV`; rated rematch votes; hardened fence; narrow `match_rating`/`match_player_rating` tables; validation first with non-blocking `held`; the public record and `eligible_until` on `player_rating`; game→web hint; generated web entry wrapper; one owner for the shared e2e D1; stricter ledger checks. |

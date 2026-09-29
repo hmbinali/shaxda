@@ -31,6 +31,9 @@ playwright-report/
 .wrangler/state/
 wrangler.toml.backup
 
+# Claude Code personal settings
+.claude/settings.local.json
+
 # Conductor local state
 .context/
 

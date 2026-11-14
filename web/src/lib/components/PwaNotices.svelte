@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { Download, RefreshCw, WifiOff, X } from "@lucide/svelte";
+  import Download from "@lucide/svelte/icons/download";
+  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
+  import WifiOff from "@lucide/svelte/icons/wifi-off";
+  import X from "@lucide/svelte/icons/x";
   import { messages } from "@shaxda/i18n";
   import { getPwaController } from "$lib/pwa/pwa.svelte";
 

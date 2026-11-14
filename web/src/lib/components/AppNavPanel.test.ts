@@ -1,4 +1,7 @@
-import { BookOpen, Flag, LogOut, Menu } from "@lucide/svelte";
+import BookOpen from "@lucide/svelte/icons/book-open";
+import Flag from "@lucide/svelte/icons/flag";
+import LogOut from "@lucide/svelte/icons/log-out";
+import Menu from "@lucide/svelte/icons/menu";
 import { siteContent } from "@shaxda/i18n";
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";

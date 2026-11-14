@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Trophy } from "@lucide/svelte";
+  import Trophy from "@lucide/svelte/icons/trophy";
   import type { PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
   import { onMount } from "svelte";

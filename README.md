@@ -33,11 +33,20 @@ This repository uses pnpm workspaces and Turborepo.
 
 ```bash
 pnpm install
-pnpm dev:web
-pnpm dev:worker
-pnpm check
-pnpm test:e2e
 ```
+
+### Start and stop local development
+
+From the project directory, run:
+
+```bash
+nvm use
+pnpm dev
+```
+
+Open [http://localhost:5173](http://localhost:5173). This starts both the
+web app and the game Worker. Press **Control+C** in the terminal running
+`pnpm dev` to stop both. Run `pnpm dev` again to restart them.
 
 ### Environment setup
 

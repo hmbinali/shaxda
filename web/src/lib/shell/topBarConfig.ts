@@ -1,12 +1,10 @@
-import {
-  BookOpen,
-  CircleHelp,
-  CircleUserRound,
-  LogIn,
-  LogOut,
-  ScrollText,
-  UserPlus,
-} from "@lucide/svelte";
+import BookOpen from "@lucide/svelte/icons/book-open";
+import CircleHelp from "@lucide/svelte/icons/circle-question-mark";
+import CircleUserRound from "@lucide/svelte/icons/circle-user-round";
+import LogIn from "@lucide/svelte/icons/log-in";
+import LogOut from "@lucide/svelte/icons/log-out";
+import ScrollText from "@lucide/svelte/icons/scroll-text";
+import UserPlus from "@lucide/svelte/icons/user-plus";
 import { siteContent } from "@shaxda/i18n";
 import type { NavPanelGroup, TopBarConfig } from "$lib/shell/appShell.svelte";
 

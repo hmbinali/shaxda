@@ -1,4 +1,6 @@
-import { AudioLines, Flag, Menu } from "@lucide/svelte";
+import AudioLines from "@lucide/svelte/icons/audio-lines";
+import Flag from "@lucide/svelte/icons/flag";
+import Menu from "@lucide/svelte/icons/menu";
 import { siteContent } from "@shaxda/i18n";
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";

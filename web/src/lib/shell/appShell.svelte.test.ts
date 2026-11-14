@@ -1,4 +1,4 @@
-import { AudioLines } from "@lucide/svelte";
+import AudioLines from "@lucide/svelte/icons/audio-lines";
 import { describe, expect, it, vi } from "vitest";
 import { createAppShell, type TopBarConfig } from "./appShell.svelte";
 

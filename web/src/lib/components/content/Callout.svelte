@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { CircleAlert, Lightbulb, ShieldCheck } from "@lucide/svelte";
+  import CircleAlert from "@lucide/svelte/icons/circle-alert";
+  import Lightbulb from "@lucide/svelte/icons/lightbulb";
+  import ShieldCheck from "@lucide/svelte/icons/shield-check";
   import type { ContentCalloutVariant } from "@shaxda/i18n";
   import type { Component, Snippet } from "svelte";
 

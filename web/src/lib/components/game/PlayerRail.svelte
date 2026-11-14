@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LockKeyhole } from "@lucide/svelte";
+  import LockKeyhole from "@lucide/svelte/icons/lock-keyhole";
   import { DRAW_TURN_LIMIT, type PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
   import {

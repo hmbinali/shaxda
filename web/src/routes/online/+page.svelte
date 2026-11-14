@@ -1,13 +1,11 @@
 <script lang="ts">
-  import {
-    Clipboard,
-    Flag,
-    LogOut,
-    Menu,
-    Plus,
-    Volume2,
-    VolumeX,
-  } from "@lucide/svelte";
+  import Clipboard from "@lucide/svelte/icons/clipboard";
+  import Flag from "@lucide/svelte/icons/flag";
+  import LogOut from "@lucide/svelte/icons/log-out";
+  import Menu from "@lucide/svelte/icons/menu";
+  import Plus from "@lucide/svelte/icons/plus";
+  import Volume2 from "@lucide/svelte/icons/volume-2";
+  import VolumeX from "@lucide/svelte/icons/volume-x";
   import { goto, replaceState } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { messages, siteContent } from "@shaxda/i18n";

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Share2 } from "@lucide/svelte";
+  import Share2 from "@lucide/svelte/icons/share-2";
   import { siteContent } from "@shaxda/i18n";
   import Button from "$components/ui/Button.svelte";
   import { profileUrl } from "$lib/site/metadata";

@@ -517,6 +517,7 @@ export const siteContent = {
       },
       // TODO(translation-review): Review the history and match detail copy.
       history: {
+        path: "/history",
         title: "Ciyaarahayga",
         description: "Liiska ciyaaraha aad akoonkaaga ku ciyaartay.",
         eyebrow: "Taariikhda ciyaaraha",
@@ -573,11 +574,9 @@ export const siteContent = {
         durationUnits: { hours: "s", minutes: "daq", seconds: "il" },
       },
       match: {
+        path: "/match/[id]",
         title: "Ciyaar Shaxda ah",
-        privateMeta: {
-          title: "Ciyaar Shaxda ah",
-          description: "Faahfaahinta ciyaar Shaxda ah.",
-        },
+        description: "Faahfaahinta ciyaar Shaxda ah.",
         pageTitle: "{a} iyo {b}",
         pageDescription: {
           win: "{winner} ayaa ka guuleystay {loser} ciyaar Shaxda ah.",

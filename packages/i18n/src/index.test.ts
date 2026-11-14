@@ -8,15 +8,17 @@ describe("i18n scaffold", () => {
     expect(messages.so.appName).toBe("Shaxda");
   });
 
-  it("provides metadata for every C1 public page", () => {
+  it("provides metadata for every site page", () => {
     const pages = siteContent.so.pages;
 
     expect(Object.keys(pages).sort()).toEqual([
       "account",
+      "history",
       "home",
       "learn",
       "legal",
       "login",
+      "match",
       "profile",
       "register",
     ]);

@@ -65,6 +65,45 @@ afterEach(async () => {
 });
 
 describe("online counters", () => {
+  it("saves a played two-account invite with the game analytics flag disabled", async () => {
+    await applyD1Migrations(bindings.DB, bindings.TEST_MIGRATIONS);
+    const counters = () =>
+      bindings.DB.prepare(
+        "SELECT day, event, count, updated_at FROM event_daily WHERE event GLOB 'online_*' ORDER BY day, event",
+      ).all();
+    const before = (await counters()).results;
+    const room = await openRoom({ ratedRequest: false, accountCreator: true });
+    const starter = getActingPlayer(
+      deserialize((await room.state()).room.gameState),
+    );
+    await room.placeFirst();
+    await room.finish(starter);
+
+    for (const seat of ["A", "B"] as const) {
+      expect(room.latest(seat, "state")).toMatchObject({
+        state: { phase: "gameOver" },
+      });
+      expect(room.latest(seat, "matchStatus")).toMatchObject({
+        save: { status: "saved" },
+      });
+    }
+    expect(
+      (
+        await bindings.DB.prepare(
+          `SELECT m.match_number, m.mode, m.rated, m.action_count,
+                  COUNT(p.seat) AS seats
+           FROM match m JOIN match_player p ON p.match_id = m.id
+           WHERE m.room_code = ? GROUP BY m.id`,
+        )
+          .bind(room.roomCode)
+          .all()
+      ).results,
+    ).toEqual([
+      { match_number: 1, mode: "invite", rated: 0, action_count: 2, seats: 2 },
+    ]);
+    expect((await counters()).results).toEqual(before);
+  });
+
   it.each([false, true])(
     "counts the second seat, play and rematches once (mixed seats: %s)",
     async (guest) => {
@@ -523,10 +562,27 @@ async function openRoom({
   ratedRequest = true,
   guest = false,
   analytics = false,
+  accountCreator = false,
 } = {}) {
+  const identityTicket = accountCreator
+    ? await mintIdentityTicket(
+        {
+          iss: "shaxda-web",
+          aud: "shaxda-rooms",
+          action: "create",
+          userId: "rated-test-account-A",
+          usernameSnapshot: "ayaan_7",
+          avatarMode: "initial",
+          imageUrl: null,
+          jti: crypto.randomUUID(),
+        },
+        bindings.ONLINE_IDENTITY_SECRET,
+        Date.now(),
+      )
+    : undefined;
   const response = await SELF.fetch("https://shaxda.test/rooms", {
     method: "POST",
-    body: JSON.stringify({ options: { ratedRequest } }),
+    body: JSON.stringify({ options: { ratedRequest }, identityTicket }),
   });
   const created = serverMessageSchema.parse(await response.json());
   if (created.type !== "roomCreated") throw new Error("Room creation failed");

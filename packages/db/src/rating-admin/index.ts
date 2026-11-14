@@ -129,17 +129,22 @@ async function makePlan(
     policyV,
     algorithmV,
     invalidationLogHead: snapshot.sourceHeads.invalidation,
-    diff:
-      rebuild?.diffs ??
-      (excluded === null
-        ? { maintenance: req.command === "pause-ratings" ? 0 : 1 }
-        : {
-            source: target ? Number(snapshot.exclusions.has(target)) : null,
-            projection:
-              snapshot.players.find((player) => player.user_id === target)
-                ?.excluded ?? null,
-            desired: excluded,
-          }),
+    diff: {
+      // A later operator write starts a new plan, even when the cursor and
+      // visible values return to the same state (for example pause/resume).
+      appliedAuditHead: snapshot.sourceHeads.audit,
+      changes:
+        rebuild?.diffs ??
+        (excluded === null
+          ? { maintenance: req.command === "pause-ratings" ? 0 : 1 }
+          : {
+              source: target ? Number(snapshot.exclusions.has(target)) : null,
+              projection:
+                snapshot.players.find((player) => player.user_id === target)
+                  ?.excluded ?? null,
+              desired: excluded,
+            }),
+    },
   };
   const bytes = await crypto.subtle.digest(
     "SHA-256",
@@ -298,7 +303,15 @@ export async function applyRatingAdmin(
 
   const token = crypto.randomUUID();
   const timeout = Date.now() + (options.waitMs ?? 120_000);
-  while (!(await acquireMaintenance(db, token, high, await databaseTime(db)))) {
+  let maintenanceBeforeLease: 0 | 1 | null;
+  while (
+    (maintenanceBeforeLease = await acquireMaintenance(
+      db,
+      token,
+      high,
+      await databaseTime(db),
+    )) === null
+  ) {
     const cursor = await db
       .prepare("SELECT cursor_seq FROM rating_processor_state WHERE id = 1")
       .first("cursor_seq");
@@ -321,7 +334,7 @@ export async function applyRatingAdmin(
         token,
         high,
         await databaseTime(db),
-        snapshot.state.maintenance === 1,
+        maintenanceBeforeLease === 1,
       );
       return finish("noop", "alreadyApplied");
     }
@@ -332,7 +345,7 @@ export async function applyRatingAdmin(
         token,
         high,
         await databaseTime(db),
-        snapshot.state.maintenance === 1,
+        maintenanceBeforeLease === 1,
       );
       return finish("rejected", "digestMismatch");
     }
@@ -386,7 +399,7 @@ export async function applyRatingAdmin(
         token,
         high,
         current,
-        snapshot.state.maintenance === 1,
+        maintenanceBeforeLease === 1,
       );
     } catch {
       throw error;
@@ -402,7 +415,7 @@ export async function setLocalRatingMaintenance(
   const now = await databaseTime(db);
   const { state } = await readRatingSnapshot(db);
   const token = crypto.randomUUID();
-  if (!(await acquireMaintenance(db, token, state.cursor_seq, now)))
+  if ((await acquireMaintenance(db, token, state.cursor_seq, now)) === null)
     return false;
   await releaseMaintenance(
     db,

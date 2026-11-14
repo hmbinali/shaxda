@@ -28,8 +28,9 @@ starts only when the spec is frozen **and** its milestone is activated
 
 ## Current implementation planning
 
-As of 2026-11-14, all 17 milestone specs are frozen. H1 Match Persistence and
-X1a Product Analytics are activated for local implementation and verification.
+As of 2026-11-14, all 17 milestone specs are frozen. H1 Match Persistence,
+H2 Match History and Detail, and X1a Product Analytics are activated for local
+implementation and verification.
 Sponsorship (S1–S3) and publishing work are scheduled later.
 
 The [build guide](../build_guide.md) maps the specs to session assignments,

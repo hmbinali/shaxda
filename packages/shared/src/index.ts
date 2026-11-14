@@ -4,6 +4,7 @@ export * from "./fixtures";
 export * from "./learning-fixtures";
 export * from "./schemas";
 export * from "./account";
+export * from "./history/schemas";
 
 export const appMetadata = {
   id: "shaxda",

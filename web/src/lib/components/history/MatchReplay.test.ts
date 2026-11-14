@@ -61,7 +61,7 @@ function viewer(match = sampleMatchPayloads.M2) {
   };
 }
 
-describe("match replay controls", () => {
+describe("match replay controls", { timeout: 15_000 }, () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();

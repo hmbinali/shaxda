@@ -17,29 +17,28 @@ with `pnpm test:e2e --timeout=120000` against isolated local Workers and D1.
 
 ## Preview
 
-On 2026-11-14 the [preview app manifest](https://shaxda-web-preview.shaxda.workers.dev/_app/immutable/entry/app.CRQ3R4qL.js)
-mapped `/match/[id]` to `nodes/12.DlPzhi60.js`. That route rendered the H2
-match details and match-level share action. The H3 viewer and position
-sharing were absent. The H3 preview smoke checks are open.
+On 2026-11-14 at 18:22 UTC, `shaxda-web-preview` began serving
+`9366b599-8592-4441-8a8a-99a658654515` at 100%. The web-only build came
+from [PR #50](https://github.com/hmbinali/shaxda/pull/50) at `ea622d9`, which
+passed [CI run 43624239476](https://github.com/hmbinali/shaxda/actions/runs/43624239476).
+The previous preview web version for H3 rollback is
+`d3bbbae9-925b-4ab0-ba7e-8982df1303ef`. Deployment followed R2 and X1b's
+switch restoration. The served match bundle matched the staged asset byte
+for byte, and the preview game Worker health check passed.
 
-1. After preview deployment is authorized, coordinate the window with
-   [Wave 2 verification](../specs/README.md#wave-2-verification) and record
-   the active preview web Worker version for rollback. From the approved
-   [PR #50](https://github.com/hmbinali/shaxda/pull/50) commit, use the
-   existing preview build settings and run `pnpm deploy:preview:web`.
-   Record the commit and the new `shaxda-web-preview` version. Confirm the
-   match page serves the H3 viewer before running the smoke checks.
-2. Reuse Wave 2's next friendly save and the two approved participant
-   sessions. Open the new match as each player and compare the final replay
-   board and result with the room. While signed out and in an unrelated
-   session, compare the match's HTML and `__data.json` with an unknown ID.
-   Expect page 404 and a 404 error node in the data response. Check
-   `Cache-Control: no-store` on both admitted responses.
-3. Reuse Wave 2's existing public rated save. Signed out, check the final
-   board and result, share an interior position and open the URL in a fresh
-   tab. Check that stepping and playback make no page data requests and
-   that canonical and Open Graph URLs omit the position query. Record the
-   Worker version, match IDs, and smoke results here.
+- [Wave 2's public M2 match](https://shaxda-web-preview.shaxda.workers.dev/match/AZ4RHCUBMGZUC6DKW9VZ)
+  passed signed-out playback through position 4, final-board and result
+  checks, position sharing into a fresh context, keyboard stepping, silent
+  start, and cues with reduced motion. Canonical and Open Graph URLs omitted
+  `a`. Stepping and playback made zero page-data requests.
+- Both signed-in owners opened Wave 2's 68-action friendly save in their
+  existing Chrome and in-app browser profiles. Both reached the same
+  result and occupancy on all 24 points, matching the terminal state of
+  the canonical M1 game played in Wave 2. Seat A won with 11 pieces to B's 2.
+  Signed-out HTML returned 404 and `__data.json` carried a 404 error node.
+  Both responses matched an unknown ID and carried `Cache-Control: no-store`.
+  The unrelated signed-in response and participant cache-policy assertions
+  passed against local Workers and D1.
 
 ## Physical Android gate
 
@@ -47,11 +46,12 @@ The frozen [H3 specification](../specs/h3-replay-viewer.md#95-end-to-end-and-the
 requires Chrome on a physical entry-level Android phone. Status: **open**.
 The only Android target found on 2026-11-14 identified itself as an emulator.
 
-1. On preview, play a real saved rated match from the beginning to the result.
-   Exercise Play, Pause, Previous, Next, Start, End, each speed, and position
-   sharing in portrait orientation. Confirm that sound starts off, the cue
-   and final overlay remain legible, and Android's **Remove animations**
-   setting keeps the layout and cues intact.
+1. On preview, play the [saved rated M2 match](https://shaxda-web-preview.shaxda.workers.dev/match/AZ4RHCUBMGZUC6DKW9VZ)
+   from the beginning to the result. Exercise Play, Pause, Previous, Next,
+   Start, End, each speed, and position sharing in portrait orientation.
+   Confirm that sound starts off, the cue and final overlay remain legible,
+   and Android's **Remove animations** setting keeps the layout and cues
+   intact.
 2. Seed the [maximal E4 fixture](../../packages/game-engine/src/fixtures/e4-maximum.ts)
    in a local D1 match with its engine-derived ledger facts. Use USB port
    forwarding in Chrome DevTools to open the local rated match on the phone.

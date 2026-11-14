@@ -56,6 +56,26 @@ export async function inspectMatch(db: D1Database, id: string) {
         .bind(id),
     ]);
   if (!matches?.results.length) return null;
+  const match = matches.results[0] as { ended_at: number; started_at: number };
+  const participants = seats!.results as { user_id: string }[];
+  const overlaps = await db
+    .prepare(
+      `
+    SELECT DISTINCT m.id, m.seq, m.started_at, m.ended_at
+      FROM match_player p
+      JOIN match m ON m.id = p.match_id
+     WHERE p.user_id IN (?, ?) AND p.ended_at > ?
+       AND m.rated = 1 AND m.started_at < ? AND m.id <> ?
+     ORDER BY m.seq`,
+    )
+    .bind(
+      participants[0]?.user_id ?? null,
+      participants[1]?.user_id ?? null,
+      match.started_at,
+      match.ended_at,
+      id,
+    )
+    .all();
   return {
     match: matches.results[0],
     seats: seats!.results,
@@ -64,6 +84,7 @@ export async function inspectMatch(db: D1Database, id: string) {
     invalidations: invalidations!.results,
     mark: marks!.results[0] ?? null,
     audit: audit!.results,
+    overlaps: overlaps.results,
   };
 }
 

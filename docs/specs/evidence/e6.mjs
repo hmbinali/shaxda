@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import {
+  createRankFixture,
+  studyRankFreshness,
+  studyRankSnapshot,
+} from "./e6-rank-snapshot.mjs";
 
 const requireFromWeb = createRequire(
   new URL("../../../web/package.json", import.meta.url),
@@ -95,7 +100,7 @@ async function insertFixtureRows(db, table, columns, rows) {
     .run();
 }
 
-async function seed(db) {
+async function seed(db, ranksOnly) {
   const accounts = Array.from({ length: playerCount }, (_, n) => {
     const id = playerId(n);
     return [
@@ -124,7 +129,7 @@ async function seed(db) {
     .bind(asOf)
     .run();
 
-  for (let start = 1; start <= 25_000; start += 250) {
+  for (let start = 1; start <= (ranksOnly ? 0 : 25_000); start += 250) {
     const matches = [];
     const seats = [];
     const decisions = [];
@@ -253,6 +258,7 @@ async function seed(db) {
     form, peak_rating, peak_seq, last_rated_at, eligible_until, last_seq, excluded`,
     ratings,
   );
+  if (ranksOnly) return;
   await db
     .prepare(
       `INSERT INTO rating_admin_audit
@@ -585,17 +591,7 @@ async function study(db) {
   }
 
   await measure("R3 maintenance flag (each page)", maintenance, [], 1);
-  const densities = [];
-  for (const threshold of [9, 1]) {
-    await db
-      .prepare(
-        `UPDATE player_rating
-      SET eligible_until = ?1 + CASE WHEN (board_key - 1) % 10 < ?2 THEN 1 ELSE -1 END`,
-      )
-      .bind(asOf, threshold)
-      .run();
-    densities.push([threshold / 10, await boardCase(`d=${threshold / 10}`)]);
-  }
+  const densities = await forEachDensity(db, async (label) => boardCase(label));
 
   await db
     .prepare(
@@ -692,6 +688,47 @@ async function study(db) {
   return { densities, observations };
 }
 
+async function setDensity(db, threshold) {
+  await db
+    .prepare(
+      `UPDATE player_rating SET eligible_until = ?1 +
+    CASE WHEN (board_key - 1) % 10 < ?2 THEN 1 ELSE -1 END`,
+    )
+    .bind(asOf, threshold)
+    .run();
+}
+
+async function forEachDensity(db, measure) {
+  const results = [];
+  for (const threshold of [9, 1]) {
+    await setDensity(db, threshold);
+    const value = await measure(`d=${threshold / 10}`);
+    results.push([threshold / 10, value]);
+  }
+  return results;
+}
+
+async function rankStudy(db) {
+  await createRankFixture(db);
+  return forEachDensity(db, async (label) => {
+    const { results } = await db
+      .prepare(
+        `SELECT ${boardFields} ${fromBoard}
+      WHERE ${listed} ${boardOrder}`,
+      )
+      .bind(asOf)
+      .all();
+    const oracle = results.map((row, i) => ({ ...row, rank: i + 1 }));
+    return {
+      ...(await studyRankSnapshot(db, asOf, oracle, label, playerId)),
+      freshness: await studyRankFreshness(db, asOf, oracle, label, playerId),
+    };
+  });
+}
+
+const ranksOnly = process.argv.includes("--rank-only");
+const withSnapshot = ranksOnly || process.argv.includes("--rank-snapshot");
+
 const mf = new Miniflare({
   modules: true,
   script:
@@ -705,10 +742,13 @@ const mf = new Miniflare({
 try {
   const db = await mf.getD1Database("DB");
   await schema(db);
-  await seed(db);
+  await seed(db, ranksOnly);
   console.error("E6 fixture seeded");
   await db.prepare("ANALYZE").run();
-  const { densities, observations } = await study(db);
+  const original = ranksOnly ? {} : await study(db);
+  const rankSnapshot = withSnapshot
+    ? (await rankStudy(db)).map(([, data]) => data)
+    : [];
   console.log(
     JSON.stringify(
       {
@@ -719,8 +759,8 @@ try {
           workerd: requireFromMiniflare("workerd/package.json").version,
         },
         asOf: new Date(asOf).toISOString(),
-        densities,
-        observations,
+        ...original,
+        ...(rankSnapshot.length ? { rankSnapshot } : {}),
       },
       null,
       2,

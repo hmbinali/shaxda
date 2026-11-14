@@ -920,6 +920,15 @@ sort separately from the ordered-page plan rule. For R5, align
 the printed SQL in §3.1 with its existing inclusive upper bound in §4.2.
 The fixture found one post-`asOf` event in the unbounded query.
 
+**R3 snapshot follow-up.** The [disposable rerun](evidence/e6-rank-snapshot-results.md)
+passed the local exact-rank read budget at both densities. Full deep
+pages used 206 reads including cursor position and state. The timed D1
+publication and warm-cache model fit the one-minute policy envelope.
+The [contract change draft](evidence/r3-rank-snapshot-contract-draft.md)
+records scheduler, cache, privacy, and write-cost checks for preview.
+The original live-query result still fails. Adoption follows the register's
+explicit contract-change process before activation.
+
 **H2 handoff.** The existing indexes passed H2's E6 slice. After H1's
 migration and writer land and H2 is activated, rerun the six filter pairs,
 summary and detail on H1's fixtures, and test friendly and missing detail

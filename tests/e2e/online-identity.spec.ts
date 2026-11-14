@@ -30,6 +30,10 @@ test.describe("V1.1-A2 online account identity", () => {
       const shareLink = await creator.getByTestId("share-link").inputValue();
       const joiner = await joinerContext.newPage();
       await joiner.goto(shareLink);
+      // Let identity loading finish before the guest name can trigger auto-join.
+      await expect(
+        joiner.getByRole("link", { name: "Gal koontada" }),
+      ).toBeVisible();
       await joiner.getByLabel("Magaca martida").fill("Cabdi");
       await joiner.getByTestId("join-room").click();
 

@@ -1,3 +1,4 @@
+import { processPendingRatings } from "@shaxda/db/rating";
 import { ANALYTICS_JOB_NAME, runAnalyticsNightly } from "@shaxda/db/analytics";
 import { UTC_DAY_MS } from "@shaxda/shared/analytics/events";
 
@@ -34,6 +35,9 @@ export function scheduled(
   ctx: { waitUntil(promise: Promise<unknown>): void },
 ): void {
   const now = controller.scheduledTime;
+  if (controller.cron === "* * * * *") {
+    ctx.waitUntil(processPendingRatings(env.DB));
+  }
   const eligible = jobs.filter(
     (job) => controller.cron === job.testCron || job.due(now, undefined),
   );

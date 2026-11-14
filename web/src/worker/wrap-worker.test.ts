@@ -22,6 +22,7 @@ it("keeps both entries out of the assets and wraps only once", () => {
     const wrapper = readFileSync(entry, "utf8");
     expect(wrapper).toContain('import kit from "./_kit_worker.js"');
     expect(wrapper).toContain("fetch: kit.fetch, scheduled");
+    expect(wrapper).toContain("export { RatingsEntrypoint }");
     expect(readFileSync(kit, "utf8")).toBe(adapterWorker);
     expect(readFileSync(ignore, "utf8")).toBe(
       "_worker.js\n_redirects\n_kit_worker.js\n",

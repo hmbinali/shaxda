@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scheduled } from "./scheduled";
 
-const { run } = vi.hoisted(() => ({ run: vi.fn() }));
+const { run, rate } = vi.hoisted(() => ({ run: vi.fn(), rate: vi.fn() }));
+vi.mock("@shaxda/db/rating", () => ({ processPendingRatings: rate }));
 vi.mock("@shaxda/db/analytics", () => ({
   ANALYTICS_JOB_NAME: "x1.nightly",
   runAnalyticsNightly: run,
@@ -27,12 +28,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   all.mockResolvedValue({ results: [] });
   run.mockResolvedValue(undefined);
+  rate.mockResolvedValue(0);
 });
 
 describe("scheduled dispatcher", () => {
   it("skips the state read before 00:15 and resumes until success", async () => {
     await tick(start - 60_000);
     expect(prepare).not.toHaveBeenCalled();
+    expect(rate).toHaveBeenCalledWith(env.DB);
     await tick(start);
     await tick(start + 60_000);
     expect(run.mock.calls).toEqual([

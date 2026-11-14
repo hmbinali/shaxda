@@ -78,6 +78,7 @@ export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
     },
     account: {
       encryptOAuthTokens: true,
+      updateAccountOnSignIn: false,
     },
     user: {
       additionalFields: {
@@ -129,12 +130,12 @@ export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
       account: {
         create: {
           before: async (account) => ({
-            data: {
-              ...account,
-              accessToken: null,
-              refreshToken: null,
-              idToken: null,
-            },
+            data: { ...account, ...discardedProviderTokens },
+          }),
+        },
+        update: {
+          before: async (account) => ({
+            data: { ...account, ...discardedProviderTokens },
           }),
         },
       },
@@ -153,3 +154,9 @@ export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
     plugins: [sveltekitCookies(getRequestEvent)],
   };
 }
+
+const discardedProviderTokens = {
+  accessToken: null,
+  refreshToken: null,
+  idToken: null,
+};

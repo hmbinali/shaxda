@@ -100,6 +100,25 @@ describe("Better Auth options", () => {
     });
   });
 
+  it("skips provider account updates on sign-in and strips tokens from other updates", async () => {
+    const options = createAuthOptions(environment());
+    expect(options.account?.updateAccountOnSignIn).toBe(false);
+    const updatedAt = new Date();
+    await expect(
+      options.databaseHooks?.account?.update?.before?.(
+        {
+          updatedAt,
+          accessToken: "new-access",
+          refreshToken: "new-refresh",
+          idToken: "new-id",
+        },
+        null,
+      ),
+    ).resolves.toEqual({
+      data: { updatedAt, accessToken: null, refreshToken: null, idToken: null },
+    });
+  });
+
   it("prevents generic profile updates from touching protected identity fields", async () => {
     const hook =
       createAuthOptions(environment()).databaseHooks?.user?.update?.before;

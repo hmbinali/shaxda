@@ -256,13 +256,8 @@ section above, against the same code.
 Found by reading the code while revising the V2 specs. Not observed in
 production data; recorded so the verified status above is not overstated.
 
-- **Provider tokens on returning sign-in.** `web/src/lib/server/auth/options.ts`
-  sets provider tokens to `null` only in the `account` **create** hook. Better
-  Auth 1.6.25 updates the linked `account` row on every later sign-in unless
-  `account.updateAccountOnSignIn` is `false`, writing the fresh encrypted access
-  token and the plaintext Google ID token (a JWT that carries the Google name,
-  email, and picture). So for any returning user the "Retained identity data"
-  statements in `v11a-accounts-runbook.md` (tokens set to null; Google full name
-  scrubbed) may not hold. Status: open. The fix (disable the update, add an
-  update hook, test it) and a reviewed production cleanup of existing rows are a
-  separate task; the `/legal` copy was written so it stays true either way.
+- **Provider tokens on returning sign-in.** Better Auth 1.6.25 previously
+  refreshed the linked account's provider tokens on sign-in. The web Worker
+  now disables that refresh and clears provider tokens in both account
+  write hooks. Existing preview and production rows still need a reviewed
+  cleanup and a returning Google sign-in check.

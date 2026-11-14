@@ -39,6 +39,8 @@ Wave 2 integration commit `103f391`, with H1, X1a, and R2 integrated.
 A3 Account Deletion is approved for V2 before public rated play (Q1,
 2026-11-14) and activated for local implementation after the sign-in token
 retention fix.
+H3 Replay Viewer is activated for local implementation from `62c4f6a`,
+with H1 and H2 merged and the replay budget recorded in E4.
 Sponsorship (S1–S3) and publishing work are scheduled later.
 
 The [build guide](../build_guide.md) maps the specs to session assignments,

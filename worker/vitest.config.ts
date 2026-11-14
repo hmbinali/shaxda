@@ -10,7 +10,8 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       wrangler: {
-        configPath: "./wrangler.toml",
+        // The E2E Worker has its own local D1 and no external rating service.
+        configPath: "./wrangler.e2e.toml",
       },
       // The pool calls `unstable_getMiniflareWorkerOptions` without `envFiles`,
       // so Wrangler loads `worker/.dev.vars` into the test Worker and there is

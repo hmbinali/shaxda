@@ -46,6 +46,22 @@ merge order, and shared-file ownership. E5 passed its reporting gate and E6
 passed for H2. The R3 snapshot remains a draft under the contract-change
 process below.
 
+## Wave 2 verification
+
+On 2026-11-14, the combined local build passed `pnpm check`, the Better Auth
+schema check, and all 86 Playwright cases in one run with fresh local D1.
+
+| Work                   | Local implementation and verification                                                                                                                                                                          | Preview                                                                  | Production                                                         |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| X1b online counters    | `9d475c5`. Verified guest and account counters, rematches, counter-write failures, the kill switch, and admin totals.                                                                                          | Counter and kill-switch rehearsal open.                                  | Seven completed UTC days of counter-to-ledger reconciliation open. |
+| A3 account deletion    | `c8b3925` and `31ce14f`. Verified the migration, request and cancel flows, Google authorization redirect, grace-period play, neutral match identity, finalization, username release, and local restore replay. | Real Google callback, finalization, release, and restore rehearsal open. | Required before public rated play.                                 |
+| Google token retention | `82dddae`. Local auth option tests verify returning sign-in skips provider-token updates and both write hooks clear token fields.                                                                              | Returning Google sign-in and existing-row cleanup open.                  | Returning sign-in and approved existing-row cleanup open.          |
+
+Native Somali copy review remains open under Q4. See the
+[analytics runbook](../ops/x1a-analytics-runbook.md), the
+[accounts runbook](../ops/v11a-accounts-runbook.md), and
+[issue #48](https://github.com/hmbinali/shaxda/issues/48).
+
 ## Spec index
 
 Register IDs are defined in the tables below. "Wave" is the build wave in

@@ -7,6 +7,9 @@ const committedTestSecret = "shaxda-e2e-only-secret-48-characters-long-000000";
 const committedOnlineIdentityTestSecret =
   "shaxda-online-identity-dev-test-secret-000000000001";
 
+const committedAnalyticsTestSalt =
+  "shaxda-analytics-e2e-test-salt-0000000000000001";
+
 async function productionEnv() {
   const env = {};
   const files = [
@@ -84,6 +87,9 @@ const forbiddenSecrets = [
   env.GOOGLE_CLIENT_SECRET,
   env.ONLINE_IDENTITY_SECRET,
   env.ONLINE_IDENTITY_SECRET_PREVIOUS,
+  env.ANALYTICS_SALT,
+  env.ADMIN_USER_IDS,
+  committedAnalyticsTestSalt,
   committedTestSecret,
   committedOnlineIdentityTestSecret,
 ].filter((value) => typeof value === "string" && value.length > 0);
@@ -93,7 +99,7 @@ const exposedSecrets = forbiddenSecrets.filter((secret) =>
 
 if (exposedSecrets.length > 0) {
   console.error(
-    "Production bundle contains an authentication or identity secret.",
+    "Production bundle contains an authentication, identity, or analytics secret.",
   );
   process.exit(1);
 }

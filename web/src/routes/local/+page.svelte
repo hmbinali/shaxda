@@ -27,6 +27,7 @@
   import PlayerRail from "$components/game/PlayerRail.svelte";
   import TabletopShell from "$components/game/TabletopShell.svelte";
   import PageMeta from "$components/PageMeta.svelte";
+  import { reportLocalEvent } from "$lib/analytics/localEvents";
   import { createLocalGameController } from "$lib/game/localGame.svelte";
   import {
     instructionKeyFor,
@@ -39,7 +40,7 @@
   const copy = messages.so.localGame;
   const orientation = { orientation: "shared" } as const;
   const seating = resolveSeating(orientation);
-  const controller = createLocalGameController();
+  const controller = createLocalGameController({ report: reportLocalEvent });
   const soundPlayer = getSoundPlayer();
   const topBarCopy = siteContent.so.topBar;
 

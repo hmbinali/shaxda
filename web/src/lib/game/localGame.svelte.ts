@@ -3,6 +3,7 @@ import {
   createInitialState,
   legalActions,
 } from "@shaxda/game-engine";
+import type { ClientEventName } from "@shaxda/shared/analytics/events";
 import type { SoundCue } from "$lib/audio/sound";
 import type { GameAction, GameState, PointId } from "@shaxda/game-engine";
 import {
@@ -42,6 +43,7 @@ export interface ActionFeedback {
 export interface LocalGameControllerOptions {
   initialState?: GameState;
   storage?: LocalGameStorage | null;
+  report?: (event: ClientEventName) => void;
 }
 
 export class LocalGameController {
@@ -54,16 +56,19 @@ export class LocalGameController {
   status = $derived(buildGameStatus(this.state));
 
   readonly #storage: LocalGameStorage | null | undefined;
+  readonly #report: LocalGameControllerOptions["report"];
+  #fresh: boolean;
   #invalidNonce = 0;
   #feedbackNonce = 0;
   #actionNonce = 0;
 
   constructor(options: LocalGameControllerOptions = {}) {
     this.#storage = options.storage;
-    this.state =
-      options.initialState ??
-      loadResumableLocalGame(this.#storage) ??
-      createInitialState("A");
+    this.#report = options.report;
+    const existing =
+      options.initialState ?? loadResumableLocalGame(this.#storage);
+    this.#fresh = existing === null;
+    this.state = existing ?? createInitialState("A");
   }
 
   clickPoint(point: PointId): void {
@@ -110,6 +115,7 @@ export class LocalGameController {
 
   startNewGame(): void {
     this.state = createInitialState("A");
+    this.#fresh = true;
     this.selected = null;
     this.invalid = null;
     this.invalidNonce = 0;
@@ -141,7 +147,12 @@ export class LocalGameController {
     };
     this.emitFeedback(cues);
 
+    if (this.#fresh) {
+      this.#fresh = false;
+      this.#report?.("local_started");
+    }
     if (this.state.phase === "gameOver") {
+      this.#report?.("local_completed");
       clearSavedLocalGame(this.#storage);
     } else {
       saveLocalGame(this.state, this.#storage);

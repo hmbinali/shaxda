@@ -1,6 +1,6 @@
 import { serialize } from "@shaxda/game-engine";
 import { gameFixtures, noJarePlacementOrder } from "@shaxda/shared";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createLocalGameController } from "./localGame.svelte";
 import {
   LOCAL_GAME_STORAGE_KEY,
@@ -240,4 +240,29 @@ describe("LocalGameController", () => {
     expect(game.state.phase).toBe("gameOver");
     expect(values.get(LOCAL_GAME_STORAGE_KEY)).toBeUndefined();
   });
+});
+
+it("reports local starts and completions across a resume and a new game", () => {
+  const storage = localStorage;
+  storage.clear();
+  const report = vi.fn();
+  const fresh = createLocalGameController({ storage, report });
+  fresh.clickPoint("O1");
+  fresh.clickPoint("O2");
+
+  const resumed = createLocalGameController({ storage, report });
+  resumed.resign();
+  resumed.resign();
+  expect(report.mock.calls).toEqual([["local_started"], ["local_completed"]]);
+
+  resumed.startNewGame();
+  resumed.clickPoint("O1");
+  resumed.resign();
+  expect(report.mock.calls).toEqual([
+    ["local_started"],
+    ["local_completed"],
+    ["local_started"],
+    ["local_completed"],
+  ]);
+  storage.clear();
 });

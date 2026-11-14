@@ -57,6 +57,10 @@ declare global {
     interface Platform {
       env: import("$lib/server/auth/options").AuthEnvironment & {
         ONLINE_IDENTITY_SECRET?: string;
+        ANALYTICS_ENABLED?: string;
+        ANALYTICS_SALT?: string;
+        ANALYTICS_RATE_LIMIT?: import("$lib/server/rateLimit").RateLimitBinding;
+        ADMIN_USER_IDS?: string;
       };
       context?: {
         waitUntil(promise: Promise<unknown>): void;

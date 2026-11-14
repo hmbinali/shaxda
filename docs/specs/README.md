@@ -83,6 +83,19 @@ preview rebuild found one processed result, no held or pending results,
 and zero drift. The live browser rerun was blocked by the saved preview
 site permission, and only one Chrome profile was reachable.
 
+The next verification on `62c4f6a` reached both preview Workers and signed in
+with the first approved test account. The invite form preselected Saaxiibtinimo.
+A signed-out browser opened the existing rated result at ledger sequence 1
+and saw its correction label. That result recorded one placement and a
+resignation. A read-only rebuild again found one processed result, no pending
+or held results, and zero drift. Preview game Worker version `165224a8` served
+100% of traffic with `RATED_PLAY_ENABLED` and `ANALYTICS_ENABLED` both `"true"`.
+The checked-in preview and production configs set the rated flag to `"false"`.
+On the same commit, six focused local Playwright cases, 34 Worker cases,
+and three D1 policy and processor cases passed, along with the hibernation
+and E2E isolation checks. The live matrix still needs a second approved
+account in an independent browser session.
+
 | Remaining live rated check                                                        | Evidence so far                                                                                                                                                         |
 | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M1 friendly save and privacy, declined invite, and M9 mixed-vote friendly rematch | Covered by local Playwright. Two authenticated preview browser sessions are needed.                                                                                     |

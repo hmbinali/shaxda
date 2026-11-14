@@ -771,10 +771,12 @@ PLAN` evidence.
 
 ## 12. Evidence
 
-Proofs run on 2026-09-29 against the repository at the revision commits,
+E1–E4 ran on 2026-09-29 against the repository at the revision commits,
 locally only: wrangler 4.107.0, miniflare 4.20260701.0, workerd
 1.20260701.1, `@sveltejs/adapter-cloudflare` 7.2.9, `@sveltejs/kit` 2.69.1,
-Node 24.20.0. Code lived in a scratch directory and is not committed.
+Node 24.20.0. Code lived in a scratch directory. E5 and E6 ran on
+2026-11-14 against local baseline `7c91b50`, with reproducible fixtures and
+results linked below.
 
 ### E1 — D1 fence and swap
 
@@ -873,28 +875,56 @@ the real phone.
 
 ### E5 — small-community rating simulation
 
-Status: pending.
+**Pass for the E5 reporting gate.** In 384 seeded 180-day cohorts of
+20–300 players, median time from first processed game to first RD ≤ 110
+was 41–53 days in sparse play, 19–22 in regular play, and 9–10 in busy
+play. The median was 16–19 processed games across scenarios. By day 30,
+sparse cohorts averaged 6–10% listed and the sparse 20-player board
+was empty in 12/32 capped runs. By day 90, 67–89% were listed in those
+sparse scenarios. Keep P18 and P19, including R3's truthful empty state.
+See the [simulation, seeds, and full results](evidence/e5-results.md).
 
-Runs before R1 activation (P18) and R3 activation (P19). Pass: a report of
-time to leave provisional, the share of players eligible for the
-leaderboard, and farming gain with and without the pair cap, for 20–300
-simulated players with sporadic play, one strong player, and a farming pair.
-P18 and P19 stand unless the report contradicts them.
+The beneficiary's median day-90 gain over the matched no-farming control
+was 64–170 points with the cap and 132–266 without. In the sparse
+scenarios the capped farmer ranked above the eligible strong player in
+1–2 of 32 runs per population. The cap limits repeated games and leaves a
+material gain in this stress case. Keep the numerical cap for now. **R1/R3 handoff.** Retain P18/P19, carry
+the observed gain to R2/R6-core before rated public play, and rehearse
+the existing invalidate/rebuild and exclude paths against a staged pair.
+Treat these cohorts as scenarios when reviewing launch data.
 
 ### E6 — query plans at 5,000 matches for one account
 
-Status: pending.
+**Fail overall on R3's deep-page read budget.** H2, R4, R5, and the
+required R3 statements pass the indexed-access check on local Miniflare
+D1. The optional R3 activity list uses the rated/time index and keyed
+joins, with temporary B-trees for its aggregate and ordering. See the
+[statement-level plans, counts, fixtures, and rerun command](evidence/e6-results.md).
+Timings are local D1 statement timings.
 
-Runs before H2, R3, R4, and R5 implementation. Pass: every plan for the
-history page, summary, head-to-head, rating window, public record, and
-leaderboard page and rank uses the owner index, the leaderboard index, or key
-lookups (primary keys and unique keys such as `match.id`); rows
-read are recorded. Known risk: R4's lifetime
-Shaxda aggregates walk the owner's whole index and parse each match's stored
-statistics (about 25,000 rows read at 5,000 saved games). If E6 or the
-preview measurement misses R4's budget, the fix is a contract change — for
-example a session-independent public statistics endpoint with edge caching,
-or an aggregate projection — made before R4 ships.
+| Scope                               | Result                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H2 history and detail               | **Pass.** All six filters, first and cursor pages, use the owner index with keyed joins and no temporary ordering. Page reads 84–295 before rating labels and 103–315 after. Summary 5,021 reads over two statements. Detail 6 reads (8 with labels), zero for a missing id.                                                                                    |
+| R3 ranked pages and standing        | **Fail page budget.** First pages pass at 219 / 1,102 reads including maintenance, at listed density ≈ 0.9 / 0.1. Deep pages including exact-rank offset and maintenance read 7,343 / 5,232 versus ≤ 2,000. Standing at the last listed rank counts 9,499 / 5,493 reads before its other statements. Required row-order plans use the board index with no sort. |
+| R4 public record and lifetime stats | **Pass local indexed reads and 25,000-row estimate.** Public rating record is one key read. Lifetime reads 12,268 in mixed history and 15,001 when all 5,000 matches are processed. The friendly-heavy list and aggregate together read 20,050. Preview still measures complete profile p95, parsing CPU, and read volume.                                      |
+| R5 head-to-head and rating window   | **Pass indexed reads.** Head-to-head reads 5,201 for 100 shared games. The bounded 90-day chart reads 2,718 in mixed history and 3,595 with all eligible window events processed.                                                                                                                                                                               |
+
+**Proposed contract changes.** For R3, evaluate the §4.5 atomic snapshot
+with indexed cursor-to-rank lookup. Preserve full-precision ordering,
+exact ranks for edited cursors, and the one-minute freshness gate. A
+forced `eligible_until` index gets the sparse offset within budget by
+12 reads. The dense case still needs a bounded exact-rank path. Resolve R3's budget through the register's
+contract-change process before dependent implementation. If the optional
+activity list is taken up, document its indexed base walk and aggregate
+sort separately from the ordered-page plan rule. For R5, align
+the printed SQL in §3.1 with its existing inclusive upper bound in §4.2.
+The fixture found one post-`asOf` event in the unbounded query.
+
+**H2 handoff.** The existing indexes passed H2's E6 slice. After H1's
+migration and writer land and H2 is activated, rerun the six filter pairs,
+summary and detail on H1's fixtures, and test friendly and missing detail
+access in the loader. Rerun the label plans after R1's migration. R3/R4/R5
+take the open budget and query findings above through their own gates.
 
 ---
 

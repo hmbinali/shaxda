@@ -65,7 +65,7 @@ projection table, or write.
 | R6-core         | `excluded`, projected from the audited exclusion source ([§7.5](v2-contracts.md#75-exclusion-projection)); invalidation and rescission through the §7.4 rebuild.                                                                  |
 | A3, once merged | Pending and final states ([§8](v2-contracts.md#8-deletion)), excluded with the predicate of A3's reader helper. Until A3 merges, no account can be pending or final.                                                              |
 | V1.1-A          | `user.username`, avatar fields, the `PublicProfile` projection of `resolveProfile`, and session handling in `web/src/hooks.server.ts`.                                                                                            |
-| Evidence        | E5 (pending) before activation; E6 (pending) records R3's plans before implementation ([§12](v2-contracts.md#12-evidence)).                                                                                                       |
+| Evidence        | E5 passed for P19. E6 recorded R3’s plans and found a deep-page budget failure ([§12](v2-contracts.md#12-evidence)).                                                                                                              |
 
 ## 3. Contracts
 
@@ -291,7 +291,7 @@ rows (lower when provisional or inactive players sit among high ratings).
 - Writes 0; Durable Object wake-ups 0; one extra request per page view; no
   new storage unless E6 justifies the `eligible_until` index §2.5 allows.
 - Budget: an uncached page reads ≤ 2,000 rows and spends ≤ 100 ms in D1.
-- E6 (pending) records `EXPLAIN QUERY PLAN` and `meta.rows_read` for page 1, a
+- E6 records `EXPLAIN QUERY PLAN` and `meta.rows_read` for page 1, a
   deep page, the last-rank count, both neighbour reads, and the Should list on
   5,000 seeded rows at d ≈ 0.9 and d ≈ 0.1, before implementation. Pass: a
   `SEARCH` on the board index or a primary key, no scan of `player_rating` or

@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./rating": {
+      "types": "./src/rating/index.ts",
+      "default": "./src/rating/index.ts"
+    },
     "./match": {
       "types": "./src/match/index.ts",
       "default": "./src/match/index.ts"
@@ -28,6 +32,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@shaxda/rating": "workspace:*",
     "@shaxda/shared": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },

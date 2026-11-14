@@ -58,6 +58,9 @@ importers:
 
   packages/db:
     dependencies:
+      "@shaxda/rating":
+        specifier: workspace:*
+        version: link:../rating
       "@shaxda/shared":
         specifier: workspace:*
         version: link:../shared

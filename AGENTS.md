@@ -49,7 +49,8 @@ that covers them is activated. Full English/i18n is not part of V2.
 
 **V2** (`docs/shaxda-v2.md`, specs in `docs/specs/`) is specified and frozen.
 H1 Match Persistence, H2 Match History and Detail, X1a Product Analytics,
-X1b Online Counters, R1 Rating System, R2 Rated Play Rules, and R6-core Ranking Integrity are
+X1b Online Counters, R1 Rating System, R2 Rated Play Rules, R6-core Ranking
+Integrity, and A3 Account Deletion are
 activated for local implementation. No V2 implementation starts before its
 spec is `frozen` in `docs/specs/README.md` **and** its milestone is activated.
 Do not pre-apply the V2 §6 rule changes; each lands in the first
@@ -250,8 +251,10 @@ Monetization is post-V1 only after the game is finished and has users.
   R2 adds the consent handshake. After the first accepted non-terminal action,
   resignation or a valid claim is a loss in every phase. Endings before play
   begins save nothing.
-- Account deletion, history, replay viewing, leaderboard, and English remain
-  later work.
+- A3 account deletion stops identity tickets at request time. Pending accounts
+  may sign in to see or cancel their request, and open game sockets can finish.
+  Finalization preserves the match ledger and rating events.
+- Replay viewing, leaderboard, and English remain later work.
 
 ## Repository Layout
 

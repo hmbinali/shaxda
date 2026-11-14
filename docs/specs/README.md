@@ -36,6 +36,9 @@ activated together for local implementation from Wave 1 commit `5b94a5c`
 after E5. Public rated play stays disabled pending the wave 2 release gates.
 X1b Online Counters is activated for local implementation from the verified
 Wave 2 integration commit `103f391`, with H1, X1a, and R2 integrated.
+A3 Account Deletion is approved for V2 before public rated play (Q1,
+2026-11-14) and activated for local implementation after the sign-in token
+retention fix.
 Sponsorship (S1–S3) and publishing work are scheduled later.
 
 The [build guide](../build_guide.md) maps the specs to session assignments,
@@ -126,7 +129,7 @@ freeze or ship without the row.
 
 | ID  | Question                                                                                                                                  | Recommendation                                                       | Blocks                                                                                |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Q1  | Ship A3 in V2, and when?                                                                                                                  | Yes; in production no later than rated public play (end of wave 2).  | A3 activation; wave-2 production enablement                                           |
+| Q1  | Ship A3 in V2, and when?                                                                                                                  | Approved on 2026-11-14. Ship before public rated play.               | A3 must be live before wave-2 public rated enablement                                 |
 | Q2  | Sponsor pilot surfaces, and may `result` appear after local games?                                                                        | P14: `lobby` + `result`, local included.                             | S1                                                                                    |
 | Q3  | Inputs, not decisions: current weekly players and games, recurring community play times, comfortable monthly Cloudflare budget.           | Provide when known; the revision proceeds without them.              | Quick-match beta targets; cost alerts                                                 |
 | Q4  | Somali glossary: every draft term in the glossary below, including the rating-status labels.                                              | Drafts below; one native review.                                     | Release of each surface (not spec freeze)                                             |
@@ -212,7 +215,7 @@ implementation, activation, or release step each check controls.
 
 | Item                        | Open                                                                                                                                                                                                                     | Blocks                                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| Q1                          | Ship A3 in V2, and when (default: yes, by the end of wave 2)                                                                                                                                                             | A3 activation; wave-2 production enablement                                                    |
+| Q1                          | Approved for V2 before public rated play.                                                                                                                                                                                | Wave-2 public rated enablement waits for A3 production verification.                           |
 | Q2                          | Pilot surfaces and `result` after local games (default: P14)                                                                                                                                                             | S1                                                                                             |
 | Q3                          | Weekly players and games, community play times, monthly Cloudflare budget                                                                                                                                                | Quick-match beta targets; billing alerts                                                       |
 | Q4                          | One native review of the glossary drafts                                                                                                                                                                                 | Release of each surface that uses them                                                         |

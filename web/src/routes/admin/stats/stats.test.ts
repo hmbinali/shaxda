@@ -68,7 +68,10 @@ describe("admin stats", () => {
       request.platform?.env.DB,
       "2026-09-21",
       "2026-11-14",
-      expect.any(Array),
+      expect.arrayContaining([
+        "online_room_joined_account",
+        "online_completed_quick_guest",
+      ]),
     );
   });
 
@@ -82,6 +85,41 @@ describe("admin stats", () => {
     expect(
       screen.getAllByText("Weli lama diiwaangelin.").length,
     ).toBeGreaterThanOrEqual(4);
+  });
+
+  it("shows online totals by event, mode, and kind from the first recorded day", async () => {
+    const invite = "online_started_invite_guest";
+    const quick = "online_completed_quick_account";
+    read.mockResolvedValue({
+      ...syntheticData,
+      daily: [
+        ...syntheticData.daily,
+        { day: "2026-11-13", event: invite, count: 4 },
+        { day: "2026-11-14", event: quick, count: 3 },
+      ],
+      recordedSince: {
+        ...syntheticData.recordedSince,
+        [invite]: "2026-11-13",
+        [quick]: "2026-11-14",
+      },
+    });
+    const data = await load(args("admin"));
+    render(Stats, { data: { ...data, account: null } });
+    const invites = within(
+      screen.getByRole("table", { name: "Ciyaaraha martiqaadka" }),
+    );
+    expect(
+      invites.getByRole("row", { name: "2026-11-13 4 0 0 0" }),
+    ).toBeVisible();
+    expect(
+      invites.getByRole("row", { name: "2026-11-12 — — — —" }),
+    ).toBeVisible();
+    const quickGames = within(
+      screen.getByRole("table", { name: "Ciyaar-helidda degdegga ah" }),
+    );
+    expect(
+      quickGames.getByRole("row", { name: "2026-11-14 0 0 0 3" }),
+    ).toBeVisible();
   });
 });
 

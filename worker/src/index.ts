@@ -12,6 +12,7 @@ import { handleMatchOps, opsJson } from "./match-ops";
 import type { MatchOpsEnv } from "./match-ops";
 import { MatchRoom } from "./match-room";
 import { RoomCoordinator } from "./room-coordinator";
+import { recordOnlineCounter, type OnlineCounterEnv } from "./online-counters";
 import { generateRoomCode } from "./room-code";
 import { verifyTurnstile } from "./turnstile";
 import { z } from "zod";
@@ -49,7 +50,7 @@ type PublicCreateRoomErrorCode =
   | "identityUnavailable"
   | "createFailed";
 
-interface Env extends MatchOpsEnv {
+interface Env extends MatchOpsEnv, OnlineCounterEnv {
   ALLOWED_ORIGIN?: string;
   TURNSTILE_SECRET?: string;
   ONLINE_IDENTITY_SECRET?: string;
@@ -57,7 +58,11 @@ interface Env extends MatchOpsEnv {
 }
 
 const worker = {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/ops/")) {
       try {
@@ -179,6 +184,13 @@ const worker = {
           return withCors(createErrorResponse("createFailed", 500), env);
         }
 
+        const kind = createRequest.data.identityTicket ? "account" : "guest";
+        recordOnlineCounter(
+          env,
+          ctx,
+          `online_room_created_${kind}`,
+          Date.now(),
+        );
         return withCors(
           Response.json(
             serverMessageSchema.parse({

@@ -5,6 +5,41 @@ import { usernameSchema } from "../account/username";
 export const clientEventNames = z.enum(["local_started", "local_completed"]);
 export type ClientEventName = z.infer<typeof clientEventNames>;
 
+export const onlineFunnelNames = [
+  "online_room_created_guest",
+  "online_room_created_account",
+  "online_room_joined_guest",
+  "online_room_joined_account",
+  "online_started_invite_guest",
+  "online_started_invite_account",
+  "online_started_quick_guest",
+  "online_started_quick_account",
+  "online_completed_invite_guest",
+  "online_completed_invite_account",
+  "online_completed_quick_guest",
+  "online_completed_quick_account",
+] as const;
+
+export const onlineCounterNameSchema = z.enum([
+  ...onlineFunnelNames,
+  "queue_joined",
+  "queue_paired",
+  "queue_started",
+  "queue_completed",
+  "queue_no_show",
+  "queue_wait_lt10s",
+  "queue_wait_lt20s",
+  "queue_wait_lt30s",
+  "queue_wait_lt60s",
+  "queue_wait_lt90s",
+  "queue_wait_lt120s",
+  "queue_wait_lt180s",
+  "queue_wait_lt300s",
+  "queue_wait_ge300s",
+  "queue_cooldown_started",
+]);
+export type OnlineCounterName = z.infer<typeof onlineCounterNameSchema>;
+
 export const gaugeNames = z.enum([
   "active_browsers_1d",
   "active_browsers_7d",

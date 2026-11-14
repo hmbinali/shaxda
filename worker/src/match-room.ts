@@ -50,6 +50,7 @@ import {
   nextAutomaticAttempt,
 } from "./match-outbox";
 import type { MatchLog, OutboxEntry, OutboxSummary } from "./match-outbox";
+import { recordOnlineCounter, type OnlineCounterEnv } from "./online-counters";
 
 import { discardRequestSchema, entryRequestSchema, opsJson } from "./match-ops";
 
@@ -145,9 +146,8 @@ type JoinedSocketAttachment = {
   messageTimestamps?: number[];
 };
 
-export interface MatchRoomEnv {
+export interface MatchRoomEnv extends OnlineCounterEnv {
   MATCH_COORDINATOR: DurableObjectNamespace;
-  DB?: D1Database;
   RATINGS?: { processNow(): Promise<{ accepted: true }> };
   RATED_PLAY_ENABLED?: string;
   ONLINE_IDENTITY_SECRET?: string;
@@ -553,6 +553,18 @@ export class MatchRoom implements DurableObject {
         updatedRoom.onlineEndReason,
       );
     }
+    if (
+      !(authoritativeRoom.slots.A && authoritativeRoom.slots.B) &&
+      updatedRoom.slots.A &&
+      updatedRoom.slots.B
+    ) {
+      recordOnlineCounter(
+        this.env,
+        this.ctx,
+        `online_room_joined_${onlineKind(updatedRoom)}`,
+        now,
+      );
+    }
   }
 
   private async handleGameAction(
@@ -943,6 +955,7 @@ export class MatchRoom implements DurableObject {
     now: number,
     claim?: OnlineMatchEndReason,
   ): Promise<void> {
+    const started = state.phase !== "gameOver" && room.playBeganAt === null;
     const entry = await this.ctx.blockConcurrencyWhile(async () => {
       const stored = await this.ctx.storage.get<MatchLog>(LOG_KEY);
       const isInitial =
@@ -958,7 +971,7 @@ export class MatchRoom implements DurableObject {
         ...currentLog,
         a: [...currentLog.a, encodeAction(action)],
       };
-      if (state.phase !== "gameOver" && room.playBeganAt === null) {
+      if (started) {
         room.playBeganAt = now;
         room.rated =
           room.options.ratedRequest &&
@@ -1031,6 +1044,17 @@ export class MatchRoom implements DurableObject {
     this.broadcastMatchStatus(room);
     if (claim && state.winner !== null)
       this.broadcastMatchEnded(room, state.winner, claim);
+
+    const completed = state.phase === "gameOver" && room.playBeganAt !== null;
+    if (started || completed) {
+      const event = started ? "started" : "completed";
+      recordOnlineCounter(
+        this.env,
+        this.ctx,
+        `online_${event}_${room.options.mode}_${onlineKind(room)}`,
+        now,
+      );
+    }
 
     if (entry?.status === "pending") await this.attemptSave(room.matchNumber);
     else if (entry) await this.reconcileRetention();
@@ -2026,6 +2050,12 @@ export class MatchRoom implements DurableObject {
 
 function emptyLog(matchNumber: number, startingSeat: PlayerSlot): MatchLog {
   return { v: REPLAY_VERSION, matchNumber, s: startingSeat, a: [] };
+}
+
+function onlineKind({ seats }: RoomState): "account" | "guest" {
+  return seats.A?.kind === "account" && seats.B?.kind === "account"
+    ? "account"
+    : "guest";
 }
 
 function presencePlayer(seat: SeatIdentity | undefined): {

@@ -58,6 +58,9 @@ describe("Somali legal content", () => {
     expect(usage?.paragraphs.join(" ")).toMatch(
       /Summaddu waa magac-beddel.*maalmaha isticmaalka waa la isku xiri karaa.*90 maalmood/,
     );
+    expect(usage?.paragraphs.join(" ")).toMatch(
+      /qolalka la sameeyey ama la galay.*tirooyin maalinle ah.*aqoonsi, koodh qol, ama magac la'aan/,
+    );
     expect(visibleCopy()).toContain("shaxda:analytics-active:v1");
   });
 

@@ -1,4 +1,12 @@
-import { env, reset, SELF } from "cloudflare:test";
+import {
+  applyD1Migrations,
+  createExecutionContext,
+  type D1Migration,
+  env,
+  reset,
+  SELF,
+  waitOnExecutionContext,
+} from "cloudflare:test";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   IDENTITY_TICKET_SKEW_MS,
@@ -43,6 +51,7 @@ describe("worker", () => {
         }),
         TURNSTILE_SECRET: "secret",
       },
+      createExecutionContext(),
     );
 
     expect(response.status).toBe(403);
@@ -55,7 +64,11 @@ describe("worker", () => {
   it("accepts a valid create ticket without storing creator identity", async () => {
     const testEnv = environment();
     const ticket = await createTicket(testEnv.ONLINE_IDENTITY_SECRET);
-    const response = await worker.fetch(roomRequest(ticket), testEnv);
+    const response = await worker.fetch(
+      roomRequest(ticket),
+      testEnv,
+      createExecutionContext(),
+    );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       type: "roomCreated",
@@ -77,7 +90,11 @@ describe("worker", () => {
       const [payload, signature = ""] = ticket.split(".");
       ticket = `${payload}.${signature.startsWith("A") ? "B" : "A"}${signature.slice(1)}`;
     }
-    const response = await worker.fetch(roomRequest(ticket), testEnv);
+    const response = await worker.fetch(
+      roomRequest(ticket),
+      testEnv,
+      createExecutionContext(),
+    );
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toMatchObject({
       code:
@@ -93,7 +110,11 @@ describe("worker", () => {
     const ticket = await createTicket("temporary-test-secret");
     const testEnv = environment();
     delete testEnv.ONLINE_IDENTITY_SECRET;
-    const response = await worker.fetch(roomRequest(ticket), testEnv);
+    const response = await worker.fetch(
+      roomRequest(ticket),
+      testEnv,
+      createExecutionContext(),
+    );
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({
       error: "identityUnavailable",
@@ -126,6 +147,40 @@ describe("worker", () => {
       code: "rateLimited",
     });
   });
+
+  it("counts successful room creation by verified creator kind", async () => {
+    const { DB, TEST_MIGRATIONS } = env as {
+      DB: D1Database;
+      TEST_MIGRATIONS: D1Migration[];
+    };
+    await applyD1Migrations(DB, TEST_MIGRATIONS);
+    const testEnv = { ...environment(), DB, ANALYTICS_ENABLED: "true" };
+    const ticket = await createTicket(testEnv.ONLINE_IDENTITY_SECRET);
+    const rejected = await createTicket(
+      testEnv.ONLINE_IDENTITY_SECRET,
+      Date.now(),
+      "join",
+    );
+    const ctx = createExecutionContext();
+    for (const [request, status] of [
+      [roomRequest(), 200],
+      [roomRequest(ticket), 200],
+      [roomRequest(rejected), 401],
+    ] as const) {
+      expect((await worker.fetch(request, testEnv, ctx)).status).toBe(status);
+    }
+    await waitOnExecutionContext(ctx);
+    expect(
+      (
+        await DB.prepare(
+          "SELECT event, count FROM event_daily ORDER BY event",
+        ).all()
+      ).results,
+    ).toEqual([
+      { event: "online_room_created_account", count: 1 },
+      { event: "online_room_created_guest", count: 1 },
+    ]);
+  });
 });
 
 type WorkerEnvironment = {
@@ -143,7 +198,7 @@ function environment(): WorkerEnvironment {
   };
 }
 
-function roomRequest(identityTicket: string): Request {
+function roomRequest(identityTicket?: string): Request {
   return new Request("https://shaxda.test/rooms", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

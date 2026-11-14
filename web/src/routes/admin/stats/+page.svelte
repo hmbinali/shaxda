@@ -1,5 +1,6 @@
 <script lang="ts">
   import { siteContent } from "@shaxda/i18n";
+  import { onlineFunnelNames } from "@shaxda/shared/analytics/events";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -19,6 +20,34 @@
     ).length,
   );
   const localNames = ["local_started", "local_completed"] as const;
+  const onlineBlocks = [
+    {
+      title: copy.onlineRooms,
+      metrics: [
+        { label: copy.created, prefix: "online_room_created" },
+        { label: copy.joined, prefix: "online_room_joined" },
+      ],
+    },
+    {
+      title: copy.onlineInvite,
+      metrics: [
+        { label: copy.started, prefix: "online_started_invite" },
+        { label: copy.completed, prefix: "online_completed_invite" },
+      ],
+    },
+    {
+      title: copy.onlineQuick,
+      metrics: [
+        { label: copy.started, prefix: "online_started_quick" },
+        { label: copy.completed, prefix: "online_completed_quick" },
+      ],
+    },
+  ] as const;
+  const onlineKinds = [
+    { label: copy.onlineGuest, suffix: "guest" },
+    { label: copy.onlineAccount, suffix: "account" },
+  ] as const;
+  const onlineDays = $derived([data.todayDay, ...data.days]);
   const activity = [
     { title: copy.browsers, prefix: "active_browsers", kind: "guest" },
     { title: copy.accounts, prefix: "active_accounts", kind: "account" },
@@ -45,11 +74,13 @@
     return counts.get(`${day}/${event}`);
   }
 
+  function firstRecordedDay(events: readonly string[]) {
+    return events.flatMap((event) => data.recordedSince[event] ?? []).sort()[0];
+  }
+
   function recordedSince(events: readonly string[]) {
-    const dates = events
-      .flatMap((event) => data.recordedSince[event] ?? [])
-      .sort();
-    return dates[0] ? `${copy.recordedSince} ${dates[0]}` : copy.unrecorded;
+    const start = firstRecordedDay(events);
+    return start ? `${copy.recordedSince} ${start}` : copy.unrecorded;
   }
 
   function localTotal(days: number, event: string) {
@@ -74,10 +105,15 @@
     return `${rate} (${numerator} / ${denominator})`;
   }
 
-  function localCount(day: string, event: string) {
-    const start = data.recordedSince[event];
+  function recordedCount(
+    day: string,
+    event: string,
+    start = data.recordedSince[event],
+  ) {
     return start && day >= start ? (count(day, event) ?? 0) : "—";
   }
+
+  const onlineStart = $derived(firstRecordedDay(onlineFunnelNames));
 </script>
 
 <svelte:head>
@@ -154,8 +190,8 @@
         {#each data.days as day (day)}
           <tr class="border-b border-board-200 text-end">
             <th scope="row" class="py-1 text-start font-normal">{day}</th>
-            <td>{localCount(day, "local_started")}</td>
-            <td>{localCount(day, "local_completed")}</td>
+            <td>{recordedCount(day, "local_started")}</td>
+            <td>{recordedCount(day, "local_completed")}</td>
           </tr>
         {/each}
       </tbody>
@@ -185,7 +221,61 @@
 
   <section class="space-y-2">
     <h2 class="text-xl font-semibold">{copy.online}</h2>
-    <p class="text-sm">{copy.unrecorded}</p>
+    <p class="text-sm">{recordedSince(onlineFunnelNames)}</p>
+    {#if onlineStart}
+      {#each onlineBlocks as block (block.title)}
+        {@const start = firstRecordedDay(
+          block.metrics.flatMap(({ prefix }) =>
+            onlineKinds.map(({ suffix }) => `${prefix}_${suffix}`),
+          ),
+        )}
+        <h3 class="font-semibold">{block.title}</h3>
+        {#if start}
+          <p class="text-sm">{copy.recordedSince} {start}</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm tabular-nums" aria-label={block.title}>
+              <thead class="border-b border-board-300 text-end">
+                <tr>
+                  <th class="py-2 text-start" scope="col">{copy.day}</th>
+                  {#each block.metrics as metric (metric.prefix)}
+                    {#each onlineKinds as kind (kind.suffix)}
+                      <th scope="col">
+                        {metric.label} · {metric.prefix ===
+                          "online_room_created" && kind.suffix === "account"
+                          ? copy.onlineCreatorAccount
+                          : kind.label}
+                      </th>
+                    {/each}
+                  {/each}
+                </tr>
+              </thead>
+              <tbody>
+                {#each onlineDays as day (day)}
+                  <tr class="border-b border-board-200 text-end">
+                    <th scope="row" class="py-1 text-start font-normal"
+                      >{day}</th
+                    >
+                    {#each block.metrics as metric (metric.prefix)}
+                      {#each onlineKinds as kind (kind.suffix)}
+                        <td
+                          >{recordedCount(
+                            day,
+                            `${metric.prefix}_${kind.suffix}`,
+                            start,
+                          )}</td
+                        >
+                      {/each}
+                    {/each}
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {:else}
+          <p class="text-sm">{copy.unrecorded}</p>
+        {/if}
+      {/each}
+    {/if}
   </section>
 
   <section class="space-y-2">

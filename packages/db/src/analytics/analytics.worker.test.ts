@@ -5,6 +5,7 @@ import { analyticsHash } from "@shaxda/shared/analytics/hash";
 import { changeUsername, claimUsername } from "../queries/account";
 import { JobLeaseLost, acquireJobLease, fencedJobBatch } from "../jobs/lease";
 import { runAnalyticsNightly } from "../jobs/analyticsNightly";
+import { incrementCounter } from "./counters";
 import {
   ACTIVITY_GAUGES_SQL,
   ACTIVITY_PRUNE_SQL,
@@ -42,6 +43,28 @@ beforeEach(async () => {
 });
 
 describe("analytics migration and lease", () => {
+  it("atomically increments an allowlisted online counter under concurrent writes", async () => {
+    await Promise.all(
+      Array.from({ length: 50 }, () =>
+        incrementCounter(db, "online_started_invite_guest", day(0), now),
+      ),
+    );
+    await expect(
+      db.prepare("SELECT day, event, count, updated_at FROM event_daily").all(),
+    ).resolves.toMatchObject({
+      results: [
+        {
+          day: day(0),
+          event: "online_started_invite_guest",
+          count: 50,
+          updated_at: now,
+        },
+      ],
+    });
+    await expect(
+      incrementCounter(db, "local_started" as never, day(0), now),
+    ).rejects.toThrow();
+  });
   it("enforces the table checks and omits the activity rowid", async () => {
     for (const values of [
       ["bad-day", id(1), "guest"],

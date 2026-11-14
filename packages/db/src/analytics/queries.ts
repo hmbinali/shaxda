@@ -3,6 +3,7 @@ import {
   clientEventNames,
   type ClientEventName,
 } from "@shaxda/shared/analytics/events";
+import { incrementDailyEvent } from "./increment";
 
 export type ActivityKind = "guest" | "account";
 
@@ -32,13 +33,7 @@ export async function incrementLocalEvent(
   day: string,
   now: number,
 ): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO event_daily (day, event, count, updated_at) VALUES (?1, ?2, 1, ?3)
-     ON CONFLICT (day, event) DO UPDATE SET count = count + 1, updated_at = excluded.updated_at`,
-    )
-    .bind(day, clientEventNames.parse(event), now)
-    .run();
+  await incrementDailyEvent(db, clientEventNames.parse(event), day, now);
 }
 
 export const ACTIVITY_GAUGES_SQL = `

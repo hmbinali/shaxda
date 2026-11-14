@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { ledgerQuery } from "./fixtures/ledger";
 import { placeOnline, resignOnline } from "./fixtures/online";
 
 test.describe("O1 guest online game", () => {
@@ -72,6 +73,7 @@ test.describe("O1 guest online game", () => {
     browser,
     page: creator,
   }) => {
+    const before = guestFunnelTotals();
     await creator.goto("/online");
     await creator.getByLabel("Magaca martida").fill("Ayaan");
     await creator.getByTestId("create-room").click();
@@ -147,8 +149,32 @@ test.describe("O1 guest online game", () => {
       await joiner.reload();
       await expect(joiner.getByTestId("create-room")).toBeVisible();
       await expect(joiner.getByTestId("online-board")).not.toBeAttached();
+      await expect.poll(guestFunnelTotals, { timeout: 20_000 }).toEqual({
+        created: before.created + 1,
+        joined: before.joined + 1,
+        started: before.started + 2,
+        completed: before.completed + 2,
+      });
     } finally {
       await joinerContext.close();
     }
   });
 });
+
+function guestFunnelTotals() {
+  const [totals] = ledgerQuery<{
+    created: number;
+    joined: number;
+    started: number;
+    completed: number;
+  }>(`SELECT
+      COALESCE(SUM(count) FILTER (WHERE event = 'online_room_created_guest'), 0) AS created,
+      COALESCE(SUM(count) FILTER (WHERE event = 'online_room_joined_guest'), 0) AS joined,
+      COALESCE(SUM(count) FILTER (WHERE event = 'online_started_invite_guest'), 0) AS started,
+      COALESCE(SUM(count) FILTER (WHERE event = 'online_completed_invite_guest'), 0) AS completed
+    FROM event_daily WHERE event IN (
+      'online_room_created_guest', 'online_room_joined_guest',
+      'online_started_invite_guest', 'online_completed_invite_guest'
+    )`);
+  return totals;
+}

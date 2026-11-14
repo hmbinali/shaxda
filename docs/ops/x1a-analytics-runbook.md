@@ -2,7 +2,8 @@
 
 ## Local verification
 
-The web Worker owns measurements, the dispatcher, and the analytics tables.
+The web Worker owns the activity beacons, dispatcher, and analytics tables.
+The game Worker records daily online totals under X1b.
 Use the committed E2E fixtures for browser tests. For a Wrangler smoke test,
 use a separate local persistence directory and fixture auth credentials
 from `web/wrangler.e2e.jsonc`. From `web/`, run:
@@ -63,6 +64,31 @@ disabled.
    consecutive days of fresh gauges and verify that the founder can quote
    30-day active browsers and active accounts with their definitions. The
    ledger gauges use the H1 tables and the same nightly job.
+
+## X1b online counters
+
+1. Confirm `0001_analytics` is applied and the game Worker points to the
+   same D1 database as the web Worker. X1b uses the existing `event_daily`
+   table. Publish the web changes for `/admin/stats` and `/legal` alongside
+   the game Worker with `ANALYTICS_ENABLED="true"`.
+2. On preview, create a guest invite and a two-account invite. Compare the
+   day's totals before and after playing both games. A reconnect changes no
+   counters, a pre-play resignation adds no starts or completions, and a
+   played rematch adds one start and one completion. Room creation uses
+   the creator's kind. Joins, starts, and completions classify mixed seats
+   as guest games. Confirm `/admin/stats` displays the totals by kind and mode.
+3. Rehearse setting `ANALYTICS_ENABLED="false"` on the game Worker. Repeat
+   an invite game, confirm there are no new online increments, and verify
+   that game play and account match saving still work. Restore the switch
+   once the check passes. The web Worker has its own switch.
+4. After the preview rehearsal and production rollout, record seven
+   consecutive completed UTC days. Compare `online_completed_*_account`
+   with saved matches by mode and UTC `ended_at` day. Check pending or stalled
+   ledger saves and `analyticsCounterFailed` logs for discrepancies. Counter
+   failures are dropped. The logs contain the metric name and error class.
+
+For rollback, turn off the game Worker's switch or redeploy the previous game
+Worker. Keep the aggregate rows and the shared analytics table.
 
 ## Stop ingestion or roll back
 

@@ -4,6 +4,7 @@ import {
   UTC_DAY_MS,
   clientEventNames,
   gaugeNames,
+  onlineFunnelNames,
   utcDay,
   utcWeekStart,
 } from "@shaxda/shared/analytics/events";
@@ -23,7 +24,7 @@ export const load = (async ({ locals, platform, setHeaders, url }) => {
     env.DB,
     utcDay(utcWeekStart(today) - 49 * UTC_DAY_MS),
     utcDay(today),
-    [...clientEventNames.options, ...gaugeNames.options],
+    [...clientEventNames.options, ...gaugeNames.options, ...onlineFunnelNames],
   );
 
   return {

@@ -27,6 +27,7 @@ export default defineConfig({
           // Empty on purpose: the Worker skips Turnstile when this is unset.
           TURNSTILE_SECRET: "",
           RATED_PLAY_ENABLED: "true",
+          ANALYTICS_ENABLED: "false",
           ONLINE_IDENTITY_SECRET:
             "shaxda-online-identity-dev-test-secret-000000000001",
         },

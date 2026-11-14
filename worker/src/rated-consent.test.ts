@@ -8,6 +8,7 @@ import {
   type D1Migration,
 } from "cloudflare:test";
 import {
+  decodeCompactReplay,
   deserialize,
   getActingPlayer,
   serialize,
@@ -18,7 +19,9 @@ import {
   serverMessageSchema,
   type ServerMessage,
 } from "@shaxda/shared";
+import { utcDay } from "@shaxda/shared/analytics/events";
 import { mintIdentityTicket } from "@shaxda/shared/identity";
+import { sampleMatchPayloads } from "@shaxda/shared/match-fixtures";
 import { RATED_DISCLOSURE_V } from "@shaxda/shared/rated-play";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MatchRoom, type MatchRoomEnv } from "./match-room";
@@ -56,7 +59,128 @@ type StoredRoom = {
   consent: Record<Seat, { accept: boolean; disclosureV: number } | null>;
 };
 
-afterEach(() => reset());
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await reset();
+});
+
+describe("online counters", () => {
+  it.each([false, true])(
+    "counts the second seat, play and rematches once (mixed seats: %s)",
+    async (guest) => {
+      await applyD1Migrations(bindings.DB, bindings.TEST_MIGRATIONS);
+      const room = await openRoom({
+        ratedRequest: false,
+        guest,
+        analytics: true,
+      });
+      const kind = guest ? "guest" : "account";
+      const joined = `online_room_joined_${kind}`;
+      const started = `online_started_invite_${kind}`;
+      const completed = `online_completed_invite_${kind}`;
+      await expect.poll(onlineCounts).toEqual({ [joined]: 1 });
+
+      await room.reconnect("B");
+      await room.finish("B");
+      expect(await onlineCounts()).toEqual({ [joined]: 1 });
+
+      await room.send("A", plainVote);
+      await room.send("B", plainVote);
+      await room.placeFirst();
+      await room.finish("B");
+      await expect
+        .poll(onlineCounts)
+        .toEqual({ [joined]: 1, [started]: 1, [completed]: 1 });
+
+      await room.send("A", plainVote);
+      await room.send("B", plainVote);
+      await room.placeFirst();
+      await room.claim("A", "abandoned");
+      await expect
+        .poll(onlineCounts)
+        .toEqual({ [joined]: 1, [started]: 2, [completed]: 2 });
+    },
+  );
+
+  it("keeps the match, broadcasts and ledger intact when a counter write fails", async () => {
+    await applyD1Migrations(bindings.DB, bindings.TEST_MIGRATIONS);
+    const room = await openRoom({ ratedRequest: false });
+    await room.placeFirst();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const db = new Proxy(bindings.DB, {
+      get(target, property) {
+        if (property === "prepare") {
+          return (sql: string) => {
+            if (sql.includes("INSERT INTO event_daily")) throw new TypeError();
+            return target.prepare(sql);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    await room.finish("B", { analyticsDB: db });
+    for (const seat of ["A", "B"] as const) {
+      expect(room.latest(seat, "state")).toMatchObject({
+        state: { phase: "gameOver" },
+      });
+    }
+    expect(room.latest("B", "matchStatus")).toMatchObject({
+      save: { status: "saved" },
+    });
+    expect(
+      (
+        await bindings.DB.prepare(
+          'SELECT count(*) AS count FROM "match"',
+        ).first()
+      )?.count,
+    ).toBe(1);
+    expect(await onlineCounts()).toEqual({});
+    expect(warn).toHaveBeenCalledExactlyOnceWith("analyticsCounterFailed", {
+      name: "online_completed_invite_account",
+      errorClass: "TypeError",
+    });
+  });
+
+  it("counts a board win once", async () => {
+    await applyD1Migrations(bindings.DB, bindings.TEST_MIGRATIONS);
+    const room = await openRoom({ ratedRequest: false, analytics: true });
+    const actions = decodeCompactReplay(
+      JSON.parse(sampleMatchPayloads.M1.replay),
+    );
+    if (!actions.ok) throw new Error("Invalid win fixture");
+    const starter = getActingPlayer(
+      deserialize((await room.state()).room.gameState),
+    );
+    let now = Date.now();
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    for (const action of actions.actions) {
+      now += 400;
+      const player = starter === "A" ? action.player : otherSeat(action.player);
+      await room.send(player, {
+        type: "gameAction",
+        action: { ...action, player },
+      });
+    }
+    expect(room.latest("A", "state")).toMatchObject({
+      state: { phase: "gameOver", winner: expect.stringMatching(/^[AB]$/) },
+    });
+    await expect.poll(onlineCounts).toEqual({
+      online_room_joined_account: 1,
+      online_started_invite_account: 1,
+      online_completed_invite_account: 1,
+    });
+  }, 60_000);
+});
+
+async function onlineCounts() {
+  const { results } = await bindings.DB.prepare(
+    "SELECT event, count FROM event_daily WHERE day = ?",
+  )
+    .bind(utcDay(Date.now()))
+    .all<{ event: string; count: number }>();
+  return Object.fromEntries(results.map(({ event, count }) => [event, count]));
+}
 
 describe("rated consent", () => {
   it.each([
@@ -395,7 +519,11 @@ function ratedVote() {
   return { ...plainVote, rated: true, disclosureV: RATED_DISCLOSURE_V };
 }
 
-async function openRoom({ ratedRequest = true, guest = false } = {}) {
+async function openRoom({
+  ratedRequest = true,
+  guest = false,
+  analytics = false,
+} = {}) {
   const response = await SELF.fetch("https://shaxda.test/rooms", {
     method: "POST",
     body: JSON.stringify({ options: { ratedRequest } }),
@@ -407,7 +535,8 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
     bindings.MATCH_ROOM.idFromName(roomCode),
   );
   const messages: Record<Seat, ServerMessage[]> = { A: [], B: [] };
-  for (const seat of ["A", "B"] as const) {
+  async function join(seat: Seat, action: "join" | "reconnect") {
+    const count = messages[seat].length;
     const { webSocket } = await SELF.fetch(
       `https://shaxda.test/rooms/${roomCode}/ws`,
       {
@@ -426,7 +555,7 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
             {
               iss: "shaxda-web",
               aud: "shaxda-rooms",
-              action: "join",
+              action,
               roomCode,
               userId: `rated-test-account-${seat}`,
               usernameSnapshot: seat === "A" ? "ayaan_7" : "cabdi_8",
@@ -444,7 +573,7 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
         .getWebSockets()
         .find((peer) => peer.deserializeAttachment()?.slot === undefined);
       if (!socket) throw new Error("No unjoined socket");
-      await (instance as MatchRoom).webSocketMessage(
+      await analyticsRoom(instance as MatchRoom, ctx).webSocketMessage(
         socket,
         JSON.stringify({
           v: protocolVersion,
@@ -456,8 +585,25 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
       );
     });
     await expect
-      .poll(() => messages[seat].find((message) => message.type === "joined"))
+      .poll(() =>
+        messages[seat]
+          .slice(count)
+          .find((message) => message.type === "joined"),
+      )
       .toMatchObject({ slot: seat });
+  }
+
+  await join("A", "join");
+  await join("B", "join");
+
+  function analyticsRoom(instance: MatchRoom, ctx: DurableObjectState) {
+    return analytics
+      ? new MatchRoom(ctx, {
+          ...bindings,
+          ANALYTICS_ENABLED: "true",
+          RATED_PLAY_ENABLED: "true",
+        })
+      : instance;
   }
 
   async function state() {
@@ -477,7 +623,11 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
   async function send(
     seat: Seat,
     body: object,
-    override?: { flag?: string; RATINGS?: MatchRoomEnv["RATINGS"] },
+    override?: {
+      flag?: string;
+      RATINGS?: MatchRoomEnv["RATINGS"];
+      analyticsDB?: D1Database;
+    },
   ) {
     const count = messages[seat].length;
     await runInDurableObject(stub, async (instance, ctx) => {
@@ -488,10 +638,13 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
       const engine = override
         ? new MatchRoom(ctx, {
             ...bindings,
+            ...(override.analyticsDB
+              ? { ANALYTICS_ENABLED: "true", DB: override.analyticsDB }
+              : {}),
             RATED_PLAY_ENABLED: override.flag,
             RATINGS: override.RATINGS,
           })
-        : (instance as MatchRoom);
+        : analyticsRoom(instance as MatchRoom, ctx);
       await engine.webSocketMessage(
         socket,
         JSON.stringify({ v: protocolVersion, roomCode, ...body }),
@@ -505,6 +658,7 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
     state,
     latest,
     send,
+    reconnect: (seat: Seat) => join(seat, "reconnect"),
     answer: (seat: Seat, accept: boolean) => send(seat, consent(accept)),
     error: async (
       seat: Seat,
@@ -526,7 +680,13 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
         override,
       );
     },
-    finish: (seat: Seat, override?: { RATINGS: MatchRoomEnv["RATINGS"] }) =>
+    finish: (
+      seat: Seat,
+      override?: {
+        RATINGS?: MatchRoomEnv["RATINGS"];
+        analyticsDB?: D1Database;
+      },
+    ) =>
       send(
         seat,
         {
@@ -544,10 +704,10 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
         if (reason === "idle") {
           room.turnStartedAt = Date.now() - 240_000;
         } else {
-          const socket = ctx
+          const sockets = ctx
             .getWebSockets()
-            .find((peer) => peer.deserializeAttachment()?.slot === loser);
-          socket?.serializeAttachment(null);
+            .filter((peer) => peer.deserializeAttachment()?.slot === loser);
+          for (const socket of sockets) socket.serializeAttachment(null);
           room.connections[loser] = {
             connected: false,
             disconnectedAt: Date.now() - 60_000,
@@ -558,7 +718,7 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
           .getWebSockets()
           .find((peer) => peer.deserializeAttachment()?.slot === seat);
         if (!claimant) throw new Error("Missing claimant");
-        await (instance as MatchRoom).webSocketMessage(
+        await analyticsRoom(instance as MatchRoom, ctx).webSocketMessage(
           claimant,
           JSON.stringify({ v: protocolVersion, type: "claimWin", roomCode }),
         );

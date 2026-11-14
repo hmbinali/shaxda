@@ -27,6 +27,10 @@
     "./analytics": {
       "types": "./src/analytics/index.ts",
       "default": "./src/analytics/index.ts"
+    },
+    "./counters": {
+      "types": "./src/analytics/counters.ts",
+      "default": "./src/analytics/counters.ts"
     }
   },
   "scripts": {

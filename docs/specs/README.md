@@ -48,8 +48,10 @@ process below.
 
 ## Wave 2 verification
 
-On 2026-11-14, the combined local build passed `pnpm check`, the Better Auth
-schema check, and all 86 Playwright cases in one run with fresh local D1.
+The combined implementation merged into `main` in
+[PR #49](https://github.com/hmbinali/shaxda/pull/49). On 2026-11-14, the combined
+local build passed `pnpm check`, the Better Auth schema check, and all 86
+Playwright cases in one run with fresh local D1.
 The follow-up [CI run](https://github.com/hmbinali/shaxda/actions/runs/43594914621)
 passed the full check, browser, and performance suites after the Google
 token-expiry fix.
@@ -70,7 +72,9 @@ guest game. With the web analytics switch off, both beacon endpoints returned
 204, local play accepted a move, and the cron retained the 90-day fixture and
 pruned the 91-day fixture. The admin page rendered for an allowlisted test
 account and returned 403 after the test allowlist was removed. The M1 account
-game below saved with game analytics disabled and no counter changes.
+game below saved with game analytics disabled and no counter changes. A Workers
+regression test covers the same save with counters off. See the
+[analytics evidence and production reconciliation](../ops/x1a-analytics-runbook.md#preview-evidence-for-2026-11-14).
 
 The preview correction rehearsal invalidated and then rescinded the rated
 test result at ledger sequence 1. Each operation changed and marked one
@@ -124,6 +128,10 @@ current client. H3's original rollback `d3bbbae9` remained available. No secret
 values were accessed or changed. The rebuild at seq 11 found three processed
 matches, five friendly skips, three pair-cap skips, no pending or held decisions,
 and zero drift.
+
+The [account verification record](../ops/v11a-a2-release-verification.md#2026-11-14--wave-2-account-privacy-follow-up)
+covers the returning Google sign-in and token retention check. First-time
+Google sign-in after the expiry fix remains open.
 
 Native Somali copy review remains open under Q4. See the
 [analytics runbook](../ops/x1a-analytics-runbook.md), the

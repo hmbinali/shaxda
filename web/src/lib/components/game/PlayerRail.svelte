@@ -8,6 +8,7 @@
     type RailState,
   } from "$lib/game/seating";
   import type { GameStatus } from "$lib/game/status";
+  import PlayerRating from "./PlayerRating.svelte";
   import ReserveTray from "./ReserveTray.svelte";
   import Avatar from "$components/account/Avatar.svelte";
 
@@ -24,6 +25,7 @@
     name: string;
     username?: string;
     avatar?: PlayerAvatar;
+    showRating?: boolean;
     viewer?: PlayerId | null;
     railState: RailState;
     instruction: RailInstructionKey | null;
@@ -40,6 +42,7 @@
     name,
     username,
     avatar,
+    showRating = false,
     viewer = null,
     railState,
     instruction,
@@ -96,6 +99,9 @@
         <h2 title={username === undefined ? name : `@${username}`}>
           {username === undefined ? name : `@${username}`}
         </h2>
+        {#if showRating && username !== undefined}
+          <PlayerRating {username} />
+        {/if}
         {#if badge !== null}
           <span class="player-badge">{badge}</span>
         {/if}

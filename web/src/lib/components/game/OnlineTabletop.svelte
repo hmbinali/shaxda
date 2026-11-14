@@ -251,6 +251,7 @@
         {viewer}
         name={playerName(seating.top)}
         username={controller.presence[seating.top]?.username}
+        showRating={controller.ratedRoom}
         avatar={controller.presence[seating.top]?.avatar}
         railState={controller.hasAuthoritativeState
           ? railStateFor(status, seating.top)
@@ -379,6 +380,7 @@
         {viewer}
         name={playerName(seating.bottom)}
         username={controller.presence[seating.bottom]?.username}
+        showRating={controller.ratedRoom}
         avatar={controller.presence[seating.bottom]?.avatar}
         badge={`(${copy.youLabel})`}
         railState={controller.hasAuthoritativeState

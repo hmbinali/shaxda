@@ -30,4 +30,4 @@ export {
 export type { MatchPayload } from "./match";
 
 export { matchRatingViewSchema, playerRatingViewSchema } from "./rating";
-export type { MatchRatingView } from "./rating";
+export type { MatchRatingView, PlayerRatingView } from "./rating";

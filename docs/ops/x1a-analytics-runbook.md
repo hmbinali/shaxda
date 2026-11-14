@@ -36,10 +36,11 @@ disabled.
 
 ## Preview and production rollout
 
-1. At integration, assign the analytics migration the next available number in
-   D1 order and synchronize its journal index, tag, and timestamp. Apply the
-   additive migration to the target web database before deploying the web
-   build. Use the environment-specific config and verification procedure in
+1. Apply the additive migrations to the target web database in order:
+   `0000_accounts.sql`, `0001_analytics.sql`, `0002_match_ledger.sql`.
+   Apply them before deploying the web build. The analytics migration is in
+   the Drizzle journal. H1's hand-written ledger migration runs through
+   Wrangler's D1 migration table. Use the environment-specific config and verification procedure in
    the [accounts runbook](v11a-accounts-runbook.md).
 2. Provision `ANALYTICS_SALT` and `ADMIN_USER_IDS` as Worker secrets in each
    environment, with distinct random salts and a minimum of 32 characters.
@@ -61,7 +62,7 @@ disabled.
 6. Apply the same order to production after preview passes. Record seven
    consecutive days of fresh gauges and verify that the founder can quote
    30-day active browsers and active accounts with their definitions. The
-   ledger gauges require the H1 migration and X1a slice 9.
+   ledger gauges use the H1 tables and the same nightly job.
 
 ## Stop ingestion or roll back
 
@@ -91,21 +92,15 @@ SELECT COUNT(*) AS expired
 FROM active_user_day WHERE day < date('now', '-90 days');
 ```
 
-## Slice 9 handoff
+## Ledger gauges
 
-Integrate after H1's `match` and `match_player` migration is on `main`.
-If H1 lands as `0001_match_ledger.sql`, rename X1a's temporary
-`0001_analytics.sql` to `0002_analytics.sql` and reconcile
-`packages/db/migrations/meta/_journal.json` with migration order. Use fresh
-local D1 state to verify the combined sequence. H1 owns the shared E2E D1
-setup. Keep both H1 ledger and X1a retention clauses in the `/legal` service
-bullet when resolving the copy overlap.
+Saved games use their UTC end day and the ledger's rated flag. Weekly return
+uses ISO weeks. D7 and D30 count returns on the exact day, with a separate
+within-seven-days figure. The admin page shows each measure's recording start
+and marks incomplete windows.
 
-Use `ledgerSeq` in the `x1.nightly` cursor to find late saves. Recompute
-saved game counts from the earliest newly ingested `ended_at` day, affected
-ISO weeks from seven days before it, and cohorts from 30 days before it.
-Advance `ledgerSeq` only after the affected writes commit. Keep bounded,
-fenced steps and use H1's ledger indexes. Replace the saved games, weekly
-return, and cohort placeholders on `/admin/stats`, and label immature
-windows without showing a zero percentage. Verify M1–M10, query plans, and a
-late save with a higher `seq` and older `ended_at`.
+The nightly job uses `ledgerSeq` in its cursor to find late saves. It pins
+the input sequence and the last complete day while it processes up to seven
+days per tick. It advances the sequence after the last affected window
+commits. Changes arriving while a rollup is in progress are picked up in a
+later rollup. A backlog can take several ticks to finish.

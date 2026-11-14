@@ -1,5 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { UTC_DAY_MS, utcDay } from "@shaxda/shared/analytics/events";
+import { prepareLedgerStep, type LedgerCursor } from "../analytics/ledger";
 import {
   ACTIVITY_GAUGES_SQL,
   ACTIVITY_PRUNE_LIMIT,
@@ -15,9 +16,8 @@ import {
   releaseJobLease,
 } from "./lease";
 
-interface AnalyticsCursor {
+interface AnalyticsCursor extends LedgerCursor {
   day: string;
-  ledgerSeq: number;
 }
 
 const MAX_CATCH_UP_DAYS = 35;
@@ -44,12 +44,15 @@ export async function runAnalyticsNightly(
             Date.parse(previous.day) + UTC_DAY_MS,
             today - MAX_CATCH_UP_DAYS * UTC_DAY_MS,
           );
-    let cursor = lease.cursor;
+    let progress: AnalyticsCursor = previous ?? {
+      day: utcDay(yesterday),
+      ledgerSeq: 0,
+    };
 
     if (nextDay <= yesterday) {
       const day = utcDay(nextDay);
       const writeTime = clock();
-      cursor = JSON.stringify({ day, ledgerSeq: previous?.ledgerSeq ?? 0 });
+      progress = { ...progress, day };
       await fencedJobBatch(
         db,
         lease,
@@ -67,12 +70,24 @@ export async function runAnalyticsNightly(
             .prepare(REGISTRATIONS_GAUGE_SQL)
             .bind(day, nextDay, nextDay + UTC_DAY_MS, writeTime),
         ],
-        cursor,
+        JSON.stringify(progress),
       );
-      if (nextDay < yesterday) {
-        await releaseJobLease(db, lease, clock(), false);
-        return;
+    }
+
+    let ledgerComplete = false;
+    if (nextDay >= yesterday) {
+      const ledger = await prepareLedgerStep(db, progress, yesterday, clock());
+      progress = { day: progress.day, ...ledger.cursor };
+      if (ledger.writes.length > 0) {
+        await fencedJobBatch(
+          db,
+          lease,
+          clock(),
+          ledger.writes,
+          JSON.stringify(progress),
+        );
       }
+      ledgerComplete = ledger.complete;
     }
 
     const [pruned] = await fencedJobBatch(
@@ -80,13 +95,13 @@ export async function runAnalyticsNightly(
       lease,
       clock(),
       [db.prepare(ACTIVITY_PRUNE_SQL).bind(utcDay(today - 90 * UTC_DAY_MS))],
-      cursor,
+      JSON.stringify(progress),
     );
     await releaseJobLease(
       db,
       lease,
       clock(),
-      (pruned?.meta.changes ?? 0) < ACTIVITY_PRUNE_LIMIT,
+      ledgerComplete && (pruned?.meta.changes ?? 0) < ACTIVITY_PRUNE_LIMIT,
     );
   } catch (error) {
     if (error instanceof JobLeaseLost) return;

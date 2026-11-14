@@ -51,3 +51,8 @@ export const UTC_DAY_MS = 86_400_000;
 export function utcDay(time: number): string {
   return new Date(time).toISOString().slice(0, 10);
 }
+
+export function utcWeekStart(day: number): number {
+  const weekday = new Date(day).getUTCDay();
+  return day - ((weekday + 6) % 7) * UTC_DAY_MS;
+}

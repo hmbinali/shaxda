@@ -1,5 +1,5 @@
 import { isHttpError, isRedirect } from "@sveltejs/kit";
-import { render, screen } from "@testing-library/svelte";
+import { render, screen, within } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { load } from "./+page.server";
 import Stats from "./+page.svelte";
@@ -66,7 +66,7 @@ describe("admin stats", () => {
     expect(data).toMatchObject({ daily: syntheticData.daily });
     expect(read).toHaveBeenCalledExactlyOnceWith(
       request.platform?.env.DB,
-      "2026-10-11",
+      "2026-09-21",
       "2026-11-14",
       expect.any(Array),
     );
@@ -83,4 +83,47 @@ describe("admin stats", () => {
       screen.getAllByText("Weli lama diiwaangelin.").length,
     ).toBeGreaterThanOrEqual(4);
   });
+});
+
+it("renders eight weeks and mature cohort dates with raw denominators", async () => {
+  read.mockResolvedValue({
+    ...syntheticData,
+    daily: [
+      ...syntheticData.daily,
+      { day: "2026-09-21", event: "week_players", count: 8 },
+      { day: "2026-09-21", event: "week_returning", count: 2 },
+      { day: "2026-11-09", event: "week_players", count: 3 },
+      { day: "2026-11-06", event: "cohort_size", count: 4 },
+      { day: "2026-11-06", event: "cohort_d7", count: 2 },
+      { day: "2026-10-07", event: "cohort_size", count: 3 },
+      { day: "2026-10-07", event: "cohort_d30", count: 0 },
+      { day: "2026-11-13", event: "cohort_size", count: 1 },
+      { day: "2026-11-13", event: "saved_friendly", count: 5 },
+    ],
+    recordedSince: { ...syntheticData.recordedSince, cohort_d30: "2026-10-07" },
+  });
+  const data = await load(args("admin"));
+  render(Stats, { data: { ...data, account: null } });
+
+  const weeks = within(
+    screen.getByRole("table", {
+      name: "Ciyaartoyda soo laabatay toddobaadka xiga",
+    }),
+  );
+  expect(weeks.getAllByRole("row")).toHaveLength(9);
+  expect(weeks.getByText(/25\s?% \(2 \/ 8\)/)).toBeVisible();
+  const open = within(weeks.getByRole("row", { name: /2026-11-09/ }));
+  expect(open.getByText("Weli ma dhammaystirna")).toBeVisible();
+  expect(
+    screen.getByText("Ha go'aamin ka hor laba toddobaad oo dhammaystiran."),
+  ).toBeVisible();
+  const d7 = within(screen.getByRole("table", { name: "Maalinta 7aad" }));
+  expect(d7.getByText(/50\s?% \(2 \/ 4\)/)).toBeVisible();
+  expect(d7.getByText("Weli ma dhammaystirna")).toBeVisible();
+  const d30 = within(screen.getByRole("table", { name: "Maalinta 30aad" }));
+  expect(d30.getByText(/0\s?% \(0 \/ 3\)/)).toBeVisible();
+  expect(d30.getByText("Weli ma dhammaystirna")).toBeVisible();
+  expect(
+    screen.getByText("La diiwaangeliyey laga bilaabo 2026-10-07"),
+  ).toBeVisible();
 });

@@ -5,6 +5,19 @@
   let { data }: { data: PageData } = $props();
   const copy = siteContent.so.adminStats;
   const windows = ["1d", "7d", "30d"] as const;
+  const cohortTitles: Record<string, string> = {
+    cohort_d7: copy.cohortD7,
+    cohort_d30: copy.cohortD30,
+    cohort_within_7d: copy.cohortWithin7,
+  };
+  const matureWeeks = $derived(
+    data.weeks.filter(
+      ({ day, mature }) =>
+        mature &&
+        (count(day, "week_players") ?? 0) > 0 &&
+        count(day, "week_returning") !== undefined,
+    ).length,
+  );
   const localNames = ["local_started", "local_completed"] as const;
   const activity = [
     { title: copy.browsers, prefix: "active_browsers", kind: "guest" },
@@ -48,8 +61,17 @@
   function completion(days: number) {
     const started = localTotal(days, "local_started");
     const completed = localTotal(days, "local_completed");
-    const rate = started === 0 ? "—" : percent.format(completed / started);
-    return `${rate} (${completed} / ${started})`;
+    return share(completed, started);
+  }
+
+  function share(
+    numerator: number | undefined,
+    denominator: number | undefined,
+  ) {
+    if (numerator === undefined || denominator === undefined) return "—";
+    const rate =
+      denominator === 0 ? "—" : percent.format(numerator / denominator);
+    return `${rate} (${numerator} / ${denominator})`;
   }
 
   function localCount(day: string, event: string) {
@@ -161,10 +183,105 @@
     </table>
   </section>
 
-  {#each [copy.online, copy.saved, copy.weeklyReturning, copy.cohorts] as title (title)}
-    <section class="space-y-2">
-      <h2 class="text-xl font-semibold">{title}</h2>
-      <p class="text-sm">{copy.unrecorded}</p>
-    </section>
-  {/each}
+  <section class="space-y-2">
+    <h2 class="text-xl font-semibold">{copy.online}</h2>
+    <p class="text-sm">{copy.unrecorded}</p>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-xl font-semibold">{copy.saved}</h2>
+    <p class="text-sm">{recordedSince(["saved_friendly", "saved_rated"])}</p>
+    <table class="w-full text-sm tabular-nums" aria-label={copy.saved}>
+      <thead class="border-b border-board-300 text-end">
+        <tr>
+          <th scope="col" class="py-2 text-start">{copy.day}</th>
+          <th scope="col">{copy.savedFriendly}</th>
+          <th scope="col">{copy.savedRated}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each data.days as day (day)}
+          <tr class="border-b border-board-200 text-end">
+            <th scope="row" class="py-1 text-start font-normal">{day}</th>
+            <td>{count(day, "saved_friendly") ?? "—"}</td>
+            <td>{count(day, "saved_rated") ?? "—"}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-xl font-semibold">{copy.weeklyReturning}</h2>
+    <p class="text-sm">{recordedSince(["week_players"])}</p>
+    {#if matureWeeks < 2}
+      <p class="text-sm">{copy.waitingForWeeks}</p>
+    {/if}
+    <table
+      class="w-full text-sm tabular-nums"
+      aria-label={copy.weeklyReturning}
+    >
+      <thead class="border-b border-board-300 text-end">
+        <tr>
+          <th scope="col" class="py-2 text-start">{copy.weekOf}</th>
+          <th scope="col">{copy.players}</th>
+          <th scope="col">{copy.returningShare}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each data.weeks as { day, mature } (day)}
+          <tr class="border-b border-board-200 text-end">
+            <th scope="row" class="py-1 text-start font-normal">{day}</th>
+            <td>{count(day, "week_players") ?? "—"}</td>
+            <td
+              >{mature
+                ? share(
+                    count(day, "week_returning"),
+                    count(day, "week_players"),
+                  )
+                : copy.immature}</td
+            >
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-xl font-semibold">{copy.cohorts}</h2>
+    {#each data.cohortWindows as { event, days, pendingDay } (event)}
+      <section class="space-y-2">
+        <h3 class="font-semibold">{cohortTitles[event]}</h3>
+        <p class="text-sm">{recordedSince([event])}</p>
+        <table
+          class="w-full text-sm tabular-nums"
+          aria-label={cohortTitles[event]}
+        >
+          <thead class="border-b border-board-300 text-end">
+            <tr>
+              <th scope="col" class="py-2 text-start">{copy.day}</th>
+              <th scope="col">{copy.players}</th>
+              <th scope="col">{copy.returningShare}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b border-board-200 text-end">
+              <th scope="row" class="py-1 text-start font-normal"
+                >{pendingDay}</th
+              >
+              <td>{count(pendingDay, "cohort_size") ?? "—"}</td>
+              <td>{copy.immature}</td>
+            </tr>
+            {#each days as day (day)}
+              <tr class="border-b border-board-200 text-end">
+                <th scope="row" class="py-1 text-start font-normal">{day}</th>
+                <td>{count(day, "cohort_size") ?? "—"}</td>
+                <td>{share(count(day, event), count(day, "cohort_size"))}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </section>
+    {/each}
+  </section>
 </div>

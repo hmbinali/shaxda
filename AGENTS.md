@@ -49,7 +49,7 @@ that covers them is activated. Full English/i18n is not part of V2.
 
 **V2** (`docs/shaxda-v2.md`, specs in `docs/specs/`) is specified and frozen.
 H1 Match Persistence, H2 Match History and Detail, X1a Product Analytics,
-R1 Rating System, R2 Rated Play Rules, and R6-core Ranking Integrity are
+X1b Online Counters, R1 Rating System, R2 Rated Play Rules, and R6-core Ranking Integrity are
 activated for local implementation. No V2 implementation starts before its
 spec is `frozen` in `docs/specs/README.md` **and** its milestone is activated.
 Do not pre-apply the V2 §6 rule changes; each lands in the first
@@ -96,8 +96,9 @@ Better Auth and Google OAuth belong to the shipped V1.1-A account milestone and
 must live in the SvelteKit web Worker. V1.1-A2 permits the game Worker to verify
 short-lived HMAC identity tickets. H1 permits a game Worker D1 binding to the
 same database as the web Worker in each environment. The Match Durable Object
-writes only the match ledger and reads only its own write results. The game
-Worker has no Better Auth, session-cookie access, or auth-table reads. Do not introduce Paraglide/Inlang or English
+writes the match ledger. X1b permits the game Worker to increment the fixed P13
+counters in `event_daily`. The game Worker reads only its own write results and
+has no Better Auth, session-cookie access, or auth-table reads. Do not introduce Paraglide/Inlang or English
 routes/content (not part of V2), and do not start match persistence, history,
 replays, ratings, or leaderboard work until the V2 milestone that covers it is
 activated.
@@ -196,7 +197,8 @@ Monetization is post-V1 only after the game is finished and has users.
 - Do not write every move as a D1 row.
 - Active match state lives in the Durable Object.
 - Completed account-vs-account persistence follows the H1 ledger contract.
-- Guest games write nothing permanent by default.
+- Guest games contribute to daily aggregate counters without saving match history
+  or identifiers.
 - If D1 is introduced for V1.0, keep it to tiny summary/operational events.
 - Index every common D1 query.
 - Avoid full-table scans.

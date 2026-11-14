@@ -177,7 +177,8 @@ Supersedes the V1.1-A2 line "the game Worker gains no D1 dependency".
 - The game Worker gets a D1 binding to the same database per environment.
 - It may **write** the match ledger (`match`, `match_player`) from the Match
   Durable Object (H1), and **increment** the fixed P13 allowlist of online and
-  queue counters in `event_daily` (X1b). Nothing else.
+  queue counters in `event_daily` (X1b). Counter rows store UTC day, event
+  name, count, and update time.
 - It never reads anything except its own write results, never reads or
   computes ratings, and has no Better Auth, session validation, cookies, or
   access to `user`, `account`, `session`, or `verification`.

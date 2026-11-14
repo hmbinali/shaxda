@@ -34,6 +34,8 @@ implementation and verification.
 R1 Rating System, R2 Rated Play Rules, and R6-core Ranking Integrity are
 activated together for local implementation from Wave 1 commit `5b94a5c`
 after E5. Public rated play stays disabled pending the wave 2 release gates.
+X1b Online Counters is activated for local implementation from the verified
+Wave 2 integration commit `103f391`, with H1, X1a, and R2 integrated.
 Sponsorship (S1–S3) and publishing work are scheduled later.
 
 The [build guide](../build_guide.md) maps the specs to session assignments,

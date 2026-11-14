@@ -661,8 +661,10 @@ For active V1.1-A account work:
 - account mutations use session-derived ownership and guarded SQL operations.
 
 For H1, the game Worker binds the same database as the web Worker in each
-environment. Its Match Durable Object writes the match ledger and reads only
-its own write results. Auth tables, Better Auth, cookies, and session
+environment. Its Match Durable Object writes the match ledger. X1b allows the
+game Worker to increment only the fixed P13 online and queue counters in
+`event_daily`. The game Worker reads only its own write results. Auth tables,
+Better Auth, cookies, and session
 validation remain exclusive to the web Worker.
 
 Do not store:

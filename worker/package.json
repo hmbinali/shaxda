@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@shaxda/db": "workspace:*",
     "@shaxda/game-engine": "workspace:*",
     "@shaxda/shared": "workspace:*",
     "zod": "^4.4.3"

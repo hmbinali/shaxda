@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./match": {
+      "types": "./src/match/index.ts",
+      "default": "./src/match/index.ts"
+    },
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"

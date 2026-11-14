@@ -14,7 +14,7 @@ import {
   parseStoredReplay,
 } from "@shaxda/shared";
 import { sampleMatchPayloads } from "@shaxda/shared/match-fixtures";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { maximumReplay } from "../../../../packages/game-engine/src/fixtures/e4-maximum";
 import { buildGameStatus } from "$lib/game/status";
 import { getReplayAdapter } from "./adapters";
@@ -250,16 +250,19 @@ describe("replay frames", () => {
     expect(maximumReplay.a).toHaveLength(1403);
     expect(JSON.stringify(maximumReplay)).toHaveLength(13922);
     const adapter = getReplayAdapter(1, 1)!;
-    const applyAction = vi.fn(adapter.applyAction);
+    let applied = 0;
     const start = performance.now();
     const result = buildReplayFrames(ready(maximumReplay), facts, {
       ...adapter,
-      applyAction,
+      applyAction: (...args) => {
+        applied++;
+        return adapter.applyAction(...args);
+      },
     });
     expect(performance.now() - start).toBeLessThan(500);
     if (!result.ok) throw new Error(result.reason);
     expect(result.frames).toHaveLength(1404);
-    expect(applyAction).toHaveBeenCalledTimes(1403);
+    expect(applied).toBe(1403);
     let found = 0;
     const seekStart = performance.now();
     for (let i = 0; i < 1000; i++) {
@@ -271,7 +274,7 @@ describe("replay frames", () => {
     }
     expect(performance.now() - seekStart).toBeLessThan(500);
     expect(found).toBe(3808);
-    expect(applyAction).toHaveBeenCalledTimes(1403);
+    expect(applied).toBe(1403);
   });
 });
 

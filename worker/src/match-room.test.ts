@@ -1643,6 +1643,114 @@ describe("match room hibernation spike", () => {
     expect(browser.status).toBe(403);
   });
 
+  it("backs off for 72 hours during a D1 outage, then leaves a stalled entry", async () => {
+    const { roomCode, first, second } = await accountRoom();
+    await placeFirst(first, second, roomCode);
+    // D1 is bound but its ledger tables have not been migrated.
+    await resignToGameOver(first, second, roomCode);
+    await expect
+      .poll(async () => (await loadOutbox(roomCode))?.attempts)
+      .toBe(1);
+    let entry = await loadOutbox(roomCode);
+    if (!entry || entry.firstAttemptAt === null)
+      throw new Error("Expected first attempt");
+    const start = entry.firstAttemptAt;
+    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    const offsets = [0, 5_000, 35_000, 155_000, 755_000, 2_555_000];
+    for (let attempts = 1; attempts < 77; attempts++) {
+      const due = entry.nextAttemptAt;
+      expect(due).toBeDefined();
+      if (due === null) throw new Error("Retry stalled too early");
+      expect(due - start).toBe(
+        offsets[attempts] ?? offsets[5]! + (attempts - 5) * 3_600_000,
+      );
+      clock.mockReturnValue(due);
+      await triggerRoomAlarm(roomCode);
+      entry = await loadOutbox(roomCode);
+      if (!entry) throw new Error("Outbox entry disappeared during outage");
+      expect(entry.attempts).toBe(attempts + 1);
+    }
+    expect(entry).toMatchObject({
+      status: "stalled",
+      stalledReason: "retriesExhausted",
+      nextAttemptAt: null,
+    });
+    await runInDurableObject(
+      roomStub(roomCode),
+      async (_instance, { storage }) => {
+        await expect(storage.getAlarm()).resolves.toBeNull();
+      },
+    );
+  }, 20_000);
+
+  it("keeps an invalid replay for inspection and refuses manual retry", async () => {
+    await applyD1Migrations(testEnv.DB, testEnv.TEST_MIGRATIONS);
+    const { roomCode, first, second } = await accountRoom();
+    await placeFirst(first, second, roomCode);
+    await runInDurableObject(
+      roomStub(roomCode),
+      async (_instance, { storage }) => {
+        await storage.put("log", { v: 1, matchNumber: 1, s: "A", a: ["P:O2"] });
+      },
+    );
+    await resignToGameOver(first, second, roomCode);
+    const entry = await loadOutbox(roomCode);
+    expect(entry).toMatchObject({
+      status: "stalled",
+      stalledReason: "replayMismatch",
+      attempts: 0,
+      nextAttemptAt: null,
+    });
+    if (!entry) throw new Error("Expected replay mismatch entry");
+    const response = await opsRequest("/ops/retry", {
+      roomCode,
+      matchNumber: 1,
+      matchId: entry.payload.id,
+    });
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "notRetryable" });
+    await expect(
+      testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
+    ).resolves.toBe(0);
+    first.close();
+    second.close();
+  });
+
+  it.each([false, true])(
+    "handles rooms created before H1 with play begun = %s",
+    async (playBegan) => {
+      await applyD1Migrations(testEnv.DB, testEnv.TEST_MIGRATIONS);
+      const { roomCode, first, second } = await accountRoom();
+      if (playBegan) await placeFirst(first, second, roomCode);
+      await runInDurableObject(
+        roomStub(roomCode),
+        async (_instance, { storage }) => {
+          const room = await storage.get<Record<string, unknown>>("room");
+          if (!room) throw new Error("Room disappeared");
+          for (const key of [
+            "rated",
+            "consent",
+            "playBeganAt",
+            "unsaved",
+            "lastSave",
+          ])
+            delete room[key];
+          await storage.put("room", room);
+          await storage.delete("log");
+        },
+      );
+      if (!playBegan) await placeFirst(first, second, roomCode);
+      await resignToGameOver(first, second, roomCode);
+      await expect
+        .poll(() =>
+          testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
+        )
+        .toBe(playBegan ? 0 : 1);
+      first.close();
+      second.close();
+    },
+  );
+
   it("cleans room storage when the alarm runs after idle expiry", async () => {
     const roomCode = await createRoom();
     const stub = roomStub(roomCode);

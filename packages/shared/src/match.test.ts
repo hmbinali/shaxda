@@ -41,7 +41,9 @@ describe("H1 ledger contracts", () => {
   it("checks ledger invariants and hashes immutable columns in canonical order", async () => {
     const sample = sampleMatchPayloads.M2;
     const hash = await matchPayloadHash(sample);
-    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(hash).toBe(
+      "88396efc525c897ad0ffa76a1bfeb84cd117d81c4b40c5f15b7291aed05b6701",
+    );
     await expect(
       matchPayloadHash({
         ...sample,

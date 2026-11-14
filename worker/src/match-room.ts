@@ -524,6 +524,9 @@ export class MatchRoom implements DurableObject {
     );
     this.broadcastPresence(updatedRoom);
     this.broadcastMatchStatus(updatedRoom);
+    // Establish the match generation before the matching board. This also
+    // restores any rematch vote cast while this seat was away.
+    this.sendRematchStatus(ws, updatedRoom);
     ws.send(
       JSON.stringify(
         stateServerMessageSchema.parse({
@@ -542,9 +545,6 @@ export class MatchRoom implements DurableObject {
         updatedRoom.onlineEndReason,
       );
     }
-    // A reconnecting seat has to learn the authoritative rematch state, which
-    // includes a request the opponent placed while this socket was away.
-    this.sendRematchStatus(ws, updatedRoom);
   }
 
   private async handleGameAction(

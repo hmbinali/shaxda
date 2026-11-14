@@ -38,7 +38,7 @@ export async function seedAccount(
       `INSERT INTO username_claim (username,user_id,claimed_at,released_at) VALUES (${sql(options.alias)},${sql(id)},${now - 1},${now})`,
     );
   }
-  execute(statements.join(";"));
+  executeE2eD1(statements.join(";"));
 
   const signature = createHmac("sha256", E2E_AUTH_SECRET)
     .update(token)
@@ -62,7 +62,7 @@ export async function seedAccount(
     username,
     token,
     cleanup() {
-      execute(
+      executeE2eD1(
         `DELETE FROM session WHERE user_id=${sql(id)};DELETE FROM username_claim WHERE user_id=${sql(id)};DELETE FROM account WHERE user_id=${sql(id)};DELETE FROM user WHERE id=${sql(id)}`,
       );
     },
@@ -86,7 +86,7 @@ function sleep(milliseconds: number): void {
  * backoff is the standard remedy and keeps the suite parallel; anything else is
  * surfaced immediately, with the Wrangler output attached.
  */
-function execute(command: string): void {
+export function executeE2eD1(command: string): void {
   const deadline = Date.now() + 20_000;
 
   for (let attempt = 0; ; attempt += 1) {
@@ -128,6 +128,6 @@ function execute(command: string): void {
   }
 }
 
-function sql(value: string | null): string {
+export function sql(value: string | null): string {
   return value === null ? "NULL" : `'${value.replaceAll("'", "''")}'`;
 }

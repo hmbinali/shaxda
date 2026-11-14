@@ -8,12 +8,13 @@ import {
   nextUsernameChangeAt,
   validateUsername,
 } from "@shaxda/shared";
+import { requireCompleteAccount } from "$lib/server/account";
 import type { Actions, PageServerLoad } from "./$types";
 
 const dateFormatter = new Intl.DateTimeFormat("so-SO", { dateStyle: "long" });
 
 export const load: PageServerLoad = async ({ locals, platform }) => {
-  const user = requireCompleteAccount(locals);
+  const user = requireCompleteAccount(locals, "/account");
   if (platform?.env.DB === undefined)
     throw new Error("D1 binding is unavailable.");
 
@@ -50,7 +51,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 
 export const actions: Actions = {
   username: async ({ locals, platform, request }) => {
-    const user = requireCompleteAccount(locals);
+    const user = requireCompleteAccount(locals, "/account");
     if (platform?.env.DB === undefined)
       throw new Error("D1 binding is unavailable.");
     const form = await request.formData();
@@ -87,7 +88,7 @@ export const actions: Actions = {
     });
   },
   avatarMode: async ({ locals, platform, request }) => {
-    const user = requireCompleteAccount(locals);
+    const user = requireCompleteAccount(locals, "/account");
     if (platform?.env.DB === undefined)
       throw new Error("D1 binding is unavailable.");
     const form = await request.formData();
@@ -102,15 +103,3 @@ export const actions: Actions = {
     return { source: "avatarMode", saved: true };
   },
 };
-
-function requireCompleteAccount(locals: App.Locals): NonNullable<
-  App.Locals["user"]
-> & {
-  username: string;
-} {
-  if (locals.user === null || locals.session === null) {
-    redirect(303, "/login?returnTo=/account");
-  }
-  if (!locals.user.username) redirect(303, "/register?returnTo=/account");
-  return locals.user as NonNullable<App.Locals["user"]> & { username: string };
-}

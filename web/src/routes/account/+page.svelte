@@ -77,6 +77,7 @@
         <ButtonLink href={profilePath(data.settings.username)}
           >{copy.profileLink}</ButtonLink
         >
+        <ButtonLink href="/history">{copy.historyLink}</ButtonLink>
         <ShareProfile
           username={data.settings.username}
           label={copy.shareProfile}

@@ -22,10 +22,18 @@ export function absoluteUrl(path: string): string {
  * username: an old alias only ever redirects, so it must never be shared or
  * used as a canonical URL.
  */
-export function profilePath(username: string): string {
+export function profilePath(username: string): `/u/${string}` {
   return `/u/${encodeURIComponent(username)}`;
 }
 
 export function profileUrl(username: string): string {
   return absoluteUrl(profilePath(username));
+}
+
+export function matchPath(id: string): `/match/${string}` {
+  return `/match/${encodeURIComponent(id)}`;
+}
+
+export function matchUrl(id: string): string {
+  return absoluteUrl(matchPath(id));
 }

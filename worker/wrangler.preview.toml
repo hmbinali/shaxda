@@ -9,6 +9,7 @@ workers_dev = true
 enabled = true
 
 [vars]
+RATED_PLAY_ENABLED = "false"
 ALLOWED_ORIGIN = "https://shaxda-web-preview.shaxda.workers.dev"
 
 [[durable_objects.bindings]]
@@ -38,3 +39,8 @@ migrations_table = "d1_migrations"
 name = "MATCH_OPS_RATE_LIMIT"
 namespace_id = "1002"
 simple = { limit = 20, period = 60 }
+
+[[services]]
+binding = "RATINGS"
+service = "shaxda-web-preview"
+entrypoint = "RatingsEntrypoint"

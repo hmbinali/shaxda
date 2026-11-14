@@ -4,6 +4,7 @@ export * from "./fixtures";
 export * from "./learning-fixtures";
 export * from "./schemas";
 export * from "./account";
+export * from "./history/schemas";
 
 export const appMetadata = {
   id: "shaxda",
@@ -27,3 +28,6 @@ export {
   MAX_STORED_REPLAY_BYTES,
 } from "./match";
 export type { MatchPayload } from "./match";
+
+export { matchRatingViewSchema, playerRatingViewSchema } from "./rating";
+export type { MatchRatingView } from "./rating";

@@ -10,7 +10,8 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AppShellHarness from "$lib/shell/AppShellHarness.svelte";
 
-vi.mock("$lib/site/metadata", () => ({
+vi.mock("$lib/site/metadata", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("$lib/site/metadata")>()),
   absoluteUrl: (path: string) => `https://shaxda.example${path}`,
   ogImagePath: "/og-image.png",
 }));
@@ -593,6 +594,53 @@ describe("/online", () => {
         name: messages.so.localGame.controls.leaveRoom,
       }),
     ).toBeVisible();
+  });
+
+  it("shows save progress and links only the current saved result", async () => {
+    const socket = await startFinishedGame();
+    const id = "A".repeat(20);
+    const status = {
+      v: protocolVersion,
+      type: "matchStatus",
+      roomCode: "ABCDEFGH",
+      connections: { A: true, B: true },
+      idleSlot: null,
+      claimableBy: null,
+      claimReason: null,
+    };
+    expect(screen.queryByTestId("online-view-match")).not.toBeInTheDocument();
+    socket.message({ ...status, save: { status: "pending", matchNumber: 1 } });
+    expect(await screen.findByTestId("online-save-status")).toHaveTextContent(
+      copy.result.saving,
+    );
+    expect(screen.queryByTestId("online-view-match")).not.toBeInTheDocument();
+    socket.message({ ...status, save: { status: "stalled", matchNumber: 1 } });
+    await waitFor(() =>
+      expect(screen.getByTestId("online-save-status")).toHaveTextContent(
+        copy.result.notSaved,
+      ),
+    );
+    expect(screen.queryByTestId("online-view-match")).not.toBeInTheDocument();
+    socket.message({
+      ...status,
+      save: { status: "saved", matchNumber: 1, matchId: id },
+    });
+    const link = await screen.findByTestId("online-view-match");
+    expect(link).toHaveAttribute("href", `/match/${id}`);
+    expect(link).not.toHaveAttribute("data-result-primary");
+    expect(screen.getByTestId("online-rematch")).toHaveFocus();
+    expect(screen.queryByTestId("online-save-status")).not.toBeInTheDocument();
+    socket.message(rematchStatusMessage(2, { A: null, B: null }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("online-view-match")).not.toBeInTheDocument(),
+    );
+    socket.message({
+      ...status,
+      save: { status: "saved", matchNumber: 1, matchId: id },
+    });
+    await waitFor(() =>
+      expect(screen.queryByTestId("online-view-match")).not.toBeInTheDocument(),
+    );
   });
 
   it("negotiates a rematch from the result overlay and waits for the server", async () => {

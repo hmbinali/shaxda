@@ -68,6 +68,12 @@ describe("Somali legal content", () => {
     expect(data?.paragraphs.join(" ")).toMatch(
       /labada ciyaaryahanba akoon ku galeen.*si gaar ah u kaydisaa.*Ciyaaraha uu marti ka qayb qaatay lama kaydiyo/,
     );
+    expect(data?.paragraphs.join(" ")).toContain(
+      "Ciyaar la kaydiyay waxaa bogga ku arki kara labada ciyaaryahan ee ciyaaray oo keliya.",
+    );
+    expect(data?.paragraphs.join(" ")).toContain(
+      "Ciyaaraha la kaydiyay way sii jiraan haddii akoon la tirtiro",
+    );
     expect(visibleCopy()).not.toContain(
       "Ma bixiyo kayd joogto ah oo natiijooyinka ah",
     );

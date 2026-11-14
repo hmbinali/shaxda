@@ -18,6 +18,7 @@
   import ConfirmDialog from "$components/game/ConfirmDialog.svelte";
   import Avatar from "$components/account/Avatar.svelte";
   import GameAnnouncer from "$components/game/GameAnnouncer.svelte";
+  import RatedDisclosure from "$components/game/RatedDisclosure.svelte";
   import GameStatusPanel from "$components/game/GameStatusPanel.svelte";
   import OnlineTabletop from "$components/game/OnlineTabletop.svelte";
   import PlayerPiecesCard from "$components/game/PlayerPiecesCard.svelte";
@@ -51,6 +52,7 @@
   };
 
   const copy = messages.so.onlineGame;
+  const ratedCopy = messages.so.ratedPlay;
   const gameCopy = messages.so.localGame;
   const controller = createOnlineGameController();
   const identity = createOnlineIdentity();
@@ -61,6 +63,7 @@
   let guestId = $state("");
   let displayName = $state("");
   let roomCodeInput = $state("");
+  let ratedRequest = $state(false);
   let pageOrigin = $state("");
   let busy = $state(false);
   let copied = $state(false);
@@ -300,6 +303,7 @@
         turnstileToken,
         identityTicket ?? undefined,
         identityUsesAccount ? requestIdentityTicket : undefined,
+        identityUsesAccount && ratedRequest,
       );
       roomCodeInput = roomCode;
       replaceState(resolve(`/online?room=${roomCode}`), {});
@@ -515,6 +519,7 @@
   {status}
   {playerName}
   stateSyncNonce={controller.stateSyncNonce}
+  matchMode={controller.matchModeLabel}
 />
 
 <div bind:this={pageBackground} class="h-full min-h-full">
@@ -661,6 +666,37 @@
                 <div bind:this={turnstileContainer}></div>
               {/if}
 
+              {#if identityUsesAccount}
+                <fieldset class="grid gap-2 text-sm">
+                  <legend class="mb-2 font-semibold"
+                    >{ratedCopy.create.legend}</legend
+                  >
+                  <div class="flex flex-wrap gap-x-4 gap-y-2">
+                    <label class="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="ratedRequest"
+                        value={false}
+                        bind:group={ratedRequest}
+                      />
+                      {ratedCopy.mode.friendly}
+                    </label>
+                    <label class="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="ratedRequest"
+                        value={true}
+                        bind:group={ratedRequest}
+                      />
+                      {ratedCopy.mode.rated}
+                    </label>
+                  </div>
+                  {#if ratedRequest}
+                    <RatedDisclosure />
+                  {/if}
+                </fieldset>
+              {/if}
+
               <div class="flex flex-wrap gap-2">
                 {#if hasInviteCode}
                   <Button
@@ -713,6 +749,16 @@
             <p class="mt-2 font-mono text-sm text-board-700">
               {controller.roomCode}
             </p>
+            {#if controller.presence[controller.mySlot ?? "A"]?.kind === "account" && controller.ratedStatus.ratedRequest !== undefined}
+              <p
+                class="mt-2 text-sm font-semibold"
+                data-testid="waiting-match-mode"
+              >
+                {controller.ratedStatus.ratedRequest
+                  ? ratedCopy.mode.rated
+                  : ratedCopy.mode.friendly}
+              </p>
+            {/if}
             {#if shareLink.length > 0}
               <div class="mt-4 grid gap-2">
                 <span class="text-sm font-semibold text-board-900">
@@ -779,20 +825,34 @@
 </div>
 
 <ConfirmDialog
-  open={pendingConfirm !== null}
-  title={pendingConfirm === "resign"
-    ? gameCopy.controls.resign
-    : pendingConfirm === "leave"
-      ? gameCopy.controls.leaveRoom
-      : gameCopy.controls.exitGame}
-  body={pendingConfirm === "resign"
-    ? gameCopy.prompts.resign
-    : pendingConfirm === "home"
-      ? gameCopy.prompts.home
-      : gameCopy.prompts.leave}
-  cancelLabel={gameCopy.tabletop.cancel}
-  confirmLabel={gameCopy.tabletop.confirm}
+  open={pendingConfirm !== null || controller.firstMove !== null}
+  title={controller.firstMove !== null
+    ? ratedCopy.lobby.pending
+    : pendingConfirm === "resign"
+      ? gameCopy.controls.resign
+      : pendingConfirm === "leave"
+        ? gameCopy.controls.leaveRoom
+        : gameCopy.controls.exitGame}
+  body={controller.firstMove !== null
+    ? ratedCopy.firstMove.body
+    : pendingConfirm === "resign"
+      ? gameCopy.prompts.resign
+      : pendingConfirm === "home"
+        ? gameCopy.prompts.home
+        : gameCopy.prompts.leave}
+  cancelLabel={controller.firstMove !== null
+    ? ratedCopy.firstMove.wait
+    : gameCopy.tabletop.cancel}
+  confirmLabel={controller.firstMove !== null
+    ? ratedCopy.consent.decline
+    : gameCopy.tabletop.confirm}
   background={pageBackground}
-  onClose={() => (pendingConfirm = null)}
-  onConfirm={confirmPendingAction}
+  onClose={() => {
+    pendingConfirm = null;
+    controller.firstMove = null;
+  }}
+  onConfirm={() => {
+    if (controller.firstMove !== null) controller.confirmFirstMove();
+    else confirmPendingAction();
+  }}
 />

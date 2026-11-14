@@ -12,6 +12,7 @@
     size?: ButtonSize;
     class?: string;
     children: Snippet;
+    element?: HTMLAnchorElement | null;
   }
 
   let {
@@ -19,10 +20,11 @@
     size = "default",
     class: className,
     children,
+    element = $bindable(null),
     ...rest
   }: Props = $props();
 </script>
 
-<a {...rest} class={buttonStyles(variant, size, className)}>
+<a bind:this={element} {...rest} class={buttonStyles(variant, size, className)}>
   {@render children()}
 </a>

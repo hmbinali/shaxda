@@ -7,6 +7,7 @@ enabled = true
 
 # Dev/test only. Preview and production use Wrangler secrets instead.
 [vars]
+RATED_PLAY_ENABLED = "true"
 MATCH_OPS_TOKEN = "shaxda-local-match-ops-fixture-000000000001"
 ONLINE_IDENTITY_SECRET = "shaxda-online-identity-dev-test-secret-000000000001"
 
@@ -37,3 +38,8 @@ migrations_table = "d1_migrations"
 name = "MATCH_OPS_RATE_LIMIT"
 namespace_id = "1002"
 simple = { limit = 20, period = 60 }
+
+[[services]]
+binding = "RATINGS"
+service = "shaxda-web"
+entrypoint = "RatingsEntrypoint"

@@ -9,7 +9,12 @@ import {
 import { expect, test, type Page } from "@playwright/test";
 import { ledgerQuery, inviteRoomCode } from "./fixtures/ledger";
 import { seedAccount } from "./fixtures/auth";
-import { actingSeat, placeOnline, resignOnline } from "./fixtures/online";
+import {
+  actingSeat,
+  isolateRoomQuota,
+  placeOnline,
+  resignOnline,
+} from "./fixtures/online";
 
 type LedgerRow = {
   id: string;
@@ -46,6 +51,7 @@ test("saves a played account game and rematch in the web Worker's D1", async ({
   page,
 }) => {
   test.setTimeout(120_000);
+  await isolateRoomQuota(page, 14);
   const opponent = await browser.newContext();
   const a = await seedAccount(context);
   const b = await seedAccount(opponent);

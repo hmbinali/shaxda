@@ -1,6 +1,7 @@
 import BookOpen from "@lucide/svelte/icons/book-open";
 import CircleHelp from "@lucide/svelte/icons/circle-question-mark";
 import CircleUserRound from "@lucide/svelte/icons/circle-user-round";
+import History from "@lucide/svelte/icons/history";
 import LogIn from "@lucide/svelte/icons/log-in";
 import LogOut from "@lucide/svelte/icons/log-out";
 import ScrollText from "@lucide/svelte/icons/scroll-text";
@@ -51,6 +52,12 @@ export function accountGroup(account: AccountNavigationState): NavPanelGroup {
               label: `@${account.username}`,
               icon: CircleUserRound,
               href: `/u/${account.username}`,
+            },
+            {
+              id: "history",
+              label: nav.history,
+              icon: History,
+              href: "/history",
             },
             {
               id: "account-settings",

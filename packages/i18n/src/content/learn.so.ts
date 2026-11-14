@@ -1,4 +1,5 @@
 import type { ContentCallout, ContentCalloutVariant } from "./types";
+import { ratedPlaySo } from "./rated-play.so";
 
 export const learnSectionIds = [
   "bilowga",
@@ -8,6 +9,7 @@ export const learnSectionIds = [
   "irmaan",
   "xannibaad",
   "dhammaadka",
+  "tartan",
   "talooyin",
   "koobid",
 ] as const;
@@ -372,6 +374,32 @@ export const learnContentSo = {
         "Tirinta 80-ka waxay bilaabataa marka dhaqdhaqaaqu bilowdo; wareeg aan qabasho lahayn ayaa kordhiya, qabashaduna eber ayay ku celisaa.",
       ],
       callouts: [],
+      diagramGroups: [],
+      summary: [],
+      ctas: [],
+    },
+    {
+      // TODO(translation-review): Review these rated-play rules before public enablement.
+      id: "tartan",
+      navLabel: "Tartan",
+      heading: "Tartan iyo Saaxiibtinimo",
+      paragraphs: [
+        "Qol aad saaxiib ku casuunto wuxuu ku bilaabmaa Saaxiibtinimo. Tartan wuxuu dhacaa marka labada ciyaaryahanba leeyihiin akoon dhammaystiran oo ay labaduba oggolaadaan ka hor tallaabada koowaad. Kulan degdeg ah had iyo jeer waa Tartan.",
+      ],
+      subsections: [],
+      rules: [
+        ratedPlaySo.disclosure.rated,
+        ratedPlaySo.disclosure.friendly,
+        "Marka tallaabada koowaad la sameeyo, is dhiibid ama ka tagid waa guuldarro weji kasta, xitaa dhigista. Haddii ciyaartu dhammaato ka hor tallaabada koowaad, waxba lama kaydiyo.",
+        'Laba ciyaaryahan 24-kii saac 3 Tartan oo keliya ayaa Darajo loogu xisaabiyaa; kuwa kale waa dadweyne, waxaana lagu calaamadeeyaa "Darajo laguma xisaabin".',
+        'Natiijada kadib waxaa muuqda "Waa la xisaabinayaa" ilaa xisaabtu dhammaato.',
+      ],
+      callouts: [
+        {
+          variant: "talo",
+          body: "Darajadu ma laha dhibco go'an. Guul aad ka gaarto ciyaaryahan cusub ama mid Darajadiisa aan weli la hubin wax yar ayay beddeshaa Darajo xasiloon; Darajadaaduna way dhaqso u beddelantaa inta aad cusub tahay.",
+        },
+      ],
       diagramGroups: [],
       summary: [],
       ctas: [],

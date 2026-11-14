@@ -10,6 +10,7 @@ const bypassAuthHook = new Set([
   "/api/analytics/active",
   "/api/analytics/event",
 ]);
+const matchHistoryRouteIds = new Set(["/history", "/match/[id]"]);
 
 export const handle: Handle = async ({ event, resolve }) => {
   event.locals.session = null;
@@ -31,5 +32,19 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.session = resolved?.session ?? null;
   event.locals.user = resolved?.user ?? null;
 
-  return svelteKitHandler({ event, resolve, auth, building });
+  const response = await svelteKitHandler({ event, resolve, auth, building });
+  // SvelteKit can skip page loads on partial data requests, including redirects.
+  if (
+    matchHistoryRouteIds.has(event.route.id ?? "") &&
+    response.headers.get("cache-control") !== "no-store"
+  ) {
+    const headers = new Headers(response.headers);
+    headers.set("cache-control", "no-store");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+  return response;
 };

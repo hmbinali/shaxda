@@ -10,7 +10,8 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       wrangler: {
-        configPath: "./wrangler.toml",
+        // The E2E Worker has its own local D1 and no external rating service.
+        configPath: "./wrangler.e2e.toml",
       },
       // The pool calls `unstable_getMiniflareWorkerOptions` without `envFiles`,
       // so Wrangler loads `worker/.dev.vars` into the test Worker and there is
@@ -25,6 +26,7 @@ export default defineConfig({
           ALLOWED_ORIGIN: "http://127.0.0.1:4173",
           // Empty on purpose: the Worker skips Turnstile when this is unset.
           TURNSTILE_SECRET: "",
+          RATED_PLAY_ENABLED: "true",
           ONLINE_IDENTITY_SECRET:
             "shaxda-online-identity-dev-test-secret-000000000001",
         },

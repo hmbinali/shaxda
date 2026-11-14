@@ -7,6 +7,7 @@ workers_dev = false
 enabled = true
 
 [vars]
+RATED_PLAY_ENABLED = "false"
 ALLOWED_ORIGIN = "https://shaxda.app"
 
 [[routes]]
@@ -48,3 +49,8 @@ migrations_table = "d1_migrations"
 name = "MATCH_OPS_RATE_LIMIT"
 namespace_id = "1002"
 simple = { limit = 20, period = 60 }
+
+[[services]]
+binding = "RATINGS"
+service = "shaxda-web"
+entrypoint = "RatingsEntrypoint"

@@ -1,9 +1,11 @@
 import type { ButtonVariant } from "$components/ui/buttonStyles";
 
-export interface GameResultAction {
+interface ResultAction {
   id: string;
   label: string;
-  onSelect: () => void;
   variant?: ButtonVariant;
   testId?: string;
 }
+
+export type GameResultAction = ResultAction &
+  ({ onSelect: () => void; href?: never } | { href: string; onSelect?: never });

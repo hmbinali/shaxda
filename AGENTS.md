@@ -48,10 +48,11 @@ ratings, leaderboard, and sponsorship stay out of scope until the V2 milestone
 that covers them is activated. Full English/i18n is not part of V2.
 
 **V2** (`docs/shaxda-v2.md`, specs in `docs/specs/`) is specified and frozen.
-H1 Match Persistence and X1a Product Analytics are activated for local
-implementation. No V2 implementation starts before its spec is `frozen` in
-`docs/specs/README.md` **and** its milestone is activated. Do not pre-apply the
-V2 §6 rule changes; each lands in the first
+H1 Match Persistence, H2 Match History and Detail, X1a Product Analytics,
+R1 Rating System, R2 Rated Play Rules, and R6-core Ranking Integrity are
+activated for local implementation. No V2 implementation starts before its
+spec is `frozen` in `docs/specs/README.md` **and** its milestone is activated.
+Do not pre-apply the V2 §6 rule changes; each lands in the first
 commit of the milestone that needs it. Precedence between the PRD and the V2
 documents is set in `docs/shaxda_prd.md` §27.
 
@@ -199,6 +200,14 @@ Monetization is post-V1 only after the game is finished and has users.
 - If D1 is introduced for V1.0, keep it to tiny summary/operational events.
 - Index every common D1 query.
 - Avoid full-table scans.
+
+### Ratings (R1, R2, R6-core)
+
+- The web Worker decides each saved match in ledger ingestion order (`seq`),
+  under a lease and an atomic fence. The game Worker only sends a hint.
+- The match and participant ledger is immutable. Rebuilding in the same
+  order reproduces the published ratings. Apply corrections by rebuilding.
+- Public rating records count processed rated events only.
 
 ### Validation
 

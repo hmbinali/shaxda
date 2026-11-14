@@ -1,4 +1,5 @@
 import { learnContentSo } from "./content/learn.so";
+import { ratedPlaySo } from "./content/rated-play.so";
 import { legalContentSo } from "./content/legal.so";
 
 export * from "./content/learn.so";
@@ -14,6 +15,7 @@ const publicDescription =
 export const messages = {
   so: {
     appName: "Shaxda",
+    ratedPlay: ratedPlaySo,
     foundationLabel: "Qandaraasyada F1",
     foundationSummary:
       "Qaab-dhismeedka shaxda, xeerarka, iyo ciyaarta martida ayaa diyaar u ah marxaladaha xiga.",
@@ -244,6 +246,10 @@ export const messages = {
         },
       },
       result: {
+        // TODO(translation-review): Review the saved-game overlay copy.
+        saving: "Ciyaarta waa la kaydinayaa…",
+        notSaved: "Ciyaartan weli lama kaydin.",
+        viewMatch: "Eeg ciyaarta",
         reasons: {
           opponentAbandoned: {
             winner: "Ciyaaryahanka kale wuu baxay; waad guuleysatay.",
@@ -290,6 +296,15 @@ export const messages = {
         savingEarlierGames:
           "Ciyaarihii hore weli waa la kaydinayaa; dib-u-ciyaarka mar kale isku day wax yar kadib.",
         staleMatch: "Tallaabadaas waxay ku socotay ciyaar dhammaatay.",
+        // TODO(translation-review): Review the rated-play errors before public enablement.
+        consentClosed: "Nooca ciyaarta hadda lama beddeli karo.",
+        consentUnavailable: "Tartan looma heli karo qolkan.",
+        disclosureOutdated:
+          "Xeerarka Tartanka waa la cusboonaysiiyay; fadlan dib u soo rar bogga.",
+        ratedOnlyRematch:
+          "Kulanka degdegga ah dib-u-ciyaarkiisu waa Tartan oo keliya.",
+        ratedPlayDisabled:
+          "Tartanku hadda waa hakad; ciyaartu waa Saaxiibtinimo.",
         rematchUnavailable:
           "Dib-u-ciyaar waxaa la codsan karaa marka ciyaartu dhammaato.",
         rateLimited: "Codsiyo badan ayaa yimid; sug wax yar.",
@@ -343,7 +358,9 @@ export const siteContent = {
       description: publicDescription,
       ogImageAlt: "Loox shaxda ah iyo magaca Shaxda",
     },
+    neutralMember: "Xubin la tirtiray",
     nav: {
+      history: "Ciyaarahayga",
       home: "Hoy",
       learn: "Baro",
       learnRules: "Baro xeerarka",
@@ -500,6 +517,7 @@ export const siteContent = {
         joinedLabel: "Ku biiray",
         nextChangeLabel: "Beddelka magaca wuxuu furmayaa",
         profileLink: "Fur bogga dadweynaha",
+        historyLink: "Ciyaarahayga",
         shareProfile: "La wadaag boggayga",
         saveUsername: "Kaydi magaca",
         saveAvatar: "Kaydi sawirka",
@@ -507,6 +525,109 @@ export const siteContent = {
         deleteTitle: "Tirtiridda akoonka",
         deleteLater:
           "Tirtiridda tooska ahi way imanaysaa mar dambe. Ilaa markaas taageerada la xiriir haddii aad rabto in akoonkaaga la tirtiro.",
+      },
+      // TODO(translation-review): Review the history and match detail copy.
+      history: {
+        path: "/history",
+        title: "Ciyaarahayga",
+        description: "Liiska ciyaaraha aad akoonkaaga ku ciyaartay.",
+        eyebrow: "Taariikhda ciyaaraha",
+        summary: {
+          caption: "Dhammaan ciyaarahaaga la kaydiyay",
+          games: "Ciyaaro",
+          winRate: "Heerka guusha",
+          streak: "Isku xigxig",
+          form: "Natiijooyinkii u dambeeyay",
+        },
+        streak: {
+          win: "{n} guul oo isku xigxiga",
+          loss: "{n} guuldarro oo isku xigxiga",
+          draw: "{n} barbaro oo isku xigxiga",
+          capped: "{n}+",
+        },
+        formMarks: { win: "G", loss: "K", draw: "B" },
+        filters: {
+          label: "Shaandhee ciyaaraha",
+          all: "Dhammaan",
+          wins: "Guulaha",
+          losses: "Guuldarrooyinka",
+          draws: "Barbarooyinka",
+          rated: "Tartan",
+          friendly: "Saaxiibtinimo",
+        },
+        row: {
+          outcome: { win: "Guul", loss: "Guuldarro", draw: "Barbaro" },
+          quick: "Kulan degdeg ah",
+          pieces: "Dhagaxa haray",
+          duration: "Muddada",
+          opponent: "Ka soo horjeeda",
+          playedAt: "Taariikhda",
+          result: "Natiijada",
+          view: "Eeg ciyaarta",
+        },
+        endReasons: {
+          opponentBelowThree: "Wax ka yar saddex dhagax",
+          opponentCapturedAll: "Dhammaan waa la qabtay",
+          resignation: "Is dhiibid",
+          drawTermination: "Barbaro",
+          bothBlocked: "Labaduba xanniban",
+          forcedJareSpaceMaking: "Jare qasab ah",
+          abandoned: "Ka bixid",
+          idle: "Hakad",
+        },
+        older: "Ciyaaro ka hor",
+        first: "Ku noqo bogga koowaad",
+        emptyFiltered: "Shaandhadan ciyaar kuma jirto.",
+        empty: {
+          title: "Weli ciyaar lama kaydin",
+          body: "Ciyaaraha aad la ciyaarto akoon kale ayaa halkan ku kaydsama. Ciyaaraha martida lama kaydiyo.",
+        },
+        durationUnits: { hours: "s", minutes: "daq", seconds: "il" },
+      },
+      match: {
+        path: "/match/[id]",
+        title: "Ciyaar Shaxda ah",
+        description: "Faahfaahinta ciyaar Shaxda ah.",
+        pageTitle: "{a} iyo {b}",
+        pageDescription: {
+          win: "{winner} ayaa ka guuleystay {loser} ciyaar Shaxda ah.",
+          draw: "{a} iyo {b} waxay ku kala tageen barbaro.",
+        },
+        headline: { win: "{winner} ayaa guuleystay", draw: "Barbaro" },
+        playerResult: { win: "Guuleystay", loss: "Khasaaray", draw: "Barbaro" },
+        youLabel: "Adiga",
+        onlineEndReasons: {
+          abandoned: "{name} wuu ka baxay ciyaarta.",
+          idle: "{name} wuu hakaday, wareeggiisiina wuu dhaafay.",
+        },
+        modes: { quick: "Kulan degdeg ah", invite: "Casuumaad" },
+        details: {
+          heading: "Faahfaahinta ciyaarta",
+          playedAt: "Taariikhda",
+          utc: "UTC",
+          duration: "Muddada",
+          mode: "Nooca",
+          startingSeat: "Bilaabay",
+          pieces: "Dhagaxa haray",
+          captures: "Qabashooyin",
+          actions: "Tallaabooyin",
+          firstAdvantage: "Horrayn",
+          undecided: "Lama go'aamin",
+          firstAdvantageBy: {
+            placementJare: "jare intii dhigista",
+            noJareFallback: "jare la'aan, ciyaaryahanka labaad",
+          },
+        },
+        privateNote: "Ciyaartan waxaa arki kara labada ciyaaryahan oo keliya.",
+        share: {
+          action: "La wadaag ciyaarta",
+          statusLabel: "Xaaladda wadaagista",
+          shareTitle: "{a} iyo {b} — Shaxda",
+          shareText: "Eeg ciyaartan Shaxda ah.",
+          shared: "Ciyaarta waa la wadaagay.",
+          copied: "Xiriiriyaha ciyaarta waa la koobiyeeyay.",
+          failed: "Wadaagiddu ma shaqayn. Xiriiriyaha gacanta ku koobi.",
+        },
       },
       profile: {
         path: "/u/[username]",
@@ -530,6 +651,16 @@ export const siteContent = {
           failed: "Wadaagiddu ma shaqayn. Xiriiriyaha gacanta ku koobi.",
         },
       },
+    },
+    // TODO(translation-review)
+    rating: {
+      label: "Darajo",
+      pending: "Waa la xisaabinayaa",
+      updating: "Darajooyinka waa la cusboonaysiinayaa",
+      provisional: "Darajo ku meel gaar ah",
+      change: "Isbeddelka darajada: {delta}",
+      unrated: "Weli darajo ma laha",
+      corrected: "Darajada waa la saxay",
     },
     accountErrors: {
       taken: "Magacan qof kale ayaa qaatay ama waa naanays hore.",

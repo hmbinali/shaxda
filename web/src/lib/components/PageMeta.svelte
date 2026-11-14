@@ -7,7 +7,13 @@
     title,
     description,
     path,
-  }: { title: string; description: string; path: string } = $props();
+    noindex = false,
+  }: {
+    title: string;
+    description: string;
+    path: string;
+    noindex?: boolean;
+  } = $props();
 
   const pageTitle = $derived(
     title === appMetadata.name ? title : `${title} | ${appMetadata.name}`,
@@ -20,6 +26,7 @@
 <svelte:head>
   <title>{pageTitle}</title>
   <meta name="description" content={description} />
+  {#if noindex}<meta name="robots" content="noindex" />{/if}
   <link rel="canonical" href={canonicalUrl} />
 
   <meta property="og:type" content="website" />

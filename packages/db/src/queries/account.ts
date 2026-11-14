@@ -1,6 +1,4 @@
 import {
-  avatarColorForUserId,
-  avatarInitial,
   avatarModeSchema,
   normalizeUsername,
   validateUsername,
@@ -8,6 +6,9 @@ import {
   type AvatarMode,
 } from "@shaxda/shared";
 import type { AnyD1Database } from "drizzle-orm/d1";
+import { toPublicProfile, type PublicProfile } from "./public-profile";
+
+export type { PublicProfile } from "./public-profile";
 
 export type ClaimUsernameOutcome =
   | { kind: "claimed" }
@@ -22,14 +23,6 @@ export type ChangeUsernameOutcome =
   | { kind: "unchanged" }
   | { kind: "cooldown"; nextEligibleAt: Date }
   | { kind: "taken" };
-
-export type PublicProfile = {
-  username: string;
-  avatarMode: AvatarMode;
-  imageUrl: string | null;
-  avatarColor: string;
-  initial: string;
-};
 
 export type ResolveProfileOutcome =
   | { kind: "current"; profile: PublicProfile }
@@ -260,16 +253,9 @@ export async function resolveProfile(
     return { kind: "alias", currentUsername: row.username };
   }
 
-  const avatarMode = avatarModeSchema.catch("initial").parse(row.avatar_mode);
   return {
     kind: "current",
-    profile: {
-      username: row.username,
-      avatarMode,
-      imageUrl: avatarMode === "google" ? row.image : null,
-      avatarColor: avatarColorForUserId(row.id),
-      initial: avatarInitial(row.username),
-    },
+    profile: toPublicProfile(row.id, row.username, row.avatar_mode, row.image),
   };
 }
 

@@ -257,7 +257,32 @@ Found by reading the code while revising the V2 specs. Not observed in
 production data; recorded so the verified status above is not overstated.
 
 - **Provider tokens on returning sign-in.** Better Auth 1.6.25 previously
-  refreshed the linked account's provider tokens on sign-in. The web Worker
-  now disables that refresh and clears provider tokens in both account
-  write hooks. Existing preview and production rows still need a reviewed
-  cleanup and a returning Google sign-in check.
+  refreshed the linked account's provider tokens on sign-in. See the dated
+  follow-up below for the fix and verification.
+
+## 2026-11-14 — Wave 2 account privacy follow-up
+
+- `82dddae` disabled returning provider account updates and cleared tokens in
+  both account write hooks. The first preview new-account callback surfaced
+  retained expiry metadata, which `a485e99` clears in both hooks. The prior
+  preview rehearsal recorded a web redeploy, cleanup of two stale expiry
+  timestamps, and a returning sign-in with all five fields empty.
+- The prior A3 preview rehearsal verified Google reauthentication, request and
+  cancellation, session revocation, pending profile and rating privacy, and
+  restored access after cancellation. Preview cron finalized a backdated
+  synthetic account and released its username. A separate synthetic D1 exercise
+  verified Time Travel and idempotent deletion replay. See the
+  [Wave 2 verification register](../specs/README.md#wave-2-verification).
+- On `62c4f6a`, the local closeout passed 17 auth and account loader tests,
+  five A3 D1 tests, the Better Auth schema check, and all three account deletion
+  browser cases with fresh local D1. The browser cases cover the Google
+  reauthentication redirect, request and cancellation, and a grace-period
+  match followed by finalization.
+- The closeout pass reached the signed-out preview login page. A fresh callback
+  with `a485e99` remains open because no unused approved Google test account
+  was available. Wrangler also required Cloudflare authentication for the
+  read-only preview aggregate, so this pass recorded no D1 result. Follow the
+  [preview token retention procedure](v11a-accounts-runbook.md#preview-provider-token-retention)
+  when both are available.
+- Production existing-row cleanup and the production Google sign-in check
+  remain open.

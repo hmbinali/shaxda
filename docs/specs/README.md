@@ -48,8 +48,9 @@ process below.
 
 ## Wave 2 verification
 
-On 2026-11-14, the combined local build passed `pnpm check`, the Better Auth
-schema check, and all 86 Playwright cases in one run with fresh local D1.
+The combined implementation merged in [PR #49](https://github.com/hmbinali/shaxda/pull/49)
+at `9aa7ecf`. On 2026-11-14, the combined local build passed `pnpm check`, the
+Better Auth schema check, and all 86 Playwright cases with fresh local D1.
 The follow-up [CI run](https://github.com/hmbinali/shaxda/actions/runs/43594914621)
 passed the full check, browser, and performance suites after the Google
 token-expiry fix.
@@ -64,6 +65,11 @@ applied. The public smoke checks passed and both Worker source paths returned 40
 | X1b online counters     | `9d475c5`. Verified guest and account counters, rematches, counter-write failures, the kill switch, and admin totals.                                                                                                                       | One guest room and a played rematch gave one create, one join, two starts, two completions and zero saves. The rated account invite gave one of each counter and one save.                                                                                                                                                                                                                                                                                                                                  | Seven completed UTC days of counter-to-ledger reconciliation open. |
 | A3 account deletion     | `c8b3925` and `31ce14f`. Verified request, cancellation, Google authorization redirect, grace-period play, neutral match identity, finalization, username release, and local restore replay. `afd00e0` also gates the public rating lookup. | Google reauthentication, request, and cancellation passed. Request revoked all sessions, hid the public profile and rating API, and neutralized the seat on a rated match. Returning Google sign-in and cancellation restored access. Live cron finalized a backdated synthetic account and released its username. On a separate synthetic D1 database, Time Travel and idempotent replay restored pending and final states, revoked a resurrected session, and neutralized the final account on the match. | Required before public rated play.                                 |
 | Google token retention  | `82dddae` and `a485e99`. Both account write hooks clear token values and expiry timestamps. Returning sign-in skips provider-token updates.                                                                                                 | Google callback succeeded. A new account confirmed no token values were stored and surfaced a retained expiry timestamp, which led to `a485e99` and a preview web redeploy. Cleared the two stale expiry timestamps. Returning Google sign-in left all token and expiry fields empty. A post-fix new-account check remains open.                                                                                                                                                                            | Returning sign-in and existing-row cleanup open.                   |
+
+The [account verification record](../ops/v11a-a2-release-verification.md#2026-11-14--wave-2-account-privacy-follow-up)
+records the post-fix preview login check. A new-account callback and a
+read-only D1 count still require an unused approved Google test account and
+authenticated preview D1 access.
 
 The preview online analytics switch suppressed every counter for a completed
 guest game. With the web analytics switch off, both beacon endpoints returned

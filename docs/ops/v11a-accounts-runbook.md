@@ -207,10 +207,10 @@ D1 retains the minimum sign-in and public-profile data:
 - public avatar preference (`initial` or explicitly opted-in `google`);
 - session/account timestamps and cooldown timestamp.
 
-The Google full name is scrubbed before insertion. Provider access, refresh, and
-ID tokens are set to null because Shaxda does not call Google APIs. Public loaders
-do not return email, ids, provider records, session records, token fields, or the
-cooldown timestamp.
+The Google full name is scrubbed before insertion. Both account write hooks
+clear the provider access, refresh, and ID tokens and their expiry fields.
+Returning sign-in skips provider account updates. Public loaders omit email,
+ids, provider records, session records, token fields, and the cooldown timestamp.
 
 The generated initial avatar is the default. Google avatar mode is opt-in, accepts
 only HTTPS `lh3`–`lh6.googleusercontent.com` URLs, uses `no-referrer`, discloses
@@ -275,6 +275,38 @@ expected to be rejected. Alias redirects and owner reclaim are covered by D1 and
 authenticated application tests; use a seeded preview account if they must be
 manually exercised before 30 days.
 
+### Preview provider-token retention
+
+Coordinate a short window on the existing preview deployment with the other
+preview testers. Before the run, record the preview D1 clock in milliseconds
+with `SELECT CAST(unixepoch('subsec') * 1000 AS INTEGER) AS now_ms`.
+Use an approved Google test account that has never signed into Shaxda preview.
+Complete the Google callback and confirm Shaxda opens `/register`. Username
+confirmation is unnecessary for this check.
+
+Query the new Google provider row through the preview Wrangler config using
+the recorded lower bound and the D1 clock at the end of the run. Substitute
+those two integer bounds when running the query through Wrangler. Report only
+the counts returned by the query. Use the existing preview database with an
+authorized Cloudflare session that can read it.
+
+```sql
+SELECT COUNT(*) AS new_google_rows,
+       COUNT(access_token) AS access_token_non_null,
+       COUNT(refresh_token) AS refresh_token_non_null,
+       COUNT(id_token) AS id_token_non_null,
+       COUNT(access_token_expires_at) AS access_expiry_non_null,
+       COUNT(refresh_token_expires_at) AS refresh_expiry_non_null
+FROM account
+WHERE provider_id = 'google'
+  AND created_at >= :start_ms AND created_at <= :end_ms;
+```
+
+The expected result is one new Google row and zero non-null values in each
+of the five fields. If the window contains other sign-ins or the row count
+differs, keep the check open until the new row can be attributed to the test.
+Record the observation in the [release verification record](v11a-a2-release-verification.md).
+
 ## Rollback
 
 For V1.1-A2, roll back both Workers together. Rolling back only the web Worker
@@ -283,6 +315,6 @@ Worker makes newly minted account tickets unusable. Do not down-migrate producti
 D1 or delete account data. If a deployment is unhealthy, restore the previous web
 and game Worker versions and their matching secret pair.
 
-V1.1-A intentionally has no self-service deletion backend. The account screen
-contains a non-interactive notice directing users to support until deletion work
-is deliberately scoped.
+While any A3 deletion request is pending, use a web build that preserves the
+pending-account restrictions and keeps the status and cancellation routes
+available.

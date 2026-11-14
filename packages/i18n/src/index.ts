@@ -531,6 +531,16 @@ export const siteContent = {
         },
       },
     },
+    // TODO(translation-review)
+    rating: {
+      label: "Darajo",
+      pending: "Waa la xisaabinayaa",
+      updating: "Darajooyinka waa la cusboonaysiinayaa",
+      provisional: "Darajo ku meel gaar ah",
+      change: "Isbeddelka darajada: {delta}",
+      unrated: "Weli darajo ma laha",
+      corrected: "Darajada waa la saxay",
+    },
     accountErrors: {
       taken: "Magacan qof kale ayaa qaatay ama waa naanays hore.",
       cooldown: "Magaca mar kale waxaad beddeli kartaa {date}.",

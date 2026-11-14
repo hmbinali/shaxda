@@ -49,6 +49,7 @@ export async function fencedJobBatch(
   now: number,
   writes: D1PreparedStatement[],
   cursor: string | null,
+  guard?: D1PreparedStatement,
 ): Promise<D1Result[]> {
   try {
     const results = await db.batch([
@@ -58,6 +59,7 @@ export async function fencedJobBatch(
           (SELECT lease_token = ?2 AND lease_expires_at > ?3 FROM job_state WHERE name = ?1))`,
         )
         .bind(lease.name, lease.token, now),
+      ...(guard ? [guard] : []),
       ...writes,
       db
         .prepare(
@@ -66,7 +68,7 @@ export async function fencedJobBatch(
         .bind(lease.name, cursor, now),
       db.prepare("DELETE FROM job_fence"),
     ]);
-    return results.slice(1, -2);
+    return results.slice(guard ? 2 : 1, -2);
   } catch (error) {
     for (let cause = error; cause instanceof Error; cause = cause.cause) {
       if (/\b(?:job_fence_guard|job_fence\.ok)\b/.test(cause.message)) {
@@ -82,15 +84,16 @@ export async function releaseJobLease(
   lease: JobLease,
   now: number,
   completed: boolean,
+  errorCode: string | null = null,
 ): Promise<void> {
   await db
     .prepare(
       `UPDATE job_state SET lease_token = NULL, lease_expires_at = NULL,
       last_success_at = CASE WHEN ?4 THEN ?3 ELSE last_success_at END,
-      last_error = CASE WHEN ?4 THEN NULL ELSE last_error END, updated_at = ?3
+      last_error = CASE WHEN ?4 OR ?5 IS NOT NULL THEN ?5 ELSE last_error END, updated_at = ?3
      WHERE name = ?1 AND lease_token = ?2 AND lease_expires_at > ?3`,
     )
-    .bind(lease.name, lease.token, now, Number(completed))
+    .bind(lease.name, lease.token, now, Number(completed), errorCode)
     .run();
 }
 

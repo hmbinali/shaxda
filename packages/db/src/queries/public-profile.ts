@@ -13,6 +13,11 @@ export type PublicProfile = {
   initial: string;
 };
 
+// Use inside a user join to keep absent, incomplete and pending identities
+// neutral without a second read.
+export const ACTIVE_PUBLIC_USER =
+  "u.deletion_requested_at IS NULL AND u.username IS NOT NULL";
+
 export function toPublicProfile(
   id: string,
   username: string,

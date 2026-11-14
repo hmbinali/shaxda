@@ -4,7 +4,11 @@ import type {
   HistoryFilter,
   MatchPayload,
 } from "@shaxda/shared";
-import { toPublicProfile, type PublicProfile } from "./public-profile";
+import {
+  ACTIVE_PUBLIC_USER,
+  toPublicProfile,
+  type PublicProfile,
+} from "./public-profile";
 
 type Seat = MatchPayload["startingSeat"];
 type Result = MatchPayload["players"][number]["result"];
@@ -133,7 +137,7 @@ export async function readHistoryPage(
      CROSS JOIN match AS m ON m.id = mp.match_id
      CROSS JOIN match_player AS op ON op.match_id = mp.match_id
        AND op.seat = CASE mp.seat WHEN 'A' THEN 'B' ELSE 'A' END
-     LEFT JOIN user AS u ON u.id = op.user_id
+     LEFT JOIN user AS u ON u.id = op.user_id AND ${ACTIVE_PUBLIC_USER}
      LEFT JOIN match_rating AS mr ON m.rated = 1 AND mr.match_id = m.id
      LEFT JOIN rating_correction_mark AS rc ON m.rated = 1 AND rc.match_id = m.id
      WHERE mp.user_id = ? ${filterSql}
@@ -202,7 +206,7 @@ export async function readMatchForViewer(
        u.username, u.avatar_mode, u.image,
        mr.rating_status, mr.rating_skip_reason, (rc.match_id IS NOT NULL) AS rating_corrected
      FROM match AS m CROSS JOIN match_player AS mp ON mp.match_id = m.id
-     LEFT JOIN user AS u ON u.id = mp.user_id
+     LEFT JOIN user AS u ON u.id = mp.user_id AND ${ACTIVE_PUBLIC_USER}
      LEFT JOIN match_rating AS mr ON m.rated = 1 AND mr.match_id = m.id
      LEFT JOIN rating_correction_mark AS rc ON m.rated = 1 AND rc.match_id = m.id
      WHERE m.id = ?`,

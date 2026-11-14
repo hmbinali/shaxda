@@ -6,7 +6,11 @@ import {
   type AvatarMode,
 } from "@shaxda/shared";
 import type { AnyD1Database } from "drizzle-orm/d1";
-import { toPublicProfile, type PublicProfile } from "./public-profile";
+import {
+  ACTIVE_PUBLIC_USER,
+  toPublicProfile,
+  type PublicProfile,
+} from "./public-profile";
 
 export type { PublicProfile } from "./public-profile";
 
@@ -38,6 +42,7 @@ type UserAccountRow = {
 const claimEligibility = `EXISTS (
   SELECT 1 FROM user u
   WHERE u.id = ?1
+    AND u.deletion_requested_at IS NULL
     AND u.username IS NULL
     AND NOT EXISTS (
       SELECT 1 FROM username_claim c WHERE c.username = ?2
@@ -47,6 +52,7 @@ const claimEligibility = `EXISTS (
 const changeEligibility = `EXISTS (
   SELECT 1 FROM user u
   WHERE u.id = ?1
+    AND u.deletion_requested_at IS NULL
     AND u.username IS NOT NULL
     AND u.username <> ?2
     AND (u.username_changed_at IS NULL OR u.username_changed_at <= ?3)
@@ -203,7 +209,7 @@ export async function setAvatarMode(
   const result = await db
     .prepare(
       `UPDATE user SET avatar_mode = ?2, updated_at = ?3
-       WHERE id = ?1 AND username IS NOT NULL RETURNING id`,
+       WHERE id = ?1 AND username IS NOT NULL AND deletion_requested_at IS NULL RETURNING id`,
     )
     .bind(userId, mode, now.getTime())
     .all();
@@ -236,7 +242,7 @@ export async function resolveProfile(
       `SELECT u.id, u.username, u.image, u.avatar_mode, c.released_at
        FROM username_claim c
        JOIN user u ON u.id = c.user_id
-       WHERE c.username = ?1
+       WHERE c.username = ?1 AND ${ACTIVE_PUBLIC_USER}
        LIMIT 1`,
     )
     .bind(username)

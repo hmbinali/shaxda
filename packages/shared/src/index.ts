@@ -27,3 +27,6 @@ export {
   MAX_STORED_REPLAY_BYTES,
 } from "./match";
 export type { MatchPayload } from "./match";
+
+export { matchRatingViewSchema, playerRatingViewSchema } from "./rating";
+export type { MatchRatingView } from "./rating";

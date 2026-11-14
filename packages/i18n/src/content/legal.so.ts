@@ -53,7 +53,7 @@ export interface LegalPageContent {
 // ciyaarta-martida, adeegyada, carruurta, xuquuqda, shuruudaha, and
 // isticmaal-fiican) must be verified by a native/fluent Somali reviewer before
 // release. It describes only what is live; it must not promise later features.
-// TODO(translation-review): Verify the X1a usage and retention disclosures.
+// TODO(translation-review): Verify the H1 and X1a storage and retention disclosures.
 export const legalContentSo = {
   path: "/legal",
   title: "Sharciga iyo asturnaanta",
@@ -88,7 +88,7 @@ export const legalContentSo = {
       heading: "Xogta Shaxda isticmaasho",
       paragraphs: [
         "Akoonku waa ikhtiyaari. Waxaad ku ciyaari kartaa marti ahaan adigoon akoon samaysan: martidu waxay doorataa magac bandhig, qalabkuna wuxuu samaystaa aqoonsi marti oo aan kala sooc lahayn. Haddii aad Google ku gasho, waxaad yeelanaysaa akoon leh magac dadweyne oo joogto ah iyo bog dadweyne.",
-        "Xogta akoonka waxaa lagu kaydiyaa Cloudflare D1, oo ah kayd xogeed. Shaxda ma kaydiso taariikh ciyaareed, natiijooyin, dib-u-ciyaar, ama miis darajo. Ciyaaraha martida iyo ciyaaraha akoonkaba wax joogto ah laguma qoro kayd xogeed marka ay dhammaadaan.",
+        "Xogta akoonka waxaa lagu kaydiyaa Cloudflare D1, oo ah kayd xogeed. Marka ciyaar khadka ahi bilaabato oo dhammaato iyadoo labada ciyaaryahanba akoon ku galeen, Shaxda waxay si gaar ah u kaydisaa natiijada, sababta ay ku dhammaatay, waqtiyada, tallaabooyinka ciyaarta, koodhka qolka, iyo aqoonsiga gudaha ee labada akoon. Magacyo iyo sawirro laguma kaydiyo diiwaanka ciyaarta. Ciyaaraha uu marti ka qayb qaatay lama kaydiyo.",
       ],
       bullets: [
         "Xogta qalabka: ciyaarta maxalliga ah, aqoonsiga martida, magaca bandhigga, dookha codka, iyo xusuusta diidmada rakibidda.",
@@ -199,7 +199,7 @@ export const legalContentSo = {
         {
           term: "Xaaladda ciyaarta",
           detail:
-            "Durable Object-ku wuxuu tirtiraa dhammaan xaaladda qolka 60 daqiiqo oo firfircoonaan la'aan ah kadib.",
+            "Durable Object-ku wuxuu tirtiraa xaaladda qolka 60 daqiiqo oo firfircoonaan la'aan ah kadib. Haddii natiijo akoon weli sugayso in la kaydiyo, qolka waa la hayaa ilaa kaydintu guulaysato ama hawlwadeenku xalliyo.",
         },
       ],
       notes: [
@@ -240,12 +240,12 @@ export const legalContentSo = {
         {
           term: "Diiwaanka qolka firfircoon",
           detail:
-            "Cinwaanka IP-ga ceeriin wuxuu ku jiri karaa diiwaanka qolka ilaa 70 daqiiqo laga bilaabo samaynta, dabadeed alarm ayaa ka saara.",
+            "Cinwaanka IP-ga ceeriin wuxuu caadi ahaan ku jiraa diiwaanka qolka ugu badnaan 70 daqiiqo laga bilaabo samaynta. Haddii natiijo akoon ay sugayso kaydin, diiwaanka waxaa la hayn karaa ilaa kaydintu guulaysato ama hawlwadeenku xalliyo.",
         },
         {
           term: "Xaaladda qolka ciyaarta",
           detail:
-            "Tani waa muddo kale: qolka waxaa la tirtiraa 60 daqiiqo oo firfircoonaan la'aan ah kadib, ee ma aha 60 daqiiqo laga bilaabo samaynta.",
+            "Muddada 60 daqiiqo ee xaaladda qolka waxay ka bilaabataa hawshii ugu dambeysay ee qolka. Qol leh natiijo sugaysa kaydin waa la sii hayaa.",
         },
       ],
       notes: [
@@ -262,7 +262,7 @@ export const legalContentSo = {
       bullets: [
         "Cloudflare waxay xogta uga shaqayn kartaa dalal kala duwan iyadoo raacaysa heshiisyadeeda iyo sharciyada khuseeya.",
         "Shaxda ma iibiso xogta martida ama akoonka, mana isticmaasho xayeysiis, lacag bixin, taageero ganacsi, ama xiriir iib.",
-        "Kaydka D1 wuxuu hayaa xogta akoonka, summadaha tirakoobka (90 maalmood), iyo tirooyin maalinle ah. Aqoonsiga martida ee ceeriin laguma hayo.",
+        "Kaydka D1 wuxuu hayaa xogta akoonka, ciyaaraha la kaydiyay ee u dhexeeya laba akoon, summadaha tirakoobka (90 maalmood), iyo tirooyin maalinle ah. Aqoonsiga martida ee ceeriin laguma hayo.",
       ],
       details: [],
       notes: [],
@@ -294,7 +294,7 @@ export const legalContentSo = {
       heading: "Adeegga aad isticmaalayso",
       paragraphs: [
         "Markaad isticmaasho Shaxda, waxaad oggolaanaysaa shuruudahan inta sharcigu oggol yahay. Haddii aadan oggolayn, ha isticmaalin ciyaarta, akoonka, ama qaybaha kale ee adeegga.",
-        "Adeeggu wuxuu bixiyaa bog waxbarasho, ciyaar laba qof oo hal qalab ah, qolal khadka ah oo laba qof ku ciyaaraan, iyo akoon ikhtiyaari ah oo Google lagu galo oo leh magac dadweyne iyo bog dadweyne. Ma bixiyo kayd joogto ah oo natiijooyinka ah, dib-u-ciyaar, ama ballanqaad ah in qol ama ciyaar dib loo soo celin karo.",
+        "Adeeggu wuxuu bixiyaa bog waxbarasho, ciyaar laba qof oo hal qalab ah, qolal khadka ah oo laba qof ku ciyaaraan, iyo akoon ikhtiyaari ah oo Google lagu galo oo leh magac dadweyne iyo bog dadweyne. Ciyaaraha martida ma kaydiyo, mana bixiyo ballanqaad ah in qol ama ciyaar aan dhammaan dib loo soo celin karo.",
       ],
       bullets: [],
       details: [],

@@ -60,4 +60,16 @@ describe("Somali legal content", () => {
     );
     expect(visibleCopy()).toContain("shaxda:analytics-active:v1");
   });
+
+  it("discloses private account game storage and excludes guest games", () => {
+    const data = legalContentSo.sections.find(
+      (section) => section.id === "xogta",
+    );
+    expect(data?.paragraphs.join(" ")).toMatch(
+      /labada ciyaaryahanba akoon ku galeen.*si gaar ah u kaydisaa.*Ciyaaraha uu marti ka qayb qaatay lama kaydiyo/,
+    );
+    expect(visibleCopy()).not.toContain(
+      "Ma bixiyo kayd joogto ah oo natiijooyinka ah",
+    );
+  });
 });

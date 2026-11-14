@@ -79,6 +79,7 @@ export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
     account: {
       encryptOAuthTokens: true,
       updateAccountOnSignIn: false,
+      storeStateStrategy: "database",
     },
     user: {
       additionalFields: {
@@ -101,6 +102,9 @@ export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
           input: false,
           returned: true,
         },
+        deletionRequestedAt: { type: "date", input: false, returned: false },
+        deletionDueAt: { type: "date", input: false, returned: false },
+        deletedAt: { type: "date", input: false, returned: false },
       },
     },
     databaseHooks: {
@@ -120,6 +124,9 @@ export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
               "username",
               "usernameChangedAt",
               "avatarMode",
+              "deletionRequestedAt",
+              "deletionDueAt",
+              "deletedAt",
             ]) {
               delete safe[field];
             }

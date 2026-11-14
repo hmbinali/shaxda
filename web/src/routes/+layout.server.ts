@@ -7,7 +7,15 @@ import {
 import type { LayoutServerLoad } from "./$types";
 
 export const load: LayoutServerLoad = ({ locals }) => {
-  if (building || locals.user === null) return { account: null };
+  if (building) return { account: null };
+  if (locals.pendingDeletion)
+    return {
+      account: {
+        status: "pendingDeletion" as const,
+        dueAt: locals.pendingDeletion.dueAt,
+      },
+    };
+  if (locals.user === null) return { account: null };
 
   const username = locals.user.username;
   if (!username) return { account: { status: "incomplete" as const } };

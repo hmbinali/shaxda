@@ -14,6 +14,7 @@ const topBar = siteContent.so.topBar;
 
 export type AccountNavigationState =
   | null
+  | { status: "pendingDeletion"; dueAt: number }
   | { status: "incomplete" }
   | {
       status: "complete";
@@ -41,6 +42,27 @@ export function pagesGroup(): NavPanelGroup {
 }
 
 export function accountGroup(account: AccountNavigationState): NavPanelGroup {
+  if (account?.status === "pendingDeletion") {
+    return {
+      id: "account",
+      label: topBar.groupAccount,
+      items: [
+        {
+          id: "deletion-status",
+          label: topBar.pendingDeletion,
+          icon: CircleUserRound,
+          href: "/account/delete",
+        },
+        {
+          id: "logout",
+          label: nav.logout,
+          icon: LogOut,
+          formAction: "/logout",
+          danger: true,
+        },
+      ],
+    };
+  }
   return {
     id: "account",
     label: topBar.groupAccount,

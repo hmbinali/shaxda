@@ -1,4 +1,9 @@
 import { processPendingRatings } from "@shaxda/db/rating";
+import {
+  FINALIZE_DELETION_JOB,
+  RELEASE_USERNAME_JOB,
+  runAccountDeletionJob,
+} from "@shaxda/db";
 import { ANALYTICS_JOB_NAME, runAnalyticsNightly } from "@shaxda/db/analytics";
 import { UTC_DAY_MS } from "@shaxda/shared/analytics/events";
 
@@ -17,16 +22,27 @@ interface ScheduledJob {
 
 const NIGHTLY_START_MS = 15 * 60_000;
 
+function nightlyDue(time: number, state: JobState | undefined) {
+  const start = time - (time % UTC_DAY_MS) + NIGHTLY_START_MS;
+  return time >= start && (state?.last_success_at ?? -1) < start;
+}
+
 export const jobs: readonly ScheduledJob[] = [
   {
     name: ANALYTICS_JOB_NAME,
     testCron: "15 0 * * *",
-    due(time, state) {
-      const start = time - (time % UTC_DAY_MS) + NIGHTLY_START_MS;
-      return time >= start && (state?.last_success_at ?? -1) < start;
-    },
+    due: nightlyDue,
     run: (env, now) => runAnalyticsNightly(env.DB, now),
   },
+  ...([FINALIZE_DELETION_JOB, RELEASE_USERNAME_JOB] as const).map(
+    (name, index) => ({
+      name,
+      testCron: `${16 + index} 0 * * *`,
+      due: nightlyDue,
+      run: (env: Environment, now: number) =>
+        runAccountDeletionJob(env.DB, name, now),
+    }),
+  ),
 ];
 
 export function scheduled(

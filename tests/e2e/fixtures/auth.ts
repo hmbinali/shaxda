@@ -40,6 +40,35 @@ export async function seedAccount(
   }
   executeE2eD1(statements.join(";"));
 
+  await setSessionCookie(context, token, expires);
+
+  return {
+    id,
+    email,
+    username,
+    token,
+    cleanup() {
+      executeE2eD1(
+        `DELETE FROM session WHERE user_id=${sql(id)};DELETE FROM username_claim WHERE user_id=${sql(id)};DELETE FROM account WHERE user_id=${sql(id)};DELETE FROM user WHERE id=${sql(id)}`,
+      );
+    },
+  };
+}
+
+export async function signInFixture(context: BrowserContext, id: string) {
+  const token = randomBytes(24).toString("hex");
+  const now = Date.now();
+  const expires = now + 24 * 60 * 60 * 1_000;
+  executeE2eD1(`INSERT INTO session (id,expires_at,token,created_at,updated_at,user_id)
+    VALUES (${sql(token)},${expires},${sql(token)},${now},${now},${sql(id)})`);
+  await setSessionCookie(context, token, expires);
+}
+
+async function setSessionCookie(
+  context: BrowserContext,
+  token: string,
+  expires: number,
+) {
   const signature = createHmac("sha256", E2E_AUTH_SECRET)
     .update(token)
     .digest("base64");
@@ -55,18 +84,6 @@ export async function seedAccount(
       expires: Math.floor(expires / 1_000),
     },
   ]);
-
-  return {
-    id,
-    email,
-    username,
-    token,
-    cleanup() {
-      executeE2eD1(
-        `DELETE FROM session WHERE user_id=${sql(id)};DELETE FROM username_claim WHERE user_id=${sql(id)};DELETE FROM account WHERE user_id=${sql(id)};DELETE FROM user WHERE id=${sql(id)}`,
-      );
-    },
-  };
 }
 
 /** Blocks the worker thread; these fixtures are synchronous by design. */

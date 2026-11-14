@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
+  import { resolve } from "$app/paths";
   import { siteContent } from "@shaxda/i18n";
   import { avatarInitial, isNormalizedUsername } from "@shaxda/shared";
   import { untrack } from "svelte";
@@ -122,6 +123,9 @@
           >{copy.confirm}</Button
         >
       </form>
+      <a class="mt-5 inline-block underline" href={resolve("/account/delete")}>
+        {siteContent.so.pages.account.deleteLink}
+      </a>
     {/if}
   </div>
 </section>

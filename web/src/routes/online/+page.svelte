@@ -96,6 +96,7 @@
   const guestFormAvailable = $derived(
     identity.status === "signedOut" ||
       identity.status === "incomplete" ||
+      identity.status === "pendingDeletion" ||
       (identity.status === "unavailable" && guestFallbackAllowed),
   );
   const identityFormBlocked = $derived(
@@ -415,7 +416,8 @@
       roomCodeInput.length > 0 &&
       (identity.status === "complete" ||
         ((identity.status === "signedOut" ||
-          identity.status === "incomplete") &&
+          identity.status === "incomplete" ||
+          identity.status === "pendingDeletion") &&
           displayName.trim().length > 0))
     ) {
       joinRoom();
@@ -606,6 +608,10 @@
                     )}>{copy.identity.completeRegistration}</a
                   >
                 </NoticeBanner>
+              {:else if identity.status === "pendingDeletion"}
+                <NoticeBanner tone="warning"
+                  >{copy.identity.pendingDeletion}</NoticeBanner
+                >
               {:else if identity.status === "unavailable" && !guestFallbackAllowed}
                 <NoticeBanner tone="warning">
                   {copy.identity.unavailable}

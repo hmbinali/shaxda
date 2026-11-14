@@ -85,4 +85,21 @@ describe("OnlineIdentity", () => {
     await expect(identity.requestTicket("create")).rejects.toThrow();
     expect(identity.status).toBe("unavailable");
   });
+
+  it("recognizes pending deletion on both status and ticket responses", async () => {
+    const identity = createOnlineIdentity({
+      fetchFn: vi.fn(async () =>
+        Response.json({ error: "account-pending-deletion" }, { status: 403 }),
+      ) as never,
+    });
+    await identity.refresh();
+    expect(identity.status).toBe("pendingDeletion");
+
+    identity.status = "complete";
+    await expect(
+      identity.requestTicket("reconnect", "ABCDEFGH"),
+    ).rejects.toThrow();
+    expect(identity.status).toBe("pendingDeletion");
+    expect(identity.account).toBeNull();
+  });
 });

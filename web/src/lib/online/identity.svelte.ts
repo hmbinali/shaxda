@@ -4,9 +4,26 @@ import {
 } from "@shaxda/shared";
 import type { OnlineIdentityAccount } from "@shaxda/shared";
 import type { TicketAction } from "@shaxda/shared/identity";
+import { z } from "zod";
 
 export type OnlineIdentityClientStatus =
-  "loading" | "signedOut" | "incomplete" | "complete" | "unavailable";
+  | "loading"
+  | "signedOut"
+  | "incomplete"
+  | "complete"
+  | "unavailable"
+  | "pendingDeletion";
+
+const pendingDeletion = z.object({
+  error: z.literal("account-pending-deletion"),
+});
+
+async function isPendingDeletion(response: Response) {
+  return (
+    response.status === 403 &&
+    pendingDeletion.safeParse(await response.json().catch(() => null)).success
+  );
+}
 
 export interface OnlineIdentityOptions {
   fetchFn?: typeof fetch;
@@ -31,6 +48,11 @@ export class OnlineIdentity {
       const response = await this.#fetch("/api/online/identity", {
         headers: { Accept: "application/json" },
       });
+      if (await isPendingDeletion(response)) {
+        this.account = null;
+        this.status = "pendingDeletion";
+        return;
+      }
       if (!response.ok) throw new Error("Online identity status failed.");
       const result = onlineIdentityStatusSchema.parse(await response.json());
       this.status = result.status;
@@ -59,6 +81,10 @@ export class OnlineIdentity {
           ...(roomCode === undefined ? {} : { roomCode }),
         }),
       });
+      if (await isPendingDeletion(response)) {
+        this.status = "pendingDeletion";
+        throw new Error("identityUnavailable");
+      }
       if (!response.ok) throw new Error("identityUnavailable");
       const result = onlineIdentityTicketResponseSchema.parse(
         await response.json(),
@@ -68,7 +94,7 @@ export class OnlineIdentity {
       }
       return result.ticket;
     } catch (error) {
-      this.status = "unavailable";
+      if (this.status !== "pendingDeletion") this.status = "unavailable";
       this.account = null;
       throw error;
     }

@@ -17,6 +17,7 @@ declare global {
 
   namespace App {
     interface Locals {
+      pendingDeletion?: { dueAt: number };
       session: {
         id: string;
         userId: string;
@@ -40,6 +41,7 @@ declare global {
 
     type AccountPageData =
       | null
+      | { status: "pendingDeletion"; dueAt: number }
       | { status: "incomplete" }
       | {
           status: "complete";

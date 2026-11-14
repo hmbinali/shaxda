@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   recordActivity: vi.fn(),
   incrementLocalEvent: vi.fn(),
+  readDeletion: vi.fn(),
 }));
 vi.mock("$app/environment", () => ({
   get dev() {
@@ -18,6 +19,10 @@ vi.mock("$lib/server/auth", () => ({
   getAuth: () => ({ api: { getSession: mocks.getSession } }),
 }));
 vi.mock("@shaxda/db/analytics", () => mocks);
+vi.mock("@shaxda/db", () => ({
+  readDeletion: mocks.readDeletion,
+  revokeSession: vi.fn(),
+}));
 
 const origin = "https://shaxda.example";
 const salt = "a".repeat(32);
@@ -38,6 +43,10 @@ beforeEach(() => {
   mocks.settings.dev = false;
   vi.spyOn(Date, "now").mockReturnValue(now);
   rate.mockResolvedValue({ success: true });
+  mocks.readDeletion.mockResolvedValue({
+    deletion_due_at: null,
+    deleted_at: null,
+  });
 });
 
 function post(
@@ -179,6 +188,24 @@ describe("analytics writes", () => {
       "2026-11-14",
       now,
     );
+  });
+
+  it("records pending accounts as guests", async () => {
+    mocks.getSession.mockResolvedValue({
+      user: { id: "pending-user", username: "ayaan" },
+    });
+    mocks.readDeletion.mockResolvedValue({
+      deletion_due_at: now + 100,
+      deleted_at: null,
+    });
+    const response = await post(active);
+    await expect(response.json()).resolves.toMatchObject({ identity: "guest" });
+    expect(mocks.recordActivity.mock.calls[0]?.[2]).toEqual([
+      {
+        kind: "guest",
+        anonId: await analyticsHash(salt, "guest", beacon.guestId),
+      },
+    ]);
   });
 
   it("returns 503 for D1 failures", async () => {

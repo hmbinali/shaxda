@@ -24,6 +24,10 @@ describe("Better Auth options", () => {
     expect(options.trustedOrigins).toEqual(["https://shaxda.app"]);
     expect(options.advanced?.useSecureCookies).toBe(true);
     expect(options.telemetry).toEqual({ enabled: false });
+    expect(options.account?.storeStateStrategy).toBe("database");
+    expect(options.user?.deleteUser?.enabled).not.toBe(true);
+    expect(options.user?.changeEmail?.enabled).not.toBe(true);
+    expect(options.plugins?.map(({ id }) => id)).toEqual(["sveltekit-cookies"]);
   });
 
   it("resolves the client IP from the Cloudflare edge header", () => {
@@ -130,6 +134,9 @@ describe("Better Auth options", () => {
         username: "changed",
         usernameChangedAt: new Date(),
         avatarMode: "google",
+        deletionRequestedAt: new Date(),
+        deletionDueAt: new Date(),
+        deletedAt: new Date(),
         emailVerified: false,
       },
       null,

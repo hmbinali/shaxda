@@ -146,7 +146,10 @@
       <h2 id="delete-account-title" class="text-lg font-semibold">
         {copy.deleteTitle}
       </h2>
-      <p class="mt-2 text-sm leading-6 text-board-700">{copy.deleteLater}</p>
+      <p class="mt-2 text-sm leading-6 text-board-700">{copy.deleteBody}</p>
+      <ButtonLink href="/account/delete" class="mt-4" variant="outline">
+        {copy.deleteLink}
+      </ButtonLink>
     </aside>
   </div>
 </section>

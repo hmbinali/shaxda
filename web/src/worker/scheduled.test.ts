@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scheduled } from "./scheduled";
 
-const { run, rate } = vi.hoisted(() => ({ run: vi.fn(), rate: vi.fn() }));
+const { run, rate, deletion } = vi.hoisted(() => ({
+  run: vi.fn(),
+  rate: vi.fn(),
+  deletion: vi.fn(),
+}));
+vi.mock("@shaxda/db", () => ({
+  FINALIZE_DELETION_JOB: "a3.finalize",
+  RELEASE_USERNAME_JOB: "a3.release",
+  runAccountDeletionJob: deletion,
+}));
 vi.mock("@shaxda/db/rating", () => ({ processPendingRatings: rate }));
 vi.mock("@shaxda/db/analytics", () => ({
   ANALYTICS_JOB_NAME: "x1.nightly",
@@ -37,6 +46,10 @@ describe("scheduled dispatcher", () => {
     expect(prepare).not.toHaveBeenCalled();
     expect(rate).toHaveBeenCalledWith(env.DB);
     await tick(start);
+    expect(deletion.mock.calls).toEqual([
+      [env.DB, "a3.finalize", start],
+      [env.DB, "a3.release", start],
+    ]);
     await tick(start + 60_000);
     expect(run.mock.calls).toEqual([
       [env.DB, start],

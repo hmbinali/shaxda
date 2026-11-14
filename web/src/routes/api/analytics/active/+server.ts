@@ -5,7 +5,7 @@ import {
   acceptAnalyticsRequest,
   analyticsResponse,
 } from "$lib/server/analyticsRequest";
-import { getAuth } from "$lib/server/auth";
+import { resolveAccountSession } from "$lib/server/auth/deletion";
 import type { RequestHandler } from "./$types";
 
 export const prerender = false;
@@ -24,11 +24,10 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (!hasAnalyticsSalt(salt)) return analyticsResponse(503);
 
   try {
-    const resolved = await getAuth(env).api.getSession({
-      headers: request.headers,
-    });
-    locals.session = resolved?.session ?? null;
-    locals.user = resolved?.user ?? null;
+    const resolved = await resolveAccountSession(env, request.headers);
+    const active = resolved?.dueAt === null ? resolved : null;
+    locals.session = active?.session ?? null;
+    locals.user = active?.user ?? null;
 
     const user = locals.user;
     const day = utcDay(now);

@@ -180,7 +180,8 @@ export const legalContentSo = {
         },
       ],
       notes: [
-        "Xogta akoonka waxay jirtaa ilaa akoonka la tirtiro. Tirtiridda akoonka ee aad adigu samayn karto hadda ma jirto; si aad u codsato in akoonkaaga la tirtiro, la xiriir [EMAIL XIRIIRKA].",
+        'Waxaad tirtiridda ka codsan kartaa bogga akoonkaaga. Isla markiiba boggaaga dadweynaha waa la qariyaa, gelitaannada waa la xiraa, ciyaar akoon oo cusubna ma bilaabi kartid. Toddoba maalmood gudahood Google ku gal si aad uga noqoto codsiga. Markay muddadu dhammaato, xogta aqoonsiga waa la tirtiraa. Ciyaaraha la kaydiyay iyo darajooyinkooda way sii jiraan iyagoo ku tusaya "Xubin la tirtiray".',
+        "Magacyada dadweynaha waxaa la hayaa 30 maalmood tirtiridda ka dib. Summadaha tirakoobka si caadi ah ayay u dhacaan 90 maalmood gudahood. Soo celinta kaydka xogtu dib uma soo celiso akoon la tirtiray.",
       ],
     },
     {
@@ -286,7 +287,7 @@ export const legalContentSo = {
       heading: "Doorashooyinkaaga iyo codsiyada xogta",
       paragraphs: [
         "Waxaad localStorage-ka iyo kaydka service worker-ka ka tirtiri kartaa dejimaha biraawsarka, ama waxaad ka saari kartaa barnaamijka la rakibay. Tani waxay tirtiri kartaa ciyaarta maxalliga ah, aqoonsiga martida, magaca bandhigga, iyo dookhyada ku jira qalabkaas.",
-        "Xogta qolalka si otomaatig ah ayay u baaba'daa marka muddada firfircoonaan la'aantu dhammaato. Magaca dadweynaha iyo sawirka bogga waxaad ka beddeli kartaa bogga akoonkaaga. Si aad u weydiisato helitaan, sixid, tirtirid, oo ay ku jirto tirtiridda akoonka, ama xog dheeraad ah oo sharcigaagu kuu oggol yahay, la xiriir [EMAIL XIRIIRKA]. Ciyaarta martida akoon ma leh, sidaas darteed mararka qaar xog gaar ah laguma nisbayn karo adiga.",
+        "Xogta qolalka si otomaatig ah ayay u baaba'daa marka muddada firfircoonaan la'aantu dhammaato. Magaca dadweynaha iyo sawirka bogga waxaad ka beddeli kartaa bogga akoonkaaga. Halkaas ayaad sidoo kale ka codsan kartaa tirtiridda akoonka. Si aad u weydiisato helitaan, sixid ama xog dheeraad ah oo sharcigaagu kuu oggol yahay, la xiriir [EMAIL XIRIIRKA]. Ciyaarta martida akoon ma leh, sidaas darteed mararka qaar xog gaar ah laguma nisbayn karo adiga.",
       ],
       bullets: [],
       details: [],

@@ -211,6 +211,8 @@ export const messages = {
           "Xaaladda koontada lama xaqiijin karo hadda. Dib u tijaabi ama si cad marti ahaan u sii wad.",
         retry: "Dib u tijaabi",
         continueAsGuest: "Ku sii wad marti ahaan",
+        pendingDeletion:
+          "Akoonkaagu wuxuu sugayaa tirtirid. Marti ahaan waad ciyaari kartaa.",
       },
       connection: {
         idle: "Aan bilaaban",
@@ -376,6 +378,7 @@ export const siteContent = {
       onlinePlay: "Ciyaar marti ah",
     },
     topBar: {
+      pendingDeletion: "Akoonka waa la tirtirayaa",
       brandLabel: "Tag hoyga Shaxda",
       actionsLabel: "Ficillada bogga",
       menuLabel: "Fur ficillo kale",
@@ -531,8 +534,9 @@ export const siteContent = {
         saveAvatar: "Kaydi sawirka",
         logout: "Ka bax akoonka",
         deleteTitle: "Tirtiridda akoonka",
-        deleteLater:
-          "Tirtiridda tooska ahi way imanaysaa mar dambe. Ilaa markaas taageerada la xiriir haddii aad rabto in akoonkaaga la tirtiro.",
+        deleteLink: "Tirtir akoonkayga",
+        deleteBody:
+          "Waxaad codsan kartaa in akoonkaaga la tirtiro. Waxaad ka noqon kartaa 7 maalmood gudahood.",
       },
       // TODO(translation-review): Review the history and match detail copy.
       history: {
@@ -669,6 +673,44 @@ export const siteContent = {
       change: "Isbeddelka darajada: {delta}",
       unrated: "Weli darajo ma laha",
       corrected: "Darajada waa la saxay",
+    },
+    // TODO(translation-review): Review the account deletion flow and disclosures.
+    accountDelete: {
+      title: "Tirtir akoonkaaga",
+      confirmUsername: "Qor magacaaga dadweynaha si aad u xaqiijiso",
+      confirmEmail: "Qor iimaylka akoonkaaga si aad u xaqiijiso",
+      effects: [
+        "Isla markiiba bogga dadweynaha waa la xirayaa, ciyaar akoon oo cusub ma bilaabi kartid, qalab kasta oo aad ku jirtana waa lagaa saarayaa.",
+        "Ciyaar hadda socota way dhammaan kartaa, laakiin haddii xiriirku go'o dib ugu soo laaban kari maysid.",
+        "Toddoba maalmood kadib tirtiriddu waa kama dambays. Ilaa markaas Google ku gal oo ka noqo.",
+        'Ciyaarihii la kaydiyay iyo natiijooyinkooda waa la hayaa. Magacaaga waxaa beddelaya "Xubin la tirtiray".',
+        "Magacyadaada dadweyne way xirnaanayaan 30 maalmood tirtiridda kadib, kadibna qof kasta ayaa qaadan kara.",
+        "Haddii aad mar kale Google ku gasho tirtiridda kadib, akoon cusub ayaa la furayaa.",
+      ],
+      acknowledge:
+        "Waan fahmay in tirtiriddu noqonayso kama dambays 7 maalmood kadib.",
+      submit: "Codso tirtiridda",
+      reauth: "Mar kale Google ku gal",
+      reauthBody:
+        "Ammaan darteed, mar kale Google ku gal kahor intaadan codsan.",
+      requested:
+        "Codsiga waa la kaydiyay. Si aad uga noqoto, Google ku gal kahor waqtigaas.",
+      pendingTitle: "Akoonkaaga waa la tirtirayaa",
+      pendingBody: "Tirtiriddu waxay noqonaysaa kama dambays waqtigan",
+      finalizing:
+        "Muddadii laga noqon karay way dhammaatay. Tirtiridda waa la dhammaystirayaa.",
+      cancel: "Ka noqo tirtiridda",
+      cancelled:
+        "Waad ka noqotay tirtiridda. Akoonkaagu sidii hore ayuu u shaqaynayaa.",
+      errors: {
+        confirmMismatch: "Qoraalku ma waafaqsana. Fadlan mar kale isku day.",
+        acknowledgeRequired: "Fadlan calaamadee xaqiijinta.",
+        differentAccount:
+          "Waxaad gashay akoon kale. Ku gal akoonka aad rabto inaad tirtirto.",
+        tooLateToCancel: "Muddadii laga noqon karay way dhammaatay.",
+        requestFailed: "Codsiga lama kaydin. Fadlan mar kale isku day.",
+        reauth: "Ammaan darteed, mar kale Google ku gal kahor intaadan codsan.",
+      },
     },
     accountErrors: {
       taken: "Magacan qof kale ayaa qaatay ama waa naanays hore.",

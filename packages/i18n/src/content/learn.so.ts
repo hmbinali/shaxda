@@ -392,6 +392,7 @@ export const learnContentSo = {
         ratedPlaySo.disclosure.friendly,
         "Marka tallaabada koowaad la sameeyo, is dhiibid ama ka tagid waa guuldarro weji kasta, xitaa dhigista. Haddii ciyaartu dhammaato ka hor tallaabada koowaad, waxba lama kaydiyo.",
         'Laba ciyaaryahan 24-kii saac 3 Tartan oo keliya ayaa Darajo loogu xisaabiyaa; kuwa kale waa dadweyne, waxaana lagu calaamadeeyaa "Darajo laguma xisaabin".',
+        "Shaxda waxay dib u eegi kartaa ciyaaraha Tartanka. Ciyaar darajadeeda waa laga saari karaa, ciyaaryahanna waa laga reebi karaa Miiska darajada; natiijada ciyaarta lama beddelo.",
         'Natiijada kadib waxaa muuqda "Waa la xisaabinayaa" ilaa xisaabtu dhammaato.',
       ],
       callouts: [

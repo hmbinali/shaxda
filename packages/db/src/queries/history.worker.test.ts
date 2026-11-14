@@ -278,7 +278,7 @@ describe("history D1 reads", () => {
     for (const [matchId, status, reason, algorithm] of [
       [id(2), "held", null, null],
       [id(4), "skipped", "pairCap", null],
-      [id(6), "skipped", "invalidated", null],
+      [id(14), "skipped", "invalidated", null],
       [id(8), "processed", null, 1],
     ] as const) {
       await db

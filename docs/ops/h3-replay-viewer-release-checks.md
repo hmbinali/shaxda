@@ -43,8 +43,18 @@ for byte, and the preview game Worker health check passed.
 ## Physical Android gate
 
 The frozen [H3 specification](../specs/h3-replay-viewer.md#95-end-to-end-and-the-device-gate)
-requires Chrome on a physical entry-level Android phone. Status: **open**.
-The only Android target found on 2026-11-14 identified itself as an emulator.
+requires Chrome on a physical entry-level Android phone. Status: **open for
+preview interaction checks**.
+
+On 2026-11-14, a physical Samsung SM-E075F (MediaTek MT6789, Android 16,
+3,698,548 KiB of reported RAM, Chrome 157.0.8103.51) loaded the 1,403-action E4
+fixture from local H3 build `4c09d2c` through USB port forwarding. The replay
+displayed `0 / 1403` in portrait without horizontal overflow. The single
+`shaxda:replay-build` entry measured **83.4 ms**, within the 1,000 ms budget.
+DevTools reported **5,725,564 bytes (5.46 MiB)** of used JS heap after the build.
+The successful load showed no crash or automatic reload. The phone was then
+needed by another project. Preview M2 controls, position sharing, silent start,
+cues, result, and Remove animations still need a physical-device check.
 
 1. On preview, play the [saved rated M2 match](https://shaxda-web-preview.shaxda.workers.dev/match/AZ4RHCUBMGZUC6DKW9VZ)
    from the beginning to the result. Exercise Play, Pause, Previous, Next,

@@ -8,12 +8,13 @@ const sectionIds = [
   "irmaan",
   "xannibaad",
   "dhammaadka",
+  "tartan",
   "talooyin",
   "koobid",
 ] as const;
 
 test.describe("complete learn guide", () => {
-  test("renders nine anchored sections, four groups, and seven teaching frames", async ({
+  test("renders the anchored sections, four groups, and seven teaching frames", async ({
     page,
   }) => {
     await page.goto("/learn");
@@ -25,6 +26,9 @@ test.describe("complete learn guide", () => {
 
     expect(renderedIds).toEqual(sectionIds);
     expect(new Set(renderedIds).size).toBe(sectionIds.length);
+    await expect(page.locator("#tartan")).toContainText(
+      "Tartan iyo Saaxiibtinimo",
+    );
     await expect(page.locator("ol[aria-label]")).toHaveCount(4);
     await expect(page.locator("figure[data-diagram-id]")).toHaveCount(7);
 

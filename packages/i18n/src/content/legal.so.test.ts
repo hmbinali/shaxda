@@ -64,15 +64,18 @@ describe("Somali legal content", () => {
     expect(visibleCopy()).toContain("shaxda:analytics-active:v1");
   });
 
-  it("discloses private account game storage and excludes guest games", () => {
+  it("discloses friendly and rated match visibility and excludes guest games", () => {
     const data = legalContentSo.sections.find(
       (section) => section.id === "xogta",
     );
     expect(data?.paragraphs.join(" ")).toMatch(
-      /labada ciyaaryahanba akoon ku galeen.*si gaar ah u kaydisaa.*Ciyaaraha uu marti ka qayb qaatay lama kaydiyo/,
+      /labada ciyaaryahanba akoon ku galeen.*Shaxda waxay kaydisaa.*Ciyaaraha uu marti ka qayb qaatay lama kaydiyo/,
     );
     expect(data?.paragraphs.join(" ")).toContain(
-      "Ciyaar la kaydiyay waxaa bogga ku arki kara labada ciyaaryahan ee ciyaaray oo keliya.",
+      "Ciyaarta Saaxiibtinimada waxaa bogga ku arki kara labada ciyaaryahan oo keliya.",
+    );
+    expect(data?.paragraphs.join(" ")).toMatch(
+      /oggolaadaan Tartan kahor bilowga, qof walba wuu arki karaa natiijada/,
     );
     expect(data?.paragraphs.join(" ")).toContain(
       "Ciyaaraha la kaydiyay way sii jiraan haddii akoon la tirtiro",

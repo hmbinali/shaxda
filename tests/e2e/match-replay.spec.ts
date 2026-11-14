@@ -48,7 +48,9 @@ test("replays a rated match publicly and shares the current position", async ({
     await expect(
       viewer.locator('[data-testid="board-point"][tabindex]'),
     ).toHaveCount(0);
-    await expect(viewer.getByRole("button", { pressed: false })).toBeVisible();
+    await expect(
+      viewer.getByRole("button", { name: "Codka shid" }),
+    ).toHaveAttribute("aria-pressed", "false");
 
     const next = viewer.getByRole("button", { name: "Tallaabada xigta" });
     await next.focus();

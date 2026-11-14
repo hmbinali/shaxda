@@ -202,3 +202,48 @@ it("resumes the exact staged prefix after an operator lease expires", async () =
     await db.prepare("SELECT COUNT(*) AS n FROM match_rating_next").first("n"),
   ).toBe(0);
 });
+
+it("reports a full-precision seat drift and keeps friendly results private", async () => {
+  const base = sampleMatchPayloads.M1;
+  const friendly = { ...base, id: ids[10]!, matchNumber: 11 };
+  expect(
+    await saveMatch(db, friendly, await matchPayloadHash(friendly)),
+  ).toMatchObject({ status: "saved" });
+  expect(await processPendingRatings(db)).toBe(1);
+  await expect(readMatchRating(db, friendly.id, null)).resolves.toBeNull();
+  await expect(
+    readMatchRating(db, friendly.id, "other-account"),
+  ).resolves.toBeNull();
+  await expect(
+    readMatchRating(db, friendly.id, friendly.players[0].userId),
+  ).resolves.toMatchObject({
+    status: "skipped",
+    reason: "friendly",
+    seats: null,
+  });
+
+  const table = "match_player_rating";
+  const clean = await readRatingSnapshot(db);
+  const seat = clean.seats[0]!;
+  const next = new DataView(new ArrayBuffer(8));
+  next.setFloat64(0, seat.rating_after);
+  next.setBigUint64(0, next.getBigUint64(0) + 1n);
+  const nextRating = next.getFloat64(0);
+  await db
+    .prepare(
+      `UPDATE ${table} SET rating_after = ? WHERE match_id = ? AND seat = ?`,
+    )
+    .bind(nextRating, seat.match_id, seat.seat)
+    .run();
+  const drift = verifyRebuild(await readRatingSnapshot(db));
+  expect(drift.diffs[0]).toMatchObject({
+    table,
+    matchId: seat.match_id,
+    column: "rating_after",
+    live: nextRating,
+    rebuilt: seat.rating_after,
+  });
+  expect(drift.marked).toEqual([]);
+  await correct("rebuild-ratings", null);
+  expect(verifyRebuild(await readRatingSnapshot(db)).diffs).toEqual([]);
+});

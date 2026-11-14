@@ -73,10 +73,10 @@ account and returned 403 after the test allowlist was removed. A focused
 local Workers test saved one played friendly invite with two account seats
 and found identical online counter snapshots with game analytics disabled.
 The live account-save check remains open. Preview D1 was reachable after
-Wrangler reauthentication and contained one saved match. The deployed game
-Worker had both flags enabled. The Chrome profile available for R2 was
-signed out, so the shared settings were held while waiting for two approved
-account sessions. See the
+Wrangler reauthentication and contained one saved match. Game Worker version
+`165224a8` had both flags enabled. R2 confirmed the first approved account
+was signed in and the second session was still needed. The shared settings
+were held for the joint rehearsal. See the
 [preview rehearsal and production reconciliation](../ops/x1a-analytics-runbook.md#x1b-online-counters).
 
 The preview correction rehearsal invalidated and then rescinded the rated

@@ -79,7 +79,6 @@ export class OnlineGameController {
   ratedVotes = $state<SeatAnswers>({ A: null, B: null });
   ratedPlayDisabled = $state(false);
   disclosureOutdated = $state(false);
-  firstMoveDeclined = $state(false);
   firstMove = $state<GameAction | null>(null);
   state = $state<GameState>(createInitialState("A"));
   roomCode = $state<string | null>(null);
@@ -143,8 +142,6 @@ export class OnlineGameController {
     if (this.matchNumber > 1) return copy.rematch.startedFriendly;
     if (this.ratedPlayDisabled)
       return messages.so.onlineGame.errors.ratedPlayDisabled;
-    if (rated === false && this.firstMoveDeclined)
-      return copy.lobby.startedUnagreed;
     if (consent?.A === false || consent?.B === false)
       return copy.lobby.declined;
     return rated === false ? copy.lobby.startedUnagreed : copy.lobby.pending;
@@ -303,7 +300,6 @@ export class OnlineGameController {
     const action = this.firstMove;
     this.firstMove = null;
     if (action === null || !this.canInteract) return;
-    this.firstMoveDeclined = true;
     if (this.canAnswerConsent) this.answerConsent(false);
     this.sendAction(action);
   }
@@ -463,7 +459,6 @@ export class OnlineGameController {
       this.lastServerError = null;
       this.#pendingAction = null;
       this.firstMove = null;
-      this.firstMoveDeclined = false;
     }
 
     this.rematchVotes = votes;
@@ -525,7 +520,6 @@ export class OnlineGameController {
     this.ratedPlayDisabled = false;
     this.disclosureOutdated = false;
     this.firstMove = null;
-    this.firstMoveDeclined = false;
     this.#creatorConsent = false;
     this.mySlot = null;
     this.presence = { A: null, B: null };

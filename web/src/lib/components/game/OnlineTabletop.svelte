@@ -178,7 +178,7 @@
         <strong data-testid="online-match-mode"
           >{controller.matchModeLabel}</strong
         >
-        {#if controller.ratedRoom || controller.ratedStatus.ratedRequest}
+        {#if !consentPrompt && controller.ratedStatus.ratedRequest}
           <a
             class="underline"
             href={resolve("/learn#tartan")}
@@ -331,6 +331,9 @@
               {/if}
               {#if controller.disclosureOutdated}
                 <p>{copy.errors.disclosureOutdated}</p>
+                <Button size="compact" onclick={() => window.location.reload()}>
+                  {messages.so.pwa.update.action}
+                </Button>
               {:else if controller.ratedPlayDisabled && controller.ratedRoom}
                 <p>{copy.errors.ratedPlayDisabled}</p>
               {/if}

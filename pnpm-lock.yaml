@@ -7,6 +7,21 @@ settings:
 importers:
   .:
     devDependencies:
+      "@shaxda/db":
+        specifier: workspace:*
+        version: link:packages/db
+      "@shaxda/shared":
+        specifier: workspace:*
+        version: link:packages/shared
+      tsx:
+        specifier: 4.23.0
+        version: 4.23.0
+      wrangler:
+        specifier: ^4.107.0
+        version: 4.107.0(@cloudflare/workers-types@4.20260702.1)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
       "@axe-core/playwright":
         specifier: ^4.12.1
         version: 4.12.1(playwright-core@1.61.1)
@@ -58,6 +73,9 @@ importers:
 
   packages/db:
     dependencies:
+      "@shaxda/game-engine":
+        specifier: workspace:*
+        version: link:../game-engine
       "@shaxda/rating":
         specifier: workspace:*
         version: link:../rating
@@ -162,6 +180,9 @@ importers:
       "@shaxda/i18n":
         specifier: workspace:*
         version: link:../packages/i18n
+      "@shaxda/rating":
+        specifier: workspace:*
+        version: link:../packages/rating
       "@shaxda/shared":
         specifier: workspace:*
         version: link:../packages/shared

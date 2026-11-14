@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./rating-admin": {
+      "types": "./src/rating-admin/index.ts",
+      "default": "./src/rating-admin/index.ts"
+    },
+    "./rating-rebuild": {
+      "types": "./src/rating/rebuild.ts",
+      "default": "./src/rating/rebuild.ts"
+    },
     "./rating": {
       "types": "./src/rating/index.ts",
       "default": "./src/rating/index.ts"
@@ -32,6 +40,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@shaxda/game-engine": "workspace:*",
     "@shaxda/rating": "workspace:*",
     "@shaxda/shared": "workspace:*",
     "drizzle-orm": "^0.45.2"

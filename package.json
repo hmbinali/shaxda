@@ -21,6 +21,8 @@
     "test:watch": "vitest --watch",
     "test:worker": "turbo run test:worker",
     "test:e2e": "playwright test",
+    "rating:rebuild": "node --import tsx scripts/rating-admin/cli.mjs rebuild",
+    "rating:admin": "node --import tsx scripts/rating-admin/cli.mjs admin",
     "match:ops": "node scripts/match-ops.mjs",
     "test:perf": "lhci autorun",
     "check": "pnpm format:check && pnpm check:hibernation && pnpm check:e2e-isolation && pnpm lint && pnpm typecheck && pnpm test && pnpm test:worker && pnpm build",
@@ -42,6 +44,8 @@
     ]
   },
   "devDependencies": {
+    "@shaxda/db": "workspace:*",
+    "@shaxda/shared": "workspace:*",
     "@axe-core/playwright": "^4.12.1",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.54.1",
@@ -54,6 +58,9 @@
     "prettier": "^3.6.2",
     "prettier-plugin-svelte": "^3.4.0",
     "svelte-eslint-parser": "^1.2.0",
+    "tsx": "4.23.0",
+    "wrangler": "^4.107.0",
+    "zod": "^4.4.3",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.35.1",

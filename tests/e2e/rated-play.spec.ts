@@ -160,7 +160,22 @@ test("saves a declined rated invitation as friendly", async ({
     try {
       const matchPath = `/match/${rows[0]!.id}`;
       expect((await signedOut.request.get(matchPath)).status()).toBe(404);
-      expect((await page.request.get(matchPath)).status()).toBe(200);
+      const board = page.getByTestId("online-board").getByTestId("board-point");
+      await expect(board).toHaveCount(24);
+      const occupancy = await board.evaluateAll((points) =>
+        points.map((point) => point.getAttribute("data-occupant")),
+      );
+      expect((await page.goto(matchPath))?.status()).toBe(200);
+      const replay = page.getByTestId("replay-viewer");
+      await replay.getByRole("button", { name: "Dhammaadka" }).click();
+      await expect(replay.getByTestId("replay-result")).toBeVisible();
+      expect(
+        await replay
+          .getByTestId("board-point")
+          .evaluateAll((points) =>
+            points.map((point) => point.getAttribute("data-occupant")),
+          ),
+      ).toEqual(occupancy);
     } finally {
       await signedOut.close();
     }

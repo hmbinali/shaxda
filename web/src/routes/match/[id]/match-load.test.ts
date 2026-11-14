@@ -1,11 +1,17 @@
-import { readMatchForViewer } from "@shaxda/db";
+import { readMatchForViewer, readMatchReplay } from "@shaxda/db";
 import { messages } from "@shaxda/i18n";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { load } from "./+page.server";
 
-vi.mock("@shaxda/db", () => ({ readMatchForViewer: vi.fn() }));
+vi.mock("@shaxda/db", () => ({
+  readMatchForViewer: vi.fn(),
+  readMatchReplay: vi.fn(),
+}));
 const readMatch = vi.mocked(readMatchForViewer);
+const readReplay = vi.mocked(readMatchReplay);
 const id = "A".repeat(20);
+const replay = { v: 1, s: "A", a: ["P:O1", "P:O2", "P:O3", "R:A"] };
+const stored = { rules_v: 1, replay_v: 1, replay: JSON.stringify(replay) };
 const profile = {
   username: "ayaan",
   avatarMode: "initial" as const,
@@ -52,7 +58,10 @@ const found = {
 } satisfies Awaited<ReturnType<typeof readMatchForViewer>>;
 
 describe("match server load", () => {
-  beforeEach(() => readMatch.mockReset());
+  beforeEach(() => {
+    readMatch.mockReset();
+    readReplay.mockReset().mockResolvedValue(stored);
+  });
 
   it("rejects a malformed id before calling D1", async () => {
     const event = request("a".repeat(20));
@@ -81,6 +90,7 @@ describe("match server load", () => {
       id,
       "unrelated",
     );
+    expect(readReplay).not.toHaveBeenCalled();
   });
 
   it("returns generic private metadata and names the losing seat in a claim", async () => {
@@ -104,7 +114,7 @@ describe("match server load", () => {
       messages.so.localGame.result.reasons.resignation,
     );
     expect(JSON.stringify(data)).not.toMatch(
-      /private-user-id|userId|roomCode|\bseq\b|replay|stats/,
+      /private-user-id|userId|roomCode|\bseq\b|stats/,
     );
   });
 
@@ -119,6 +129,40 @@ describe("match server load", () => {
       visibility: "public",
       meta: { title: "@ayaan iyo Xubin la tirtiray", noindex: false },
       reason: messages.so.localGame.result.reasons.resignation,
+      replay: { kind: "ready", rulesV: 1, replayV: 1, replay },
     });
+    expect(readReplay).toHaveBeenCalledWith(expect.anything(), id);
   });
+
+  it.each([
+    [null, "readFailed"],
+    [{ ...stored, rules_v: 2 }, "unsupportedVersion"],
+    [{ ...stored, replay_v: 2 }, "unsupportedVersion"],
+    [{ ...stored, replay: "private malformed text" }, "invalid"],
+    [{ ...stored, replay: JSON.stringify({ ...replay, s: "B" }) }, "invalid"],
+    [{ ...stored, replay: JSON.stringify({ ...replay, a: [] }) }, "invalid"],
+  ] as const)(
+    "keeps the match details if replay validation fails",
+    async (row, reason) => {
+      readMatch.mockResolvedValue(found);
+      readReplay.mockResolvedValue(row);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        await expect(
+          load(request(id, "private-user-id")),
+        ).resolves.toMatchObject({
+          match: { id },
+          replay: { kind: "unavailable" },
+        });
+        expect(warn).toHaveBeenCalledExactlyOnceWith("replayUnavailable", {
+          matchId: id,
+          rulesV: row?.rules_v,
+          replayV: row?.replay_v,
+          reason,
+        });
+      } finally {
+        warn.mockRestore();
+      }
+    },
+  );
 });

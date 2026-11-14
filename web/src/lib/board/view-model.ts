@@ -16,6 +16,8 @@ import type {
 import { BOARD_LINES, POINT_COORDS } from "./layout";
 
 export interface BoardViewOptions {
+  mode?: "live" | "replay";
+  cueLines?: readonly JareLine[];
   selected?: PointId | null;
   lastAction?: {
     action: GameAction;
@@ -55,19 +57,25 @@ export function buildBoardView(
   options: BoardViewOptions = {},
 ): BoardView {
   const selected = options.selected ?? null;
-  const actions = legalActions(state);
+  const replay = options.mode === "replay";
+  const actions = replay ? [] : legalActions(state);
   const legalHintPoints = getLegalHintPoints(state, selected, actions);
   const captureTargetPoints = getCaptureTargetPoints(state, actions);
   const removalTargetPoints = getRemovalTargetPoints(state, actions);
   const movablePoints = getMovablePoints(actions);
   const showSpaceMakingCandidates =
+    !replay &&
     selected === null &&
     state.phase === "movement" &&
     getActingPlayer(state) !== state.currentPlayer;
 
   return {
     lines: BOARD_LINES,
-    jareLines: buildJareLineViews(state, options.lastAction ?? null),
+    jareLines: buildJareLineViews(
+      state,
+      options.lastAction ?? null,
+      replay ? (options.cueLines ?? []) : undefined,
+    ),
     movablePoints,
     points: POINT_IDS.map((id) => {
       const coord = POINT_COORDS[id];
@@ -91,13 +99,12 @@ export function buildBoardView(
 function buildJareLineViews(
   state: GameState,
   lastAction: BoardViewOptions["lastAction"],
+  cueLines?: readonly JareLine[],
 ): BoardJareLineView[] {
   const activePendingCaptureLineIds = getActivePendingCaptureLineIds(state);
-  const visibleLineIds = getVisibleJareLineIds(
-    state,
-    lastAction,
-    activePendingCaptureLineIds,
-  );
+  const visibleLineIds = cueLines
+    ? new Set(cueLines.map((line) => line.join("-")))
+    : getVisibleJareLineIds(state, lastAction, activePendingCaptureLineIds);
 
   return JARE_LINES.filter((line) => visibleLineIds.has(line.join("-"))).map(
     (line) => {

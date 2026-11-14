@@ -1,6 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import {
   applyAction,
+  getActingPlayer,
   type GameAction,
   type GameState,
 } from "@shaxda/game-engine";
@@ -8,6 +9,7 @@ import { gameFixtures } from "@shaxda/shared";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Board from "./Board.svelte";
+import { buildReplayCue } from "$lib/replay/frames";
 
 describe("Board", () => {
   afterEach(() => {
@@ -77,6 +79,49 @@ describe("Board", () => {
     expect(
       screenClass(container, '[data-testid="board-legal-hint"]'),
     ).toContain("fill-success");
+  });
+
+  it("keeps replay cues visible while disabling point interaction and hints", async () => {
+    vi.useFakeTimers();
+    const before = gameFixtures.movement;
+    const action = {
+      type: "move",
+      player: getActingPlayer(before),
+      from: "O8",
+      to: "O1",
+    } as const;
+    const result = applyAction(before, action);
+    if (!result.ok) throw new Error(result.error);
+    const onSelectPoint = vi.fn();
+    const { container } = render(Board, {
+      props: {
+        state: result.state,
+        mode: "replay",
+        cue: buildReplayCue(before, action, result.state),
+        interactive: true,
+        onSelectPoint,
+        selected: "O1",
+      },
+    });
+    const origin = point(container, "O8");
+    const destination = point(container, "O1");
+    await fireEvent.click(destination);
+    expect(onSelectPoint).not.toHaveBeenCalled();
+    expect(
+      container.querySelector('[data-testid="board-point"][tabindex]'),
+    ).toBeNull();
+    expect(
+      container.querySelector(
+        '[data-testid="board-legal-hint"], [data-testid="board-selected-ring"]',
+      ),
+    ).toBeNull();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(
+      origin.querySelector('[data-replay-cue="origin"]'),
+    ).toBeInTheDocument();
+    expect(
+      destination.querySelector('[data-replay-cue="destination"]'),
+    ).toBeInTheDocument();
   });
 
   it("renders capture target state for a pending capture fixture", () => {

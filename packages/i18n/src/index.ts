@@ -179,6 +179,33 @@ export const messages = {
         stateSynced: "Xaaladda ciyaarta waa la waafajiyay.",
       },
     },
+    // TODO(translation-review): Review the replay controls and announcements.
+    matchReplay: {
+      title: "Dib u daawo",
+      regionLabel: "Dib u daawashada ciyaarta",
+      loading: "Dib u daawashada waa la diyaarinayaa…",
+      unavailable: "Dib u daawashada ciyaartan lama heli karo.",
+      controls: {
+        play: "Ciyaar",
+        pause: "Hakad",
+        previous: "Tallaabadii hore",
+        next: "Tallaabada xigta",
+        start: "Bilowga",
+        end: "Dhammaadka",
+        speed: "Xawaare",
+      },
+      counter: "Tallaabo {position} ee {total}",
+      startPosition: "Ciyaartu weli ma bilaabmin.",
+      sharePosition: "La wadaag tallaabadan",
+      firstAdvantage: {
+        placementJare:
+          "{name} ayaa helay horraynta: jare ayuu sameeyay xilligii dhigista.",
+        noJareFallback:
+          "Jare lama samayn xilligii dhigista; {name} ayaa helay horraynta.",
+      },
+      phaseEntered: "Waji cusub: {phase}.",
+      keyboardHelp: "Falaarta bidix iyo midig ku soco tallaabo tallaabo.",
+    },
     onlineGame: {
       title: "Ciyaar marti ah",
       description: "Samee qol shax ah ama ku biir xiriiriye marti ah.",

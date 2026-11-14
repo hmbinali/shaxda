@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { seedAccount } from "./fixtures/auth";
+import { seedMatches } from "./fixtures/match";
 import { openAccountPanel } from "./fixtures/panel";
 
 const storageKey = "shaxda:local-game:v1";
@@ -50,6 +52,33 @@ const movementJareState = JSON.stringify({
 });
 
 test.describe("Q1 mobile responsive smoke", () => {
+  test("a public replay and its controls fit a phone viewport", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(90_000);
+    const a = await seedAccount(context);
+    const b = await seedAccount(context);
+    const match = await seedMatches(a.id, b.id, 1, {
+      rated: true,
+      sample: "M2",
+    });
+    await context.clearCookies();
+    try {
+      await page.goto(`/match/${match.ids[0]}?a=2`);
+      await expect(page.getByTestId("replay-counter")).toHaveText("2 / 4");
+      await page.getByRole("button", { name: "Dhammaadka" }).click();
+      await expect(page.getByTestId("replay-result")).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(page.viewportSize()!.width);
+    } finally {
+      match.cleanup();
+      a.cleanup();
+      b.cleanup();
+    }
+  });
+
   test("public pages, local play, and online lobby fit a phone viewport", async ({
     page,
   }) => {

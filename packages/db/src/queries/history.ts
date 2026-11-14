@@ -245,3 +245,10 @@ export async function readMatchForViewer(
     },
   } as const;
 }
+
+export function readMatchReplay(db: D1Database, matchId: string) {
+  return db
+    .prepare("SELECT rules_v, replay_v, replay FROM match WHERE id = ?")
+    .bind(matchId)
+    .first<{ rules_v: number; replay_v: number; replay: string }>();
+}

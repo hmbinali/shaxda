@@ -8,12 +8,16 @@ export interface AnnouncedAction {
   formedJare?: boolean;
 }
 
+type DescribedAction = Omit<AnnouncedAction, "nonce"> & {
+  nonce?: number;
+};
+
 export type PlayerName = (player: PlayerId) => string;
 
 const copy = messages.so.localGame;
 
 export function buildAnnouncement(
-  lastAction: AnnouncedAction | null,
+  lastAction: DescribedAction | null,
   status: GameStatus,
   playerName: PlayerName,
 ): string {
@@ -23,7 +27,7 @@ export function buildAnnouncement(
 
   return joinAnnouncementParts([
     actionAnnouncement(lastAction, status, playerName),
-    statusAnnouncement(status, playerName),
+    buildStatusAnnouncement(status, playerName),
   ]);
 }
 
@@ -33,12 +37,12 @@ export function buildStateSummary(
 ): string {
   return joinAnnouncementParts([
     copy.announce.stateSynced,
-    statusAnnouncement(status, playerName),
+    buildStatusAnnouncement(status, playerName),
   ]);
 }
 
 function actionAnnouncement(
-  lastAction: AnnouncedAction,
+  lastAction: DescribedAction,
   status: GameStatus,
   playerName: PlayerName,
 ): string {
@@ -67,7 +71,7 @@ function actionAnnouncement(
   }
 }
 
-function statusAnnouncement(
+export function buildStatusAnnouncement(
   status: GameStatus,
   playerName: PlayerName,
 ): string {

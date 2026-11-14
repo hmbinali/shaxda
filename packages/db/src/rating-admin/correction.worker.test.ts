@@ -163,3 +163,42 @@ it("holds pending saves during a pause and discards shadow rows on resume", asyn
     issues: {},
   });
 });
+
+it("resumes the exact staged prefix after an operator lease expires", async () => {
+  await fixture(9, 0, 1);
+  expect(await processPendingRatings(db)).toBe(1);
+  const input = request("invalidate-match", ids[9]!);
+  const plan = await planRatingAdmin(db, input);
+  const live = await readRatingSnapshot(db);
+  await expect(
+    applyRatingAdmin(
+      db,
+      input,
+      plan.digest,
+      {},
+      {
+        afterStaging: async () => {
+          // The original operator can no longer publish or clean up its staged rows.
+          await db
+            .prepare("UPDATE rating_processor_state SET lease_expires_at = 0")
+            .run();
+          throw new Error("operator stopped");
+        },
+      },
+    ),
+  ).rejects.toThrow("operator stopped");
+  const paused = await readRatingSnapshot(db);
+  expect(paused.state.maintenance).toBe(1);
+  expect(paused.matches).toEqual(live.matches);
+  expect(paused.players).toEqual(live.players);
+  expect(
+    await db.prepare("SELECT COUNT(*) AS n FROM match_rating_next").first("n"),
+  ).toBe(live.matches.length);
+  await expect(applyRatingAdmin(db, input, plan.digest)).resolves.toEqual({
+    outcome: "applied",
+  });
+  expect(verifyRebuild(await readRatingSnapshot(db)).diffs).toEqual([]);
+  expect(
+    await db.prepare("SELECT COUNT(*) AS n FROM match_rating_next").first("n"),
+  ).toBe(0);
+});

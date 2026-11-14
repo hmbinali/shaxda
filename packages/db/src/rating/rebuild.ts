@@ -93,7 +93,7 @@ export async function readRatingSnapshot(
     cursor = last.seq;
   }
 
-  const [endRows, pendingRows, extraRows] = await db.batch([
+  const [endRows, pendingRows, extraRows, extraSeats] = await db.batch([
     db.prepare(SOURCE_STATE),
     db
       .prepare(
@@ -102,6 +102,12 @@ export async function readRatingSnapshot(
       .bind(high),
     db
       .prepare("SELECT * FROM match_rating WHERE seq > ? ORDER BY seq LIMIT 1")
+      .bind(high),
+    db
+      .prepare(
+        `SELECT r.* FROM match m JOIN match_player_rating r ON r.match_id = m.id
+      WHERE m.seq > ? ORDER BY m.seq, r.seat LIMIT 1`,
+      )
       .bind(high),
   ]);
   const end = endRows?.results[0] as unknown as SnapshotState | undefined;
@@ -118,6 +124,7 @@ export async function readRatingSnapshot(
   }
   // Include an unexpected decision above the cursor in the verification diff.
   matches.push(...(extraRows!.results as unknown as StoredMatch[]));
+  seats.push(...(extraSeats!.results as unknown as SeatRating[]));
   return {
     state,
     ledger,
@@ -180,6 +187,9 @@ export function verifyRebuild(
   const changed = new Set<string>();
   const marked = new Set<string>();
   const sequence = new Map(snapshot.ledger.map((row) => [row.id, row.seq]));
+  for (const row of snapshot.matches) {
+    if (!sequence.has(row.match_id)) sequence.set(row.match_id, row.seq);
+  }
   const counts = { match_rating: 0, match_player_rating: 0, player_rating: 0 };
   function compare(
     table: Table,
@@ -318,12 +328,6 @@ export async function stageRebuild(
   const previousTimes = new Map(
     snapshot.matches.map((row) => [row.match_id, row.decided_at]),
   );
-  // A restarted operator can safely restage from the same high-water mark.
-  await db.batch([
-    guard(db, token, now(), high, 1),
-    ...clearNext(db),
-    db.prepare("DELETE FROM rating_fence"),
-  ]);
   const tables: readonly { table: Table; rows: readonly object[] }[] = [
     {
       table: MATCHES,
@@ -338,7 +342,15 @@ export async function stageRebuild(
     { table: PLAYERS, rows: rebuilt.players },
   ];
   for (const { table, rows } of tables) {
-    for (let i = 0; i < rows.length; i += 100) {
+    const staged = await verifiedPrefix(db, table, rows);
+    if (staged === null) {
+      await db.batch([
+        guard(db, token, now(), high, 1),
+        db.prepare(`DELETE FROM ${table}_next`),
+        db.prepare("DELETE FROM rating_fence"),
+      ]);
+    }
+    for (let i = staged ?? 0; i < rows.length; i += 100) {
       const instant = now();
       const inserts = rows.slice(i, i + 100).map((row) => {
         const values = Object.values(row);
@@ -360,6 +372,39 @@ export async function stageRebuild(
         db.prepare("DELETE FROM rating_fence"),
       ]);
     }
+  }
+}
+
+// Shadow insertion order is the checkpoint. Verify the prefix against the
+// newly folded plan before resuming, including when a prior operator staged
+// a different correction at the same high-water mark.
+async function verifiedPrefix(
+  db: D1Database,
+  table: Table,
+  rebuilt: readonly object[],
+): Promise<number | null> {
+  let checkpoint = 0;
+  for (;;) {
+    const page = await db
+      .prepare(
+        `SELECT rowid AS staging_row, * FROM ${table}_next
+      WHERE rowid > ? ORDER BY rowid LIMIT 500`,
+      )
+      .bind(checkpoint)
+      .all<Rows>();
+    for (const { staging_row: index, ...row } of page.results) {
+      if (index !== checkpoint + 1 || checkpoint >= rebuilt.length) return null;
+      const expected = rebuilt[checkpoint] as Rows;
+      if (
+        !Object.keys(expected).every((column) =>
+          Object.is(row[column], expected[column]),
+        )
+      ) {
+        return null;
+      }
+      checkpoint++;
+    }
+    if (page.results.length < 500) return checkpoint;
   }
 }
 

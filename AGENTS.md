@@ -200,6 +200,14 @@ Monetization is post-V1 only after the game is finished and has users.
 - Index every common D1 query.
 - Avoid full-table scans.
 
+### Ratings (R1, R2, R6-core)
+
+- The web Worker decides each saved match in ledger ingestion order (`seq`),
+  under a lease and an atomic fence. The game Worker only sends a hint.
+- The match and participant ledger is immutable. Rebuilding in the same
+  order reproduces the published ratings. Apply corrections by rebuilding.
+- Public rating records count processed rated events only.
+
 ### Validation
 
 - Validate every WebSocket message with Zod.

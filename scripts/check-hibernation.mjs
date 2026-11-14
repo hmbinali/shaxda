@@ -10,6 +10,11 @@ const workerOnly = (file) => file.startsWith(fileURLToPath(workerSrc));
 
 const checks = [
   {
+    name: "rating processor import in game Worker",
+    pattern: /["']@shaxda\/(?:rating|db\/rating(?:-admin)?)(?:\/[^"']*)?["']/g,
+    appliesTo: workerOnly,
+  },
+  {
     name: "bare @shaxda/db import",
     pattern: /["']@shaxda\/db["']/g,
     appliesTo: () => true,

@@ -1,0 +1,12 @@
+{
+  "name": "shaxda-rating-admin-production",
+  "compatibility_date": "2026-07-05",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "shaxda-db",
+      "database_id": "b84cc232-ddbd-437d-acd0-0fa0d77e12b0",
+      "remote": true,
+    },
+  ],
+}

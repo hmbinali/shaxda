@@ -758,6 +758,18 @@ refuses new consent without rewriting recorded answers.
 See the [H1 contract](specs/h1-match-persistence.md) for the ledger and
 retry rules.
 
+### 17.5 Ledger-derived ratings (R1)
+
+The web Worker decides each saved match once in ledger ingestion order
+(`seq`), under a lease and an atomic fence. The game Worker sends a
+best-effort hint after saving. Rating decisions and player records derive
+from the immutable match and participant ledger. Rebuild in the same order
+to reproduce the published ratings or publish an audited correction through
+R6-core. Public rating records count processed rated events only.
+
+See the [rating system spec](specs/r1-rating-system.md) and
+[ranking integrity spec](specs/r6-ranking-integrity.md).
+
 ---
 
 ## 18. Analytics and Monitoring

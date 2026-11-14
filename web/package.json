@@ -23,6 +23,7 @@
     "@shaxda/db": "workspace:*",
     "@shaxda/game-engine": "workspace:*",
     "@shaxda/i18n": "workspace:*",
+    "@shaxda/rating": "workspace:*",
     "@shaxda/shared": "workspace:*",
     "better-auth": "1.6.25",
     "class-variance-authority": "^0.7.1",

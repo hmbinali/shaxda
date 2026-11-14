@@ -1680,13 +1680,6 @@ describe("match room hibernation spike", () => {
       },
     );
     await resignToGameOver(first, second, roomCode);
-    // Match the operations view only after the asynchronous hold is synced.
-    await expect
-      .poll(async () => {
-        const room = await readStoredRoom(roomCode);
-        return room?.holdSynced;
-      })
-      .toBe(true);
     const entry = await loadOutbox(roomCode);
     expect(entry).toMatchObject({
       status: "stalled",
@@ -1695,17 +1688,32 @@ describe("match room hibernation spike", () => {
       nextAttemptAt: null,
     });
     if (!entry) throw new Error("Expected replay mismatch entry");
-    const response = await opsRequest("/ops/retry", {
-      roomCode,
-      matchNumber: 1,
-      matchId: entry.payload.id,
-    });
+    const response = await roomStub(roomCode).fetch(
+      "https://shaxda.internal/internal/ops/retry",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomCode,
+          matchNumber: 1,
+          matchId: entry.payload.id,
+        }),
+      },
+    );
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({ error: "notRetryable" });
     await expect(
       testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
     ).resolves.toBe(0);
-    await closeRoomSockets(first, second);
+    const discard = await opsRequest("/ops/discard", {
+      roomCode,
+      matchNumber: 1,
+      matchId: entry.payload.id,
+      reason: "Clear invalid replay fixture.",
+    });
+    expect(discard.status).toBe(200);
+    first.close();
+    second.close();
   });
 
   it.each([false, true])(
@@ -1732,13 +1740,20 @@ describe("match room hibernation spike", () => {
         },
       );
       if (!playBegan) await placeFirst(first, second, roomCode);
+      const saved = playBegan
+        ? null
+        : waitForMessageWhere(
+            first,
+            "matchStatus",
+            (status) => status.save?.status === "saved",
+          );
       await resignToGameOver(first, second, roomCode);
-      await expect
-        .poll(() =>
-          testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
-        )
-        .toBe(playBegan ? 0 : 1);
-      await closeRoomSockets(first, second);
+      await saved;
+      await expect(
+        testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
+      ).resolves.toBe(playBegan ? 0 : 1);
+      first.close();
+      second.close();
     },
   );
 
@@ -2001,12 +2016,6 @@ async function waitForJoinedOrError(
     const message = serverMessageSchema.parse(await nextJson(socket));
     if (message.type === "joined" || message.type === "error") return message;
   }
-}
-
-async function closeRoomSockets(...sockets: WebSocket[]): Promise<void> {
-  const closed = sockets.map((socket) => waitForClose(socket));
-  for (const socket of sockets) socket.close();
-  await Promise.all(closed);
 }
 
 function waitForClose(

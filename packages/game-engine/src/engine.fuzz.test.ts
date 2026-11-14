@@ -25,6 +25,19 @@ const WIN_REASONS = new Set([
   "resignation",
 ]);
 const RECENT_ACTION_LIMIT = 12;
+const FIRST_SEED = 0x5eed_0000;
+const GAME_COUNT = 1_000;
+const GAMES_PER_BATCH = 50;
+
+// Give each batch its own timeout so the full seed sweep can run on slower hosts.
+const seedBatches = Array.from(
+  { length: Math.ceil(GAME_COUNT / GAMES_PER_BATCH) },
+  (_, index) => ({
+    firstSeed: FIRST_SEED + index * GAMES_PER_BATCH,
+    lastSeed:
+      FIRST_SEED + Math.min((index + 1) * GAMES_PER_BATCH, GAME_COUNT) - 1,
+  }),
+);
 
 interface FuzzContext {
   seed: number;
@@ -35,89 +48,91 @@ interface FuzzContext {
 }
 
 describe("engine fuzz", () => {
-  it("terminates seeded random legal playouts without invalid states", () => {
-    const gameCount = 1_000;
-    const actionCap = 1_200;
+  it.each(seedBatches)(
+    "terminates legal playouts for seeds $firstSeed–$lastSeed",
+    ({ firstSeed, lastSeed }) => {
+      const actionCap = 1_200;
 
-    for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
-      const seed = 0x5eed_0000 + gameIndex;
-      const random = mulberry32(seed);
-      let state = createInitialState(random() < 0.5 ? "A" : "B");
-      let previous = state;
-      const history: GameAction[] = [];
+      for (let seed = firstSeed; seed <= lastSeed; seed += 1) {
+        const random = mulberry32(seed);
+        let state = createInitialState(random() < 0.5 ? "A" : "B");
+        let previous = state;
+        const history: GameAction[] = [];
 
-      for (let step = 0; step < actionCap; step += 1) {
-        assertInvariants(state, previous, {
-          seed,
-          step,
-          state,
-          history,
-        });
+        for (let step = 0; step < actionCap; step += 1) {
+          assertInvariants(state, previous, {
+            seed,
+            step,
+            state,
+            history,
+          });
 
-        if (state.phase === "gameOver") {
-          assertEndState({ seed, step, state, history });
-          break;
+          if (state.phase === "gameOver") {
+            assertEndState({ seed, step, state, history });
+            break;
+          }
+
+          const actions = legalActions(state).filter(
+            (action) => action.type !== "resign",
+          );
+
+          if (actions.length === 0) {
+            throw new Error(
+              formatFuzzError(
+                {
+                  seed,
+                  step,
+                  state,
+                  history,
+                },
+                "no legal non-resign actions before gameOver",
+              ),
+            );
+          }
+
+          const action = actions[Math.floor(random() * actions.length)]!;
+          const result = applyAction(state, action);
+
+          if (!result.ok) {
+            throw new Error(
+              formatFuzzError(
+                {
+                  seed,
+                  step,
+                  state,
+                  action,
+                  history,
+                },
+                `action failed with ${result.error}`,
+              ),
+            );
+          }
+
+          history.push(action);
+          if (history.length > RECENT_ACTION_LIMIT) {
+            history.shift();
+          }
+          previous = state;
+          state = result.state;
         }
 
-        const actions = legalActions(state).filter(
-          (action) => action.type !== "resign",
-        );
-
-        if (actions.length === 0) {
+        if (state.phase !== "gameOver") {
           throw new Error(
             formatFuzzError(
               {
                 seed,
-                step,
+                step: actionCap,
                 state,
                 history,
               },
-              "no legal non-resign actions before gameOver",
+              `did not terminate within ${actionCap} actions`,
             ),
           );
         }
-
-        const action = actions[Math.floor(random() * actions.length)]!;
-        const result = applyAction(state, action);
-
-        if (!result.ok) {
-          throw new Error(
-            formatFuzzError(
-              {
-                seed,
-                step,
-                state,
-                action,
-                history,
-              },
-              `action failed with ${result.error}`,
-            ),
-          );
-        }
-
-        history.push(action);
-        if (history.length > RECENT_ACTION_LIMIT) {
-          history.shift();
-        }
-        previous = state;
-        state = result.state;
       }
-
-      if (state.phase !== "gameOver") {
-        throw new Error(
-          formatFuzzError(
-            {
-              seed,
-              step: actionCap,
-              state,
-              history,
-            },
-            `did not terminate within ${actionCap} actions`,
-          ),
-        );
-      }
-    }
-  }, 30_000);
+    },
+    30_000,
+  );
 
   it("space-making for a blocked player resolves to that player or terminates", () => {
     const state = baseMovementState("A", {

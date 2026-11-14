@@ -7,6 +7,7 @@ import {
   readHistoryPage,
   readHistorySummary,
   readMatchForViewer,
+  readMatchReplay,
 } from "./history";
 
 const { DB: db, TEST_MIGRATIONS } = env as unknown as {
@@ -145,6 +146,27 @@ async function assertIndexed(
 }
 
 describe("history D1 reads", () => {
+  it("reads only the replay columns through the unique match id index", async () => {
+    const { spy, captured } = statements();
+    const match = fixtures[4]!;
+    await expect(readMatchReplay(spy, match.id)).resolves.toEqual({
+      rules_v: match.rulesV,
+      replay_v: match.replayV,
+      replay: match.replay,
+    });
+    await expect(readMatchReplay(db, missing)).resolves.toBeNull();
+    const [{ sql, args }] = captured as [(typeof captured)[number]];
+    const { results } = await db
+      .prepare(`EXPLAIN QUERY PLAN ${sql}`)
+      .bind(...args)
+      .all<{ detail: string }>();
+    expect(results.map(({ detail }) => detail)).toEqual([
+      expect.stringMatching(
+        /SEARCH match USING INDEX sqlite_autoindex_match_1/,
+      ),
+    ]);
+  });
+
   it.each(filters)("uses keyed pages for %s", async (filter) => {
     const { spy, captured } = statements();
     const first = await readHistoryPage(spy, {

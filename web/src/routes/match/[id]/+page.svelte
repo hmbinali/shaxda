@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { siteContent } from "@shaxda/i18n";
+  import { messages, siteContent } from "@shaxda/i18n";
   import MatchParticipant from "$components/history/MatchParticipant.svelte";
+  import MatchReplay from "$components/history/MatchReplay.svelte";
   import RatedLabel from "$components/game/RatedLabel.svelte";
   import PageMeta from "$components/PageMeta.svelte";
   import ShareLink from "$components/ShareLink.svelte";
   import { formatDuration, formatMatchDateTime } from "$lib/history/format";
   import { participantName } from "$lib/history/presentation";
+  import { replayPositionUrl } from "$lib/replay/position";
   import { matchPath, matchUrl } from "$lib/site/metadata";
   import type { PageData } from "./$types";
 
@@ -61,8 +63,43 @@
     </div>
   </header>
 
-  <!-- H3 replay and H4 statistics render here after the server access check. -->
+  {#key match.id}
+    <MatchReplay
+      replay={data.replay}
+      matchId={match.id}
+      facts={{ ...match, players: data.players }}
+      names={{
+        A: participantName(data.players.A.participant),
+        B: participantName(data.players.B.participant),
+      }}
+      headline={data.headline}
+      reason={data.reason}
+      onlineEndReason={match.onlineEndReason}
+    >
+      {#snippet share(position, ready)}
+        {@render matchDetails()}
+        {#if data.visibility === "public" && data.shareTitle}
+          <ShareLink
+            copy={copy.share}
+            payload={{
+              title: data.shareTitle,
+              text: copy.share.shareText,
+              url: replayPositionUrl(new URL(matchUrl(match.id)), position)
+                .href,
+            }}
+            label={ready ? messages.so.matchReplay.sharePosition : undefined}
+            testId="share-match"
+          />
+        {:else}
+          <p class="text-sm text-board-700">{copy.privateNote}</p>
+        {/if}
+      {/snippet}
+    </MatchReplay>
+  {/key}
+</section>
 
+{#snippet matchDetails()}
+  <!-- H4 statistics render before the existing details. -->
   <section
     class="rounded-2xl border border-board-700/20 bg-board-50 p-5 sm:p-8"
     aria-labelledby="match-details"
@@ -125,17 +162,4 @@
       </div>
     </dl>
   </section>
-  {#if data.visibility === "public" && data.shareTitle}
-    <ShareLink
-      copy={copy.share}
-      payload={{
-        title: data.shareTitle,
-        text: copy.share.shareText,
-        url: matchUrl(match.id),
-      }}
-      testId="share-match"
-    />
-  {:else}
-    <p class="text-sm text-board-700">{copy.privateNote}</p>
-  {/if}
-</section>
+{/snippet}

@@ -9,7 +9,10 @@ export async function seedMatches(
   a: string,
   b: string,
   count: number,
-  { rated = false }: { rated?: boolean } = {},
+  {
+    rated = false,
+    sample,
+  }: { rated?: boolean; sample?: keyof typeof sampleMatchPayloads } = {},
 ) {
   const room = Array.from(randomBytes(8), (byte) => alphabet[byte % 32]).join(
     "",
@@ -19,18 +22,20 @@ export async function seedMatches(
   const statements: string[] = [];
 
   for (let index = 0; index < count; index++) {
-    const sample = [
-      sampleMatchPayloads.M1,
-      sampleMatchPayloads.M9,
-      sampleMatchPayloads.M5,
-    ][index % 3]!;
+    const fixture = sample
+      ? sampleMatchPayloads[sample]
+      : [
+          sampleMatchPayloads.M1,
+          sampleMatchPayloads.M9,
+          sampleMatchPayloads.M5,
+        ][index % 3]!;
     const id = Array.from(randomBytes(20), (byte) => alphabet[byte % 32]).join(
       "",
     );
     const matchNumber = index + 1;
     const endedAt = roomCreatedAt + matchNumber * 1000;
     const match = {
-      ...sample,
+      ...fixture,
       id,
       roomCode: room,
       roomCreatedAt,
@@ -40,9 +45,9 @@ export async function seedMatches(
       startedAt: endedAt - 45_000,
       endedAt,
       players: [
-        { ...sample.players[0], userId: a },
-        { ...sample.players[1], userId: b },
-      ] as typeof sample.players,
+        { ...fixture.players[0], userId: a },
+        { ...fixture.players[1], userId: b },
+      ] as typeof fixture.players,
     };
     const values = [
       match.id,

@@ -16,9 +16,12 @@
     SOCKET_RADIUS,
   } from "$lib/board/layout";
   import { buildBoardView } from "$lib/board/view-model";
+  import type { ReplayCue } from "$lib/replay/frames";
 
   interface Props {
     state: GameState;
+    mode?: "live" | "replay";
+    cue?: ReplayCue | null;
     selected?: PointId | null;
     interactive?: boolean;
     onSelectPoint?: (point: PointId) => void;
@@ -49,7 +52,9 @@
   let {
     state: gameState,
     selected = null,
-    interactive = false,
+    interactive: allowInteraction = false,
+    mode = "live",
+    cue = null,
     onSelectPoint,
     onCancelSelection,
     lastAction = null,
@@ -58,6 +63,16 @@
     ariaLabel = messages.so.boardGallery.title,
     ariaDescribedBy,
   }: Props = $props();
+
+  const interactive = $derived(mode === "live" && allowInteraction);
+  const replayAction = $derived(mode === "replay" ? cue?.action : undefined);
+  const replayDestination = $derived(
+    replayAction?.type === "place"
+      ? replayAction.point
+      : replayAction?.type === "move"
+        ? replayAction.to
+        : undefined,
+  );
 
   const instanceId = $props.id();
   const svgDefinitionIds = {
@@ -84,13 +99,24 @@
   );
   const view = $derived(
     buildBoardView(gameState, {
-      selected,
+      mode,
+      selected: mode === "live" ? selected : null,
       lastAction: presentedLastAction,
+      cueLines: cue?.jareLines,
     }),
   );
   const copy = messages.so.boardGallery;
-  const pieceFeedback = $derived(getPieceFeedback(lastAction));
-  const removalFeedback = $derived(getRemovalFeedback(lastAction));
+  const pieceFeedback = $derived(
+    mode === "live" ? getPieceFeedback(lastAction) : null,
+  );
+  const removalFeedback = $derived(
+    mode === "live" ? getRemovalFeedback(lastAction) : null,
+  );
+  const removalAction = $derived(
+    replayAction?.type === "capture" || replayAction?.type === "removeInitial"
+      ? replayAction
+      : removalFeedback?.action,
+  );
   let focusedPoint = $state<PointId>("O1");
   let inputModality = $state<"keyboard" | "pointer">("pointer");
   let pressedPoint = $state<PointId | null>(null);
@@ -100,7 +126,7 @@
   let pointElements = $state<Partial<Record<PointId, SVGGElement>>>({});
 
   $effect(() => {
-    const feedback = lastAction;
+    const feedback = mode === "live" ? lastAction : null;
 
     if (feedback?.action.type !== "place" || !feedback.formedJare) {
       visiblePlacementJareNonce = null;
@@ -151,7 +177,7 @@
 
   $effect(() => {
     const shell = boardShell;
-    const nonce = invalidNonce;
+    const nonce = mode === "live" ? invalidNonce : 0;
 
     if (shell === null || nonce <= 0) {
       return;
@@ -455,8 +481,8 @@
     aria-label={ariaLabel}
     aria-describedby={effectiveAriaDescribedBy}
     style={`--shaxda-selected-offset: ${SELECTED_PIECE_OFFSET}px;`}
-    onfocusout={handleBoardFocusOut}
-    onanimationend={handleBoardAnimationEnd}
+    onfocusout={interactive ? handleBoardFocusOut : undefined}
+    onanimationend={mode === "live" ? handleBoardAnimationEnd : undefined}
   >
     <defs>
       <radialGradient id={svgDefinitionIds.pieceA} cx="34%" cy="28%" r="72%">
@@ -648,9 +674,9 @@
           points={line.points
             .map((point) => `${POINT_COORDS[point].x},${POINT_COORDS[point].y}`)
             .join(" ")}
-          class={line.isActivePendingCapture
-            ? "shaxda-jare-line shaxda-jare-line-active shaxda-cue-enter"
-            : "shaxda-jare-line shaxda-cue-enter"}
+          class="shaxda-jare-line"
+          class:shaxda-jare-line-active={line.isActivePendingCapture}
+          class:shaxda-cue-enter={mode === "live"}
         />
       {/each}
     </g>
@@ -735,6 +761,24 @@
             aria-hidden="true"
             pointer-events="none"
           />
+
+          {#if replayDestination === point.id || (replayAction?.type === "move" && replayAction.from === point.id)}
+            <circle
+              data-replay-cue={replayDestination === point.id
+                ? "destination"
+                : "origin"}
+              cx={point.x}
+              cy={point.y}
+              r={PIECE_RADIUS + 1.35}
+              class="fill-transparent stroke-selected"
+              stroke-dasharray={replayDestination === point.id
+                ? undefined
+                : "1.4 1.2"}
+              stroke-width="1.2"
+              aria-hidden="true"
+              pointer-events="none"
+            />
+          {/if}
 
           {#if point.isLegalHint}
             <circle
@@ -883,35 +927,38 @@
       {/each}
     </g>
 
-    {#if removalFeedback !== null}
+    {#if removalAction !== undefined}
       <g
         data-testid="board-removal-feedback"
-        data-feedback-nonce={removalFeedback.nonce}
+        data-feedback-nonce={removalFeedback?.nonce}
         aria-hidden="true"
         pointer-events="none"
       >
-        <g data-testid="board-removal-ghost" class="shaxda-removal-ghost">
-          <circle
-            cx={POINT_COORDS[removalFeedback.action.point].x + 0.65}
-            cy={POINT_COORDS[removalFeedback.action.point].y + 0.9}
-            r={PIECE_RADIUS}
-            class="fill-board-900/25"
-          />
-          <circle
-            cx={POINT_COORDS[removalFeedback.action.point].x}
-            cy={POINT_COORDS[removalFeedback.action.point].y}
-            r={PIECE_RADIUS}
-            fill={pieceFill(removedPlayer(removalFeedback.action))}
-            class={`shaxda-piece ${pieceStrokeClass(removedPlayer(removalFeedback.action))}`}
-            stroke-width="0.65"
-          />
-        </g>
+        {#if mode === "live"}
+          <g data-testid="board-removal-ghost" class="shaxda-removal-ghost">
+            <circle
+              cx={POINT_COORDS[removalAction.point].x + 0.65}
+              cy={POINT_COORDS[removalAction.point].y + 0.9}
+              r={PIECE_RADIUS}
+              class="fill-board-900/25"
+            />
+            <circle
+              cx={POINT_COORDS[removalAction.point].x}
+              cy={POINT_COORDS[removalAction.point].y}
+              r={PIECE_RADIUS}
+              fill={pieceFill(removedPlayer(removalAction))}
+              class={`shaxda-piece ${pieceStrokeClass(removedPlayer(removalAction))}`}
+              stroke-width="0.65"
+            />
+          </g>
+        {/if}
         <circle
           data-testid="board-removal-confirmation"
-          cx={POINT_COORDS[removalFeedback.action.point].x}
-          cy={POINT_COORDS[removalFeedback.action.point].y}
+          cx={POINT_COORDS[removalAction.point].x}
+          cy={POINT_COORDS[removalAction.point].y}
           r={PIECE_RADIUS + 0.6}
-          class={`shaxda-removal-confirmation fill-transparent ${removalConfirmationClass(removalFeedback.action)}`}
+          class={`fill-transparent ${removalConfirmationClass(removalAction)}`}
+          class:shaxda-removal-confirmation={mode === "live"}
           stroke-width="1"
         />
       </g>

@@ -8,12 +8,16 @@ export interface AnnouncedAction {
   formedJare?: boolean;
 }
 
+type DescribedAction = Omit<AnnouncedAction, "nonce"> & {
+  nonce?: number;
+};
+
 export type PlayerName = (player: PlayerId) => string;
 
 const copy = messages.so.localGame;
 
 export function buildAnnouncement(
-  lastAction: AnnouncedAction | null,
+  lastAction: DescribedAction | null,
   status: GameStatus,
   playerName: PlayerName,
 ): string {
@@ -38,7 +42,7 @@ export function buildStateSummary(
 }
 
 function actionAnnouncement(
-  lastAction: AnnouncedAction,
+  lastAction: DescribedAction,
   status: GameStatus,
   playerName: PlayerName,
 ): string {

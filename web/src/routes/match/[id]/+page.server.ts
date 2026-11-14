@@ -1,4 +1,4 @@
-import { readMatchForViewer } from "@shaxda/db";
+import { readMatchForViewer, readMatchReplay } from "@shaxda/db";
 import { messages, siteContent } from "@shaxda/i18n";
 import { matchIdSchema } from "@shaxda/shared";
 import { error } from "@sveltejs/kit";
@@ -7,6 +7,7 @@ import {
   participantFor,
   participantName,
 } from "$lib/history/presentation";
+import { loadMatchReplay } from "$lib/replay/data";
 import type { PageServerLoad } from "./$types";
 
 export const prerender = false;
@@ -32,6 +33,9 @@ export const load: PageServerLoad = async ({
   if (outcome.kind === "missing") error(404, "match-not-found");
 
   const { match, viewerSeat } = outcome;
+  const replay = await loadMatchReplay(match, () =>
+    readMatchReplay(db, id.data),
+  );
   const participantA = participantFor(match.players.A.profile);
   const participantB = participantFor(match.players.B.profile);
   const a = participantName(participantA);
@@ -47,6 +51,7 @@ export const load: PageServerLoad = async ({
 
   return {
     match: details,
+    replay,
     viewerSeat,
     players: {
       A: {

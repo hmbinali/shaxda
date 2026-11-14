@@ -4,7 +4,7 @@ import { matchPayloadHash } from "@shaxda/shared";
 import { sampleMatchPayloads } from "@shaxda/shared/match-fixtures";
 import { saveMatch } from "../match";
 import { foldLedger } from "./fold";
-import { guard, pendingEvents } from "./queries";
+import { guard, PAIR_SELECT, pendingEvents } from "./queries";
 import { processPendingRatings } from "./processor";
 
 const { DB: db, TEST_MIGRATIONS } = env as unknown as {
@@ -51,6 +51,32 @@ it("decides ledger-ordered batches bit for bit with the fold under competing tri
   expect(await processPendingRatings(db)).toBe(5);
   expect(await processPendingRatings(db)).toBe(0);
   const { results: ledger } = await pendingEvents(db, 0, 30);
+  const candidate = ledger.at(-1)!;
+  const pair = db
+    .prepare(PAIR_SELECT)
+    .bind(
+      candidate.a_id,
+      candidate.b_id,
+      candidate.ended_at - 86_400_000,
+      candidate.ended_at,
+      candidate.seq,
+    );
+  expect((await pair.all()).meta.rows_read).toBeLessThanOrEqual(
+    3 * ledger.length + 12,
+  );
+  const plan = await db
+    .prepare(`EXPLAIN QUERY PLAN ${PAIR_SELECT}`)
+    .bind(
+      candidate.a_id,
+      candidate.b_id,
+      candidate.ended_at - 86_400_000,
+      candidate.ended_at,
+      candidate.seq,
+    )
+    .all<{ detail: string }>();
+  expect(plan.results.map((row) => row.detail).join("\n")).toContain(
+    "match_player_owner_idx",
+  );
   const folded = foldLedger(ledger, {
     invalidations: new Set(),
     exclusions: new Set(),

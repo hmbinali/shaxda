@@ -5,6 +5,7 @@ import {
   summarizeReplay,
 } from "@shaxda/game-engine";
 import { parseStoredReplay } from "@shaxda/shared";
+import { RatingInputError, RatingMathError, updateMatch } from "@shaxda/rating";
 import { PAIR_CAP_WINDOW_MS } from "@shaxda/shared/rated-play";
 import {
   decideEvent,
@@ -211,6 +212,48 @@ export async function inspectRating(db: D1Database, id: string, full: boolean) {
     exclusions: snapshot.exclusions,
   });
   const drift = verifyRebuild(snapshot).diffs;
+  const seats = snapshot.seats.filter((seat) => seat.match_id === id);
+  const [storedA, storedB] = seats;
+  let recomputedFromStored: unknown = null;
+  if (storedA && storedB) {
+    const stateBefore = (seat: typeof storedA) => ({
+      rating: seat.rating_before,
+      rd: seat.rd_before,
+      volatility: seat.volatility_before,
+    });
+    try {
+      const result = updateMatch(
+        stateBefore(storedA),
+        stateBefore(storedB),
+        row.winner_seat === null ? 0.5 : row.winner_seat === "A" ? 1 : 0,
+      );
+      const comparison = [
+        ["A", "rating_after", storedA.rating_after, result.a.rating],
+        ["A", "rd_after", storedA.rd_after, result.a.rd],
+        [
+          "A",
+          "volatility_after",
+          storedA.volatility_after,
+          result.a.volatility,
+        ],
+        ["B", "rating_after", storedB.rating_after, result.b.rating],
+        ["B", "rd_after", storedB.rd_after, result.b.rd],
+        [
+          "B",
+          "volatility_after",
+          storedB.volatility_after,
+          result.b.volatility,
+        ],
+      ].find(([, , live, rebuilt]) => !Object.is(live, rebuilt));
+      recomputedFromStored = { result, firstDifference: comparison ?? null };
+    } catch (error) {
+      if (!(
+        error instanceof RatingMathError || error instanceof RatingInputError
+      ))
+        throw error;
+      recomputedFromStored = { error: error.name };
+    }
+  }
   return {
     invalidated,
     validation: invalidated ? null : validateEvent(row),
@@ -220,7 +263,8 @@ export async function inspectRating(db: D1Database, id: string, full: boolean) {
     stored:
       snapshot.matches.find((decision) => decision.match_id === id) ??
       "pending",
-    seats: snapshot.seats.filter((seat) => seat.match_id === id),
+    seats,
+    recomputedFromStored,
     firstDifference:
       drift.find((diff) =>
         full ? (diff.seq ?? Infinity) <= row.seq : diff.matchId === id,

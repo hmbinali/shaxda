@@ -139,15 +139,24 @@
         name={playerName(seating.top)}
         username={controller.presence[seating.top]?.username}
         avatar={controller.presence[seating.top]?.avatar}
-        railState={railStateFor(status, seating.top)}
-        instruction={instructionKeyFor(status, seating.top, orientation)}
+        railState={controller.hasAuthoritativeState
+          ? railStateFor(status, seating.top)
+          : "waiting"}
+        instruction={controller.hasAuthoritativeState
+          ? instructionKeyFor(status, seating.top, orientation)
+          : null}
         notice={noticeFor(seating.top)}
         connected={controller.connections[seating.top]}
       />
     {/snippet}
 
     {#snippet board()}
-      <div class="relative h-full w-full" data-testid="online-board">
+      <div
+        class="relative h-full w-full"
+        data-testid="online-board"
+        data-current-player={controller.actingSeat}
+        data-save-status={controller.save?.status}
+      >
         <Board
           state={controller.state}
           selected={controller.selected}
@@ -205,8 +214,12 @@
         username={controller.presence[seating.bottom]?.username}
         avatar={controller.presence[seating.bottom]?.avatar}
         badge={`(${copy.youLabel})`}
-        railState={railStateFor(status, seating.bottom)}
-        instruction={instructionKeyFor(status, seating.bottom, orientation)}
+        railState={controller.hasAuthoritativeState
+          ? railStateFor(status, seating.bottom)
+          : "waiting"}
+        instruction={controller.hasAuthoritativeState
+          ? instructionKeyFor(status, seating.bottom, orientation)
+          : null}
         notice={noticeFor(seating.bottom)}
         connected={controller.connections[seating.bottom]}
       />

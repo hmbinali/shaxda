@@ -286,6 +286,10 @@ export const messages = {
         notSpaceMaking: "Dhaqaaqaas meel bannayn sharci ah ma aha.",
         unsupportedAction: "Tallaabadaas lama taageero.",
         notClaimable: "Guusha hadda lama qaadan karo.",
+        // TODO(translation-review): H1 error copy.
+        savingEarlierGames:
+          "Ciyaarihii hore weli waa la kaydinayaa; dib-u-ciyaarka mar kale isku day wax yar kadib.",
+        staleMatch: "Tallaabadaas waxay ku socotay ciyaar dhammaatay.",
         rematchUnavailable:
           "Dib-u-ciyaar waxaa la codsan karaa marka ciyaartu dhammaato.",
         rateLimited: "Codsiyo badan ayaa yimid; sug wax yar.",

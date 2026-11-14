@@ -4,9 +4,12 @@ import {
   identityTicketSchema,
   protocolVersion,
   roomCodeSchema,
+  roomOptionsSchema,
   serverMessageSchema,
 } from "@shaxda/shared";
 import { verifyIdentityTicket } from "@shaxda/shared/identity";
+import { handleMatchOps, opsJson } from "./match-ops";
+import type { MatchOpsEnv } from "./match-ops";
 import { MatchRoom } from "./match-room";
 import { RoomCoordinator } from "./room-coordinator";
 import { generateRoomCode } from "./room-code";
@@ -19,6 +22,7 @@ const COORDINATOR_NAME = "global";
 const createRoomRequestSchema = z.object({
   turnstileToken: z.string().min(1).max(4096).optional(),
   identityTicket: identityTicketSchema.optional(),
+  options: roomOptionsSchema.optional(),
 });
 
 const coordinatorReserveResponseSchema = z.discriminatedUnion("ok", [
@@ -45,9 +49,7 @@ type PublicCreateRoomErrorCode =
   | "identityUnavailable"
   | "createFailed";
 
-interface Env {
-  MATCH_ROOM: DurableObjectNamespace;
-  MATCH_COORDINATOR: DurableObjectNamespace;
+interface Env extends MatchOpsEnv {
   ALLOWED_ORIGIN?: string;
   TURNSTILE_SECRET?: string;
   ONLINE_IDENTITY_SECRET?: string;
@@ -57,6 +59,13 @@ interface Env {
 const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/ops/")) {
+      try {
+        return await handleMatchOps(request, env, clientIp(request));
+      } catch {
+        return opsJson({ error: "unavailable" }, 503);
+      }
+    }
 
     if (request.method === "OPTIONS" && url.pathname === "/rooms") {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
@@ -152,7 +161,10 @@ const worker = {
         const initResponse = await room.fetch(
           new Request(new URL("/internal/rooms/init", url.origin), {
             method: "POST",
-            body: JSON.stringify({ roomCode }),
+            body: JSON.stringify({
+              roomCode,
+              options: createRequest.data.options,
+            }),
             headers: { "Content-Type": "application/json" },
           }),
         );

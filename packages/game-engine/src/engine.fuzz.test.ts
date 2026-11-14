@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { legalActions } from "./actions";
 import { POINT_IDS } from "./board";
 import { getLegalMoves, getSpaceMakingMoves } from "./moves";
+import { decodeCompactReplay, encodeCompactReplay } from "./replay";
 import { applyAction } from "./reducer";
 import { deserialize, serialize } from "./serialization";
 import { createInitialState } from "./state";
@@ -58,6 +59,7 @@ describe("engine fuzz", () => {
         let state = createInitialState(random() < 0.5 ? "A" : "B");
         let previous = state;
         const history: GameAction[] = [];
+        const replayActions: GameAction[] = [];
 
         for (let step = 0; step < actionCap; step += 1) {
           assertInvariants(state, previous, {
@@ -108,6 +110,7 @@ describe("engine fuzz", () => {
             );
           }
 
+          replayActions.push(action);
           history.push(action);
           if (history.length > RECENT_ACTION_LIMIT) {
             history.shift();
@@ -129,6 +132,14 @@ describe("engine fuzz", () => {
             ),
           );
         }
+        const replay = decodeCompactReplay(
+          encodeCompactReplay(state.startingPlayer, replayActions),
+        );
+        expect(
+          replay.ok &&
+            isDeepStrictEqual(serialize(replay.state), serialize(state)),
+          `replay for seed ${seed}`,
+        ).toBe(true);
       }
     },
     30_000,

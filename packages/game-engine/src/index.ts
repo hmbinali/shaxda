@@ -35,3 +35,14 @@ export type {
   Ring,
   RingPosition,
 } from "./types";
+export {
+  COMPACT_ACTION_PATTERN,
+  MAX_REPLAY_ACTIONS,
+  REPLAY_VERSION,
+  RULES_VERSION,
+  decodeCompactReplay,
+  encodeAction,
+  encodeCompactReplay,
+  summarizeReplay,
+} from "./replay";
+export type { CompactReplay, FirstAdvantageBy } from "./replay";

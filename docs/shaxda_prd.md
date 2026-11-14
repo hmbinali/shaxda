@@ -119,9 +119,9 @@ without coupling it to game persistence:
 V1.1-A established permanent Google-backed identity, a required public username,
 privacy-first avatars, public profiles, account settings, and session-aware
 navigation. V1.1-A2 preserves guest play while allowing complete accounts to
-claim online-room seats through short-lived signed tickets. Better Auth, D1, and
-session validation remain exclusively in the web Worker; the game Worker gains
-HMAC ticket verification only.
+claim online-room seats through short-lived signed tickets. Better Auth and session
+validation remain exclusively in the web Worker. H1 permits the game Worker
+to bind the same D1 database for Match Durable Object ledger writes only.
 
 ---
 
@@ -570,7 +570,11 @@ The server must:
 - validate every move with `game-engine`;
 - reject illegal moves;
 - validate all WebSocket messages with Zod;
-- broadcast updated state after valid actions.
+- broadcast updated state after valid actions;
+- randomize the starting seat for the first game of every online room and
+  alternate it on every rematch, including in guest rooms.
+
+The client derives the acting seat from authoritative state.
 
 The client may animate/preview, but the server decides legality.
 
@@ -647,7 +651,7 @@ D1 is mainly for V1.1:
 
 For active V1.1-A account work:
 
-- D1 is bound only to the SvelteKit web Worker;
+- Account data is accessed only by the SvelteKit web Worker;
 - production and preview use distinct databases;
 - local and automated tests use Wrangler/Miniflare persistence only;
 - Better Auth core tables are generated from the pinned auth configuration;
@@ -655,6 +659,11 @@ For active V1.1-A account work:
 - all common auth and profile lookups are indexed;
 - schema constraints enforce normalized usernames and allowed avatar modes;
 - account mutations use session-derived ownership and guarded SQL operations.
+
+For H1, the game Worker binds the same database as the web Worker in each
+environment. Its Match Durable Object writes the match ledger and reads only
+its own write results. Auth tables, Better Auth, cookies, and session
+validation remain exclusive to the web Worker.
 
 Do not store:
 
@@ -732,19 +741,21 @@ protocol, and active identity state is not persisted to D1. Match history,
 replay, ratings, leaderboard data, and completed-match persistence remain in
 V1.1-B/C.
 
-### 17.4 V1.1 Matches
+### 17.4 Completed Online Matches (H1)
 
-For completed logged-in matches, store one row containing:
+After the first accepted non-terminal action, an account-vs-account game
+ending in game over writes one match row with a compact replay and two
+participant rows. A resignation or valid claim is a loss in every phase
+after play begins. Endings before play begins and games with a guest
+produce no ledger rows.
 
-- match id;
-- players;
-- winner;
-- timestamps;
-- final status;
-- basic stats;
-- compact replay.
+Invite games are friendly by default and private to their two participants.
+Rated results and replays are public and require both players to consent
+before play begins. R2 introduces the consent handshake, so H1 saves only
+friendly games.
 
-Do not store each move as its own D1 row.
+See the [H1 contract](specs/h1-match-persistence.md) for the ledger and
+retry rules.
 
 ---
 
@@ -1402,7 +1413,7 @@ Includes:
 - unit, Workers integration, compatibility, and authenticated online e2e tests;
 - shared-secret setup, deployment, and rotation documentation.
 
-Constraints:
+Historical constraints at V1.1-A2 release (H1 supersedes its D1 restriction):
 
 - `/online` remains client-only and prerendered;
 - the web Worker is the only session-validation boundary and never sends email,

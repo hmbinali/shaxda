@@ -43,3 +43,13 @@ traffic. Guest games do not write permanent match history in V1.0.
 - Room expiration releases the coordinator reservation before deleting room
   storage.
 - Coordinator pruning uses Durable Object alarms only.
+
+## H1 ledger monitoring
+
+- The game Worker's `DB` binding shares the web D1 database. Review D1 usage
+  after rollout. A normal save inserts one match row and two participant rows.
+- Confirm the `MATCH_OPS_RATE_LIMIT` binding and the `MATCH_OPS_TOKEN` secret
+  in preview and production. Use the operator command in the launch runbook to
+  check for held rooms during the first week.
+- Watch Worker logs for `matchReplayMismatch`, `matchSaveIntegrity`, and
+  `matchSaveStalled`. Record the room code and match number in the incident.

@@ -47,6 +47,7 @@ const CONFLICTING_DEV_VARS = {
 // local ALLOWED_ORIGIN breaks CORS for the preview server and the real
 // TURNSTILE_SECRET makes every online room creation fail `turnstileFailed`.
 const CONFLICTING_WORKER_DEV_VARS = {
+  DB: "developer-local-not-a-database",
   ALLOWED_ORIGIN: "http://localhost:5173",
   TURNSTILE_SECRET: "developer-local-turnstile-secret",
   ONLINE_IDENTITY_SECRET: "developer-local-online-identity-secret",
@@ -293,7 +294,7 @@ try {
     label: "1/4b a conflicting worker/.dev.vars",
     slug: "worker-dev-vars",
     cwd: workerRoot,
-    config: "wrangler.toml",
+    config: "wrangler.e2e.toml",
     envFileFrom: resolve(workerRoot, E2E_ENV_FILE),
     conflicting: CONFLICTING_WORKER_DEV_VARS,
   });
@@ -367,7 +368,7 @@ try {
     CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",
   };
   const wranglerProbe = {
-    SHAXDA_PROBE_CONFIG: "wrangler.toml",
+    SHAXDA_PROBE_CONFIG: "wrangler.e2e.toml",
     SHAXDA_PROBE_DIR: workerProbe.directory,
     SHAXDA_PROBE_ENV_FILES: E2E_ENV_FILE,
   };

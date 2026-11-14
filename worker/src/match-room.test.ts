@@ -1,11 +1,17 @@
 import {
+  applyD1Migrations,
+  type D1Migration,
   env,
+  evictDurableObject,
   reset,
   runDurableObjectAlarm,
   runInDurableObject,
   SELF,
 } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { saveMatch } from "@shaxda/db/match";
+import { outboxSummary } from "./match-outbox";
+import type { OutboxEntry, OutboxSummary } from "./match-outbox";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createInitialState,
   deserialize,
@@ -20,6 +26,7 @@ import type {
 import {
   a2ConformanceActionScripts,
   fullGameActionScripts,
+  matchPayloadHash,
   protocolVersion,
   ROOM_CODE_ALPHABET,
   serverMessageSchema,
@@ -33,10 +40,24 @@ import {
 import type { TicketAction } from "@shaxda/shared/identity";
 
 const testEnv = env as {
+  DB: D1Database;
+  TEST_MIGRATIONS: D1Migration[];
+  MATCH_OPS_TOKEN: string;
   MATCH_ROOM: DurableObjectNamespace;
   MATCH_COORDINATOR: DurableObjectNamespace;
   ONLINE_IDENTITY_SECRET: string;
 };
+
+beforeEach(() => {
+  const getRandomValues = crypto.getRandomValues.bind(crypto);
+  vi.spyOn(crypto, "getRandomValues").mockImplementation((array) => {
+    if (array instanceof Uint8Array && array.length === 1) {
+      array[0] = 0;
+      return array;
+    }
+    return getRandomValues(array);
+  });
+});
 
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -69,6 +90,7 @@ describe("match room hibernation spike", () => {
         throw new Error("Expected Uint8Array room-code entropy.");
       }
 
+      if (array.length === 1) return array;
       const roomCode = generatedCodes.shift();
       if (!roomCode) {
         throw new Error("Unexpected room-code generation attempt.");
@@ -1190,7 +1212,7 @@ describe("match room hibernation spike", () => {
       votes: { A: null, B: null },
     });
     for (const state of [await firstFresh, await secondFresh]) {
-      expect(state.state).toEqual(createInitialState("A"));
+      expect(state.state).toEqual(createInitialState("B"));
       expect(state.state.winner).toBeNull();
       expect(state.state.endReason).toBeNull();
     }
@@ -1205,7 +1227,7 @@ describe("match room hibernation spike", () => {
       nudgedTurnAt: null,
       slots: { A: "guest:guest-id-a", B: "guest:guest-id-b" },
     });
-    expect(stored?.gameState).toEqual(serialize(createInitialState("A")));
+    expect(stored?.gameState).toEqual(serialize(createInitialState("B")));
     expect(stored?.turnStartedAt).toEqual(expect.any(Number));
 
     first.close();
@@ -1305,10 +1327,9 @@ describe("match room hibernation spike", () => {
     ).resolves.toMatchObject({ votes: { A: null, B: "accept" } });
 
     const reconnected = await connectRoom(roomCode);
+    const restoredVotes = waitForMessage(reconnected, "rematchStatus");
     await joinAndWait(reconnected, roomCode, "guest-id-a");
-    await expect(
-      waitForMessage(reconnected, "rematchStatus"),
-    ).resolves.toMatchObject({
+    await expect(restoredVotes).resolves.toMatchObject({
       matchNumber: 1,
       votes: { A: null, B: "accept" },
     });
@@ -1373,7 +1394,9 @@ describe("match room hibernation spike", () => {
       );
       sendRematch(rejoined, roomCode, "accept");
 
-      expect((await fresh).state).toEqual(createInitialState("A"));
+      expect((await fresh).state).toEqual(
+        createInitialState(matchNumber === 2 ? "B" : "A"),
+      );
       await expect(readStoredRoom(roomCode)).resolves.toMatchObject({
         matchNumber,
         onlineEndReason: null,
@@ -1398,6 +1421,333 @@ describe("match room hibernation spike", () => {
     guest.close();
     rejoined.close();
   });
+
+  it("recovers a pending save after eviction and a lost D1 acknowledgement", async () => {
+    await applyD1Migrations(testEnv.DB, testEnv.TEST_MIGRATIONS);
+    const { roomCode, first, second } = await accountRoom();
+    await placeFirst(first, second, roomCode);
+    // Simulate an outage without changing the outbox or the match transaction.
+    await testEnv.DB.prepare(
+      "ALTER TABLE match_player RENAME TO match_player_offline",
+    ).run();
+    const pending = waitForMessageWhere(
+      first,
+      "matchStatus",
+      (message) => message.save?.status === "pending",
+    );
+    await resignToGameOver(first, second, roomCode);
+    await pending;
+    await expect
+      .poll(async () => (await loadOutbox(roomCode))?.attempts)
+      .toBe(1);
+    const entry = await loadOutbox(roomCode);
+    if (!entry) throw new Error("Expected durable outbox entry");
+    expect(entry).toMatchObject({
+      status: "pending",
+      stalledReason: null,
+      lastError: "D1 ledger write failed.",
+    });
+    expect(entry.nextAttemptAt! - entry.firstAttemptAt!).toBe(5_000);
+    await expect(
+      testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
+    ).resolves.toBe(0);
+    await testEnv.DB.prepare(
+      "ALTER TABLE match_player_offline RENAME TO match_player",
+    ).run();
+
+    // D1 committed, but the room never received an acknowledgement.
+    await expect(
+      saveMatch(testEnv.DB, entry.payload, entry.payloadHash),
+    ).resolves.toMatchObject({ status: "saved", existed: false });
+    await evictDurableObject(roomStub(roomCode));
+    const saved = waitForMessageWhere(
+      first,
+      "matchStatus",
+      (message) => message.save?.status === "saved",
+    );
+    await makeSaveDue(roomCode, entry);
+    await triggerRoomAlarm(roomCode);
+    await expect(saved).resolves.toMatchObject({
+      save: { matchId: entry.payload.id, matchNumber: 1, status: "saved" },
+    });
+    await expect(loadOutbox(roomCode)).resolves.toBeUndefined();
+    await expect(
+      testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
+    ).resolves.toBe(1);
+    await expect(
+      testEnv.DB.prepare("SELECT count(*) AS n FROM match_player").first("n"),
+    ).resolves.toBe(2);
+    first.close();
+    second.close();
+  });
+
+  it("retains expired rooms with integrity conflicts until an operator discards", async () => {
+    await applyD1Migrations(testEnv.DB, testEnv.TEST_MIGRATIONS);
+    const { roomCode, first, second } = await accountRoom();
+    const placed = await placeFirst(first, second, roomCode);
+    expect(placed.state.board.O1).toBe("A");
+    await testEnv.DB.prepare(
+      "ALTER TABLE match_player RENAME TO match_player_offline",
+    ).run();
+    await resignToGameOver(first, second, roomCode);
+    await expect
+      .poll(async () => (await loadOutbox(roomCode))?.attempts)
+      .toBe(1);
+    const entry = await loadOutbox(roomCode);
+    if (!entry) throw new Error("Expected durable outbox entry");
+    await testEnv.DB.prepare(
+      "ALTER TABLE match_player_offline RENAME TO match_player",
+    ).run();
+    const conflict = { ...entry.payload, id: "BBBBBBBBBBBBBBBBBBBB" };
+    await saveMatch(testEnv.DB, conflict, await matchPayloadHash(conflict));
+    await makeSaveDue(roomCode, entry);
+    await patchStoredRoom(roomCode, (room) => ({ ...room, lastActivityAt: 0 }));
+    await triggerRoomAlarm(roomCode);
+
+    await expect(websocketResponse(roomCode)).resolves.toMatchObject({
+      status: 404,
+    });
+    const result = await opsRequest(`/ops/unsaved?room=${roomCode}`);
+    expect(result.headers.get("Cache-Control")).toBe("no-store");
+    const listing = await result.json();
+    expect(listing).toMatchObject({
+      expired: true,
+      entries: [
+        {
+          matchNumber: 1,
+          matchId: entry.payload.id,
+          status: "stalled",
+          stalledReason: "integrity",
+        },
+      ],
+    });
+    expect(JSON.stringify(listing)).not.toContain("ledger-account");
+    expect(JSON.stringify(listing)).not.toContain("P:O1");
+    await runInDurableObject(roomStub(roomCode), async (_instance, state) => {
+      await expect(state.storage.getAlarm()).resolves.toBeNull();
+    });
+
+    const body = {
+      roomCode,
+      matchNumber: 1,
+      matchId: "CCCCCCCCCCCCCCCCCCCC",
+      reason: "Discard test fixture.",
+    };
+    await expect(opsRequest("/ops/discard", body)).resolves.toMatchObject({
+      status: 409,
+    });
+    await expect(
+      opsRequest("/ops/discard", { ...body, matchId: entry.payload.id }),
+    ).resolves.toMatchObject({ status: 200 });
+    await expect(readStoredRoom(roomCode)).resolves.toBeUndefined();
+    const list = await opsRequest("/ops/unsaved");
+    await expect(list.json()).resolves.toMatchObject({ rooms: [] });
+  });
+
+  it("sends a pending terminal state on reconnect after the original broadcast is interrupted", async () => {
+    await applyD1Migrations(testEnv.DB, testEnv.TEST_MIGRATIONS);
+    const { roomCode, first, second } = await accountRoom();
+    await placeFirst(first, second, roomCode);
+    const stub = roomStub(roomCode);
+    await runInDurableObject(stub, async (instance, state) => {
+      const room = instance as unknown as {
+        broadcastState(): void;
+        broadcastMatchStatus(): void;
+        attemptSave(): Promise<void>;
+        webSocketMessage(socket: WebSocket, message: string): Promise<void>;
+      };
+      const suppressState = vi
+        .spyOn(room, "broadcastState")
+        .mockImplementationOnce(() => {});
+      const suppressStatus = vi
+        .spyOn(room, "broadcastMatchStatus")
+        .mockImplementationOnce(() => {});
+      const suppressSave = vi
+        .spyOn(room, "attemptSave")
+        .mockResolvedValueOnce(undefined);
+      try {
+        const socket = state
+          .getWebSockets()
+          .find((socket) => socket.deserializeAttachment()?.slot === "A");
+        if (!socket) throw new Error("Expected an authorized socket");
+        await room.webSocketMessage(
+          socket,
+          JSON.stringify({
+            v: protocolVersion,
+            type: "gameAction",
+            roomCode,
+            action: { type: "resign", player: "A" },
+          }),
+        );
+        expect(suppressState).toHaveBeenCalledOnce();
+        expect(suppressStatus).toHaveBeenCalledOnce();
+        expect(suppressSave).toHaveBeenCalledOnce();
+      } finally {
+        suppressState.mockRestore();
+        suppressStatus.mockRestore();
+        suppressSave.mockRestore();
+      }
+    });
+    const entry = await loadOutbox(roomCode);
+    if (!entry) throw new Error("Expected durable outbox entry");
+    expect(entry.attempts).toBe(0);
+    await evictDurableObject(stub, { webSockets: "close" });
+    const rejoined = await connectRoom(roomCode);
+    const pending = waitForMessageWhere(
+      rejoined,
+      "matchStatus",
+      (message) => message.save?.status === "pending",
+    );
+    const joined = await joinAndWait(
+      rejoined,
+      roomCode,
+      "ledger-guest-a",
+      undefined,
+      await mintTestTicket("reconnect", roomCode, {
+        userId: "ledger-account-a",
+      }),
+    );
+    expect(joined.state.state.phase).toBe("gameOver");
+    await pending;
+
+    const saved = waitForMessageWhere(
+      rejoined,
+      "matchStatus",
+      (message) => message.save?.status === "saved",
+    );
+    await makeSaveDue(roomCode, entry);
+    await triggerRoomAlarm(roomCode);
+    await expect(saved).resolves.toMatchObject({
+      save: { matchId: entry.payload.id },
+    });
+    rejoined.close();
+    second.close();
+  });
+
+  it("rejects stale mutations without changing the board", async () => {
+    const { roomCode, first, second } = await accountRoom();
+    for (const message of [
+      {
+        type: "gameAction",
+        action: { type: "place", player: "A", point: "O1" },
+      },
+      { type: "claimWin" },
+      { type: "rematch", vote: "accept" },
+    ]) {
+      const error = waitForMessage(first, "error");
+      sendJson(first, {
+        v: protocolVersion,
+        roomCode,
+        matchNumber: 2,
+        ...message,
+      });
+      await expect(error).resolves.toMatchObject({ code: "staleMatch" });
+    }
+    expect((await readStoredRoom(roomCode))?.gameState).toBe(
+      serialize(createInitialState("A")),
+    );
+    first.close();
+    second.close();
+  });
+
+  it("keeps the ops API out of browser requests and checks the bearer", async () => {
+    const url = "https://shaxda.test/ops/unsaved";
+    const unauthorized = await SELF.fetch(url);
+    expect(unauthorized.status).toBe(401);
+    const preflight = await SELF.fetch(url, {
+      method: "OPTIONS",
+      headers: { Origin: "https://shaxda.test" },
+    });
+    expect(preflight.status).toBe(404);
+    expect(preflight.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    const browser = await SELF.fetch(url, {
+      headers: {
+        Origin: "https://shaxda.test",
+        Authorization: `Bearer ${testEnv.MATCH_OPS_TOKEN}`,
+      },
+    });
+    expect(browser.status).toBe(403);
+  });
+
+  it("keeps an invalid replay for inspection and refuses manual retry", async () => {
+    await applyD1Migrations(testEnv.DB, testEnv.TEST_MIGRATIONS);
+    const { roomCode, first, second } = await accountRoom();
+    await placeFirst(first, second, roomCode);
+    await runInDurableObject(
+      roomStub(roomCode),
+      async (_instance, { storage }) => {
+        await storage.put("log", { v: 1, matchNumber: 1, s: "A", a: ["P:O2"] });
+      },
+    );
+    await finishByCallingRoom(roomCode);
+    const entry = await loadOutbox(roomCode);
+    expect(entry).toMatchObject({
+      status: "stalled",
+      stalledReason: "replayMismatch",
+      attempts: 0,
+      nextAttemptAt: null,
+    });
+    if (!entry) throw new Error("Expected replay mismatch entry");
+    const response = await roomStub(roomCode).fetch(
+      "https://shaxda.internal/internal/ops/retry",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomCode,
+          matchNumber: 1,
+          matchId: entry.payload.id,
+        }),
+      },
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "notRetryable" });
+    await expect(
+      testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
+    ).resolves.toBe(0);
+    const discard = await opsRequest("/ops/discard", {
+      roomCode,
+      matchNumber: 1,
+      matchId: entry.payload.id,
+      reason: "Clear invalid replay fixture.",
+    });
+    expect(discard.status).toBe(200);
+    first.close();
+    second.close();
+  });
+
+  it.each([false, true])(
+    "handles rooms created before H1 with play begun = %s",
+    async (playBegan) => {
+      await applyD1Migrations(testEnv.DB, testEnv.TEST_MIGRATIONS);
+      const { roomCode, first, second } = await accountRoom();
+      if (playBegan) await placeFirst(first, second, roomCode);
+      await runInDurableObject(
+        roomStub(roomCode),
+        async (_instance, { storage }) => {
+          const room = await storage.get<Record<string, unknown>>("room");
+          if (!room) throw new Error("Room disappeared");
+          for (const key of [
+            "rated",
+            "consent",
+            "playBeganAt",
+            "unsaved",
+            "lastSave",
+          ])
+            delete room[key];
+          await storage.put("room", room);
+          await storage.delete("log");
+        },
+      );
+      if (!playBegan) await placeFirst(first, second, roomCode);
+      await finishByCallingRoom(roomCode);
+      await expect(
+        testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
+      ).resolves.toBe(playBegan ? 0 : 1);
+      first.close();
+      second.close();
+    },
+  );
 
   it("cleans room storage when the alarm runs after idle expiry", async () => {
     const roomCode = await createRoom();
@@ -1433,6 +1783,97 @@ describe("match room hibernation spike", () => {
     expect(response.status).toBe(404);
   });
 });
+
+async function finishByCallingRoom(roomCode: string): Promise<void> {
+  // Await the whole handler, including D1 and coordinator I/O. A state frame
+  // alone only proves that the terminal storage write has reached the client.
+  await runInDurableObject(roomStub(roomCode), async (instance, state) => {
+    const socket = state
+      .getWebSockets()
+      .find((candidate) => candidate.deserializeAttachment()?.slot === "A");
+    if (!socket) throw new Error("Expected seat A");
+    const room = instance as DurableObject;
+    await room.webSocketMessage?.(
+      socket,
+      JSON.stringify({
+        v: protocolVersion,
+        type: "gameAction",
+        roomCode,
+        action: { type: "resign", player: "A" },
+      }),
+    );
+  });
+}
+
+async function accountRoom() {
+  const roomCode = await createRoom();
+  const first = await connectRoom(roomCode);
+  const second = await connectRoom(roomCode);
+  await joinAndWait(
+    first,
+    roomCode,
+    "ledger-guest-a",
+    undefined,
+    await mintTestTicket("join", roomCode, { userId: "ledger-account-a" }),
+  );
+  await joinAndWait(
+    second,
+    roomCode,
+    "ledger-guest-b",
+    undefined,
+    await mintTestTicket("join", roomCode, {
+      userId: "ledger-account-b",
+      usernameSnapshot: "cabdi_8",
+    }),
+  );
+  return { roomCode, first, second };
+}
+
+async function placeFirst(
+  first: WebSocket,
+  second: WebSocket,
+  roomCode: string,
+) {
+  const placed = waitForMessage(second, "state");
+  sendAction(first, roomCode, { type: "place", player: "A", point: "O1" });
+  return placed;
+}
+
+async function loadOutbox(roomCode: string) {
+  return runInDurableObject(roomStub(roomCode), (_instance, state) =>
+    state.storage.get<OutboxEntry>("outbox:1"),
+  );
+}
+
+async function makeSaveDue(roomCode: string, entry: OutboxEntry) {
+  await runInDurableObject(
+    roomStub(roomCode),
+    async (_instance, { storage }) => {
+      const room = await storage.get<{
+        unsaved: Record<number, OutboxSummary>;
+      }>("room");
+      if (!room) throw new Error("Room disappeared");
+      const nextAttemptAt = Date.now() - 1;
+      const due = { ...entry, nextAttemptAt };
+      await storage.put({
+        room: { ...room, unsaved: { ...room.unsaved, 1: outboxSummary(due) } },
+        "outbox:1": due,
+      });
+      await storage.setAlarm(Date.now() + 5_000);
+    },
+  );
+}
+
+function opsRequest(path: string, body?: Record<string, unknown>) {
+  return SELF.fetch(`https://shaxda.test${path}`, {
+    method: body ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${testEnv.MATCH_OPS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
 
 async function createRoom(): Promise<string> {
   const response = await SELF.fetch("https://shaxda.test/rooms", {

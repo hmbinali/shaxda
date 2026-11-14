@@ -21,6 +21,7 @@
     "test:watch": "vitest --watch",
     "test:worker": "turbo run test:worker",
     "test:e2e": "playwright test",
+    "match:ops": "node scripts/match-ops.mjs",
     "test:perf": "lhci autorun",
     "check": "pnpm format:check && pnpm check:hibernation && pnpm check:e2e-isolation && pnpm lint && pnpm typecheck && pnpm test && pnpm test:worker && pnpm build",
     "check:build-freshness": "node scripts/check-build-freshness.mjs",

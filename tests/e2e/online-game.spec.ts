@@ -1,16 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
-async function resign(page: Page): Promise<void> {
-  await page
-    .getByTestId("app-top-bar")
-    .getByRole("button", { name: "Fur ficillo kale" })
-    .click();
-  await page.getByRole("menuitem", { name: "Is dhiib" }).click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Xaqiiji" })
-    .click();
-}
+import { expect, test } from "@playwright/test";
+import { placeOnline, resignOnline } from "./fixtures/online";
 
 test.describe("O1 guest online game", () => {
   test("creates, joins by link, syncs a move, and reconnects after refresh", async ({
@@ -49,33 +38,17 @@ test.describe("O1 guest online game", () => {
         "false",
       );
 
-      await creator.locator('[data-point-id="O1"]').click();
-
-      await expect(creator.locator('[data-point-id="O1"]')).toHaveAttribute(
-        "data-occupant",
-        "A",
-      );
-      await expect(joiner.locator('[data-point-id="O1"]')).toHaveAttribute(
-        "data-occupant",
-        "A",
-      );
-      await expect(joiner.getByTestId("board-place-animation")).toHaveClass(
+      const pages = { A: creator, B: joiner };
+      const starter = await placeOnline(pages, "O1");
+      const observer = pages[starter === "A" ? "B" : "A"];
+      await expect(observer.getByTestId("board-place-animation")).toHaveClass(
         /shaxda-piece-pop/,
       );
-      await expect(joiner.getByTestId("game-announcer")).toContainText(
-        "Ayaan wuxuu dhagax dhigay barta O1",
+      await expect(observer.getByTestId("game-announcer")).toContainText(
+        `${starter === "A" ? "Ayaan" : "Cabdi"} wuxuu dhagax dhigay barta O1`,
       );
-
-      await joiner.locator('[data-point-id="O2"]').click();
-      await expect(joiner.locator('[data-point-id="O2"]')).toHaveAttribute(
-        "data-occupant",
-        "B",
-      );
-      await expect(
-        joiner.locator(
-          '[data-point-id="O2"] [data-testid="board-piece-b-ring"]',
-        ),
-      ).toBeVisible();
+      const second = await placeOnline(pages, "O2");
+      expect(second).not.toBe(starter);
       await expect(joiner.getByTestId("board")).toHaveCSS("transform", "none");
 
       await creator.reload();
@@ -83,7 +56,7 @@ test.describe("O1 guest online game", () => {
       await expect(creator.getByTestId("online-board")).toBeVisible();
       await expect(creator.locator('[data-point-id="O1"]')).toHaveAttribute(
         "data-occupant",
-        "A",
+        starter,
       );
     } finally {
       await joinerContext.close();
@@ -113,20 +86,10 @@ test.describe("O1 guest online game", () => {
       await expect(creator.getByTestId("online-board")).toBeVisible();
       await expect(joiner.getByTestId("online-board")).toBeVisible();
 
-      // Both seats place a piece so the fresh match is provably clean, and the
-      // turn returns to the creator, which is when a resignation is legal.
-      await creator.locator('[data-point-id="O1"]').click();
-      await expect(joiner.locator('[data-point-id="O1"]')).toHaveAttribute(
-        "data-occupant",
-        "A",
-      );
-      await joiner.locator('[data-point-id="O2"]').click();
-      await expect(creator.locator('[data-point-id="O2"]')).toHaveAttribute(
-        "data-occupant",
-        "B",
-      );
-
-      await resign(creator);
+      const pages = { A: creator, B: joiner };
+      const starter = await placeOnline(pages, "O1");
+      await placeOnline(pages, "O2");
+      await resignOnline(creator);
       await expect(creator.getByTestId("online-game-result")).toBeVisible();
       await expect(joiner.getByTestId("online-game-result")).toBeVisible();
 
@@ -142,7 +105,7 @@ test.describe("O1 guest online game", () => {
       await expect(creator.getByTestId("online-game-result")).toBeVisible();
       await expect(creator.locator('[data-point-id="O1"]')).toHaveAttribute(
         "data-occupant",
-        "A",
+        starter,
       );
 
       await creator.getByTestId("online-rematch").click();
@@ -159,18 +122,10 @@ test.describe("O1 guest online game", () => {
         }
       }
 
-      await creator.locator('[data-point-id="M1"]').click();
-      await expect(joiner.locator('[data-point-id="M1"]')).toHaveAttribute(
-        "data-occupant",
-        "A",
-      );
-      await joiner.locator('[data-point-id="M2"]').click();
-      await expect(creator.locator('[data-point-id="M2"]')).toHaveAttribute(
-        "data-occupant",
-        "B",
-      );
+      expect(await placeOnline(pages, "M1")).not.toBe(starter);
+      await placeOnline(pages, "M2");
 
-      await resign(creator);
+      await resignOnline(creator);
       await expect(joiner.getByTestId("online-game-result")).toBeVisible();
       await joiner.getByTestId("online-new-match").click();
 

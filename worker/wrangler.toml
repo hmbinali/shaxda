@@ -7,6 +7,7 @@ enabled = true
 
 # Dev/test only. Preview and production use Wrangler secrets instead.
 [vars]
+MATCH_OPS_TOKEN = "shaxda-local-match-ops-fixture-000000000001"
 ONLINE_IDENTITY_SECRET = "shaxda-online-identity-dev-test-secret-000000000001"
 
 [[durable_objects.bindings]]
@@ -24,3 +25,15 @@ new_sqlite_classes = ["MatchRoom"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["RoomCoordinator"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shaxda-db"
+database_id = "b84cc232-ddbd-437d-acd0-0fa0d77e12b0"
+migrations_dir = "../packages/db/migrations"
+migrations_table = "d1_migrations"
+
+[[ratelimits]]
+name = "MATCH_OPS_RATE_LIMIT"
+namespace_id = "1002"
+simple = { limit = 20, period = 60 }

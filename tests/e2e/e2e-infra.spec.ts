@@ -9,7 +9,6 @@ import {
 import { fingerprintTree, listFiles } from "../../scripts/lib/fs-tree.mjs";
 
 const workerE2eState = resolveE2eStatePath("wrangler-e2e");
-const webE2eState = resolveE2eStatePath("wrangler-web-e2e");
 
 type Baseline = {
   path: string;
@@ -62,7 +61,7 @@ test.describe("E2E infrastructure", () => {
       `expected Durable Object state under ${workerE2eState}`,
     ).toContain("do/");
 
-    expect(listFiles(webE2eState).length).toBeGreaterThan(0);
+    expect(workerFiles.join("\n")).toContain("d1/");
 
     // A developer's own Wrangler state may legitimately pre-exist, so require it
     // to be unchanged rather than absent.

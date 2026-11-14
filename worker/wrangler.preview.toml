@@ -26,3 +26,15 @@ new_sqlite_classes = ["MatchRoom"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["RoomCoordinator"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shaxda-db-preview"
+database_id = "5a84ac83-8387-4b68-b831-28ec450cd922"
+migrations_dir = "../packages/db/migrations"
+migrations_table = "d1_migrations"
+
+[[ratelimits]]
+name = "MATCH_OPS_RATE_LIMIT"
+namespace_id = "1002"
+simple = { limit = 20, period = 60 }

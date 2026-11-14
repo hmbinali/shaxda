@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { e2eOrigins } from "./scripts/lib/e2e-env.mjs";
+
+const origins = e2eOrigins();
+
 export default defineConfig({
   testDir: "tests/e2e",
   timeout: 30_000,
@@ -17,7 +21,7 @@ export default defineConfig({
   // and CI identical. Costs about 18s on a 69-test suite.
   workers: 1,
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: origins.web,
     trace: "on-first-retry",
   },
   projects: [
@@ -42,13 +46,13 @@ export default defineConfig({
       command: "node scripts/start-worker-e2e.mjs",
       reuseExistingServer: false,
       timeout: 120_000,
-      url: "http://127.0.0.1:8787/health",
+      url: `${origins.worker}/health`,
     },
     {
       command: "node scripts/start-web-e2e.mjs",
       reuseExistingServer: false,
       timeout: 180_000,
-      url: "http://127.0.0.1:4173",
+      url: origins.web,
     },
   ],
 });

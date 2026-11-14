@@ -7,7 +7,8 @@
 // state to `worker/.wrangler/state`, where nothing ever cleaned it up. This
 // spawns Wrangler directly so the flags are actually parsed.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnGroup } from "./lib/spawn-group.mjs";
 import { resolve } from "node:path";
 import {
@@ -16,7 +17,7 @@ import {
   testResultsRoot,
 } from "./lib/e2e-state.mjs";
 import { fingerprintTree } from "./lib/fs-tree.mjs";
-import { buildWranglerE2eEnv } from "./lib/e2e-env.mjs";
+import { buildWranglerE2eEnv, e2eOrigins } from "./lib/e2e-env.mjs";
 
 export const WORKER_E2E_STATE = "wrangler-e2e";
 export const WORKER_DEV_STATE_BASELINE = "dev-state-baseline.worker.json";
@@ -38,28 +39,60 @@ writeFileSync(
   `${JSON.stringify({ path: devState, ...fingerprintTree(devState) }, null, 2)}\n`,
 );
 
+const origins = e2eOrigins();
+const env = buildWranglerE2eEnv(process.env);
+const envFile = resolve(state, "worker.env");
+mkdirSync(state, { recursive: true });
+const fixture = readFileSync(resolve(worker, ".env.e2e"), "utf8");
+writeFileSync(
+  envFile,
+  fixture.replace(/^ALLOWED_ORIGIN=.*$/m, `ALLOWED_ORIGIN=${origins.web}`),
+);
+const migration = spawnSync(
+  "pnpm",
+  [
+    "exec",
+    "wrangler",
+    "d1",
+    "migrations",
+    "apply",
+    "shaxda-db-e2e",
+    "--config",
+    "wrangler.e2e.toml",
+    "--env-file",
+    envFile,
+    "--local",
+    "--persist-to",
+    state,
+  ],
+  { cwd: worker, stdio: "inherit", env },
+);
+if (migration.status !== 0) process.exit(migration.status ?? 1);
+
 spawnGroup(
   "pnpm",
   [
     "exec",
     "wrangler",
     "dev",
+    "--config",
+    "wrangler.e2e.toml",
     "--ip",
     "127.0.0.1",
     "--port",
-    "8787",
+    new URL(origins.worker).port,
     "--persist-to",
-    "../test-results/wrangler-e2e",
+    state,
     // Wrangler only consults `.dev.vars` when no env file is given, so this is
     // what keeps a developer's real `worker/.dev.vars` — a local
     // `ALLOWED_ORIGIN`, a real `TURNSTILE_SECRET` — out of the run.
     "--env-file",
-    ".env.e2e",
+    envFile,
   ],
   {
     cwd: worker,
     stdio: "inherit",
-    env: buildWranglerE2eEnv(process.env),
+    env,
   },
 );
 

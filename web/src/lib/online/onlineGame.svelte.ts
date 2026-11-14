@@ -5,7 +5,12 @@ import type {
   PlayerId,
   PointId,
 } from "@shaxda/game-engine";
-import type { RematchVote, RematchVotes, ServerMessage } from "@shaxda/shared";
+import type {
+  MatchSave,
+  RematchVote,
+  RematchVotes,
+  ServerMessage,
+} from "@shaxda/shared";
 import {
   mapPointClick,
   type PointInteractionInvalidReason,
@@ -62,6 +67,8 @@ export type OnlineRematchStage =
   | "starting";
 
 export class OnlineGameController {
+  hasAuthoritativeState = $state(false);
+  save = $state<MatchSave | null>(null);
   state = $state<GameState>(createInitialState("A"));
   roomCode = $state<string | null>(null);
   mySlot = $state<PlayerId | null>(null);
@@ -83,6 +90,11 @@ export class OnlineGameController {
   rematchVotes = $state<RematchVotes>({ A: null, B: null });
   rematchStarting = $state(false);
   status = $derived(buildGameStatus(this.state));
+  actingSeat = $derived(
+    this.hasAuthoritativeState && this.state.phase !== "gameOver"
+      ? getActingPlayer(this.state)
+      : null,
+  );
   started = $derived(this.presence.A !== null && this.presence.B !== null);
   opponentConnected = $derived(
     this.mySlot === null ? null : this.connections[otherSlot(this.mySlot)],
@@ -99,6 +111,7 @@ export class OnlineGameController {
   boardInteractive = $derived(
     this.connectionStatus === "connected" &&
       this.started &&
+      this.hasAuthoritativeState &&
       this.mySlot !== null &&
       this.state.phase !== "gameOver",
   );
@@ -244,7 +257,7 @@ export class OnlineGameController {
       return;
     }
 
-    const sent = this.#client.sendClaimWin(this.roomCode);
+    const sent = this.#client.sendClaimWin(this.roomCode, this.matchNumber);
     if (!sent) {
       this.markInvalid("actionRejected");
     }
@@ -277,7 +290,7 @@ export class OnlineGameController {
       return;
     }
 
-    const sent = this.#client.sendRematchVote(vote);
+    const sent = this.#client.sendRematchVote(vote, this.matchNumber);
     if (!sent) {
       this.markInvalid("actionRejected");
       return;
@@ -287,7 +300,7 @@ export class OnlineGameController {
   }
 
   private sendAction(action: GameAction): void {
-    const sent = this.#client.sendGameAction(action);
+    const sent = this.#client.sendGameAction(action, this.matchNumber);
     if (!sent) {
       this.markInvalid("actionRejected");
       return;
@@ -312,6 +325,7 @@ export class OnlineGameController {
         this.idleSlot = message.idleSlot;
         this.claimableBy = message.claimableBy;
         this.claimReason = message.claimReason;
+        this.save = message.save ?? null;
         return;
       case "matchEnded":
         this.onlineEndReason = message.reason;
@@ -337,6 +351,7 @@ export class OnlineGameController {
       // The server confirmed a new logical match. Drop everything scoped to the
       // finished game; its replacement board arrives in the state broadcast.
       this.matchNumber = matchNumber;
+      this.hasAuthoritativeState = false;
       this.selected = null;
       this.invalid = null;
       this.lastAction = null;
@@ -355,6 +370,7 @@ export class OnlineGameController {
     const action =
       pendingAction ?? inferOpponentAction(previousState, nextState);
     this.state = nextState;
+    this.hasAuthoritativeState = true;
     this.selected = null;
     this.invalid = null;
     this.lastServerError = null;
@@ -395,6 +411,8 @@ export class OnlineGameController {
 
   private resetDisplayedRoomState(): void {
     this.state = createInitialState("A");
+    this.hasAuthoritativeState = false;
+    this.save = null;
     this.mySlot = null;
     this.presence = { A: null, B: null };
     this.connections = { A: false, B: false };

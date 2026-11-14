@@ -4,28 +4,49 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = new URL("..", import.meta.url);
 const workerSrc = new URL("worker/src/", repoRoot);
+const ledgerSrc = new URL("packages/db/src/match/", repoRoot);
+const ledgerOnly = (file) => file.startsWith(fileURLToPath(ledgerSrc));
+const workerOnly = (file) => file.startsWith(fileURLToPath(workerSrc));
 
 const checks = [
   {
+    name: "bare @shaxda/db import",
+    pattern: /["']@shaxda\/db["']/g,
+    appliesTo: () => true,
+  },
+  {
+    name: "auth-table SQL",
+    pattern:
+      /\b(?:FROM|JOIN|INTO|UPDATE|TABLE|REFERENCES)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(?:["'`[])?(?:user|account|session|verification|username_claim)\b/gi,
+    appliesTo: () => true,
+  },
+  {
+    name: "Drizzle or Better Auth import in ledger writer",
+    pattern: /["'](?:drizzle-orm|better-auth)(?:\/[^"']*)?["']/g,
+    appliesTo: ledgerOnly,
+  },
+  {
     name: "normal WebSocket accept",
     pattern: /\.accept\s*\(/g,
-    appliesTo: () => true,
+    appliesTo: workerOnly,
   },
   {
     name: "setInterval",
     pattern: /\bsetInterval\s*\(/g,
-    appliesTo: () => true,
+    appliesTo: workerOnly,
   },
   {
     name: "setTimeout in Durable Object lifecycle source",
     pattern: /\bsetTimeout\s*\(/g,
-    appliesTo: () => true,
+    appliesTo: workerOnly,
   },
 ];
 
 const violations = [];
 
-for (const filePath of await listTypeScriptFiles(workerSrc)) {
+for (const filePath of (
+  await Promise.all([workerSrc, ledgerSrc].map(listTypeScriptFiles))
+).flat()) {
   const relativePath = path.relative(fileURLToPath(repoRoot), filePath);
   if (filePath.endsWith(".test.ts")) {
     continue;

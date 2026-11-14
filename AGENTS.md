@@ -47,8 +47,8 @@ production browser checks are tracked in
 ratings, leaderboard, and sponsorship stay out of scope until the V2 milestone
 that covers them is activated. Full English/i18n is not part of V2.
 
-**V2** (`docs/shaxda-v2.md`, specs in `docs/specs/`) is specified and frozen,
-not built: no V2 milestone is activated yet. No V2 implementation starts
+**V2** (`docs/shaxda-v2.md`, specs in `docs/specs/`) is specified and frozen.
+H1 Match Persistence is activated for local implementation. No V2 implementation starts
 before its spec is `frozen` in `docs/specs/README.md` **and** its milestone is
 activated. Do not pre-apply the V2 §6 rule changes; each lands in the first
 commit of the milestone that needs it. Precedence between the PRD and the V2
@@ -92,8 +92,10 @@ Read these before relevant work:
 
 Better Auth and Google OAuth belong to the shipped V1.1-A account milestone and
 must live in the SvelteKit web Worker. V1.1-A2 permits the game Worker to verify
-short-lived HMAC identity tickets only; it must not gain Better Auth, D1, or
-session-cookie access. Do not introduce Paraglide/Inlang or English
+short-lived HMAC identity tickets. H1 permits a game Worker D1 binding to the
+same database as the web Worker in each environment. The Match Durable Object
+writes only the match ledger and reads only its own write results. The game
+Worker has no Better Auth, session-cookie access, or auth-table reads. Do not introduce Paraglide/Inlang or English
 routes/content (not part of V2), and do not start match persistence, history,
 replays, ratings, or leaderboard work until the V2 milestone that covers it is
 activated.
@@ -191,7 +193,7 @@ Monetization is post-V1 only after the game is finished and has users.
 
 - Do not write every move as a D1 row.
 - Active match state lives in the Durable Object.
-- Completed logged-in persistence is V1.1 only.
+- Completed account-vs-account persistence follows the H1 ledger contract.
 - Guest games write nothing permanent by default.
 - If D1 is introduced for V1.0, keep it to tiny summary/operational events.
 - Index every common D1 query.
@@ -215,7 +217,8 @@ Monetization is post-V1 only after the game is finished and has users.
 ### Accounts / Identity (V1.1-A / V1.1-A2)
 
 - Auth lives in the SvelteKit web Worker at `/api/auth/*`; do not add Better Auth,
-  D1, cookies, or session validation to the game Worker or change Turnstile.
+  cookies, or session validation to the game Worker or change Turnstile. The H1
+  ledger binding does not grant access to auth tables.
 - The game Worker may verify V1.1-A2 HMAC identity tickets at room create, join,
   and reconnect only. It must fail closed when a supplied ticket cannot be
   verified and must never silently downgrade that connection to a guest.
@@ -227,8 +230,16 @@ Monetization is post-V1 only after the game is finished and has users.
 - Guest local and online play continue to work without an account.
 - Active account-owned room seats are allowed in V1.1-A2. The permanent user id
   is private ownership data; only the username/avatar snapshot may be broadcast.
-- Account deletion, match persistence, history, replay, leaderboard, and English
-  remain later work.
+- The first game in every online room starts at a random seat and rematches
+  alternate the starting seat. The client uses authoritative state to identify
+  the acting seat.
+- Invite games are friendly and private by default. Rated play requires both
+  players to consent before play starts and makes results and replays public.
+  R2 adds the consent handshake. After the first accepted non-terminal action,
+  resignation or a valid claim is a loss in every phase. Endings before play
+  begins save nothing.
+- Account deletion, history, replay viewing, leaderboard, and English remain
+  later work.
 
 ## Repository Layout
 

@@ -226,6 +226,9 @@ importers:
 
   worker:
     dependencies:
+      "@shaxda/db":
+        specifier: workspace:*
+        version: link:../packages/db
       "@shaxda/game-engine":
         specifier: workspace:*
         version: link:../packages/game-engine

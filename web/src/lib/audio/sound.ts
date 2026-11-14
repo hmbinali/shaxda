@@ -33,8 +33,17 @@ export class SoundPlayer {
     }
   }
 
-  async unlock(cue: SoundCue = "place"): Promise<void> {
-    await this.play([cue]);
+  async unlock(cue: SoundCue | null = "place"): Promise<void> {
+    if (cue !== null) {
+      await this.play([cue]);
+      return;
+    }
+
+    try {
+      await this.resumeContext();
+    } catch {
+      // Sound is optional when the browser cannot resume Web Audio.
+    }
   }
 
   async preload(): Promise<void> {
@@ -48,13 +57,9 @@ export class SoundPlayer {
 
   private async playCue(cue: SoundCue): Promise<void> {
     try {
-      const context = this.getContext();
+      const context = await this.resumeContext();
       if (context === null) {
         return;
-      }
-
-      if (context.state === "suspended") {
-        await context.resume();
       }
 
       const buffer = await this.loadBuffer(context, cue);
@@ -71,6 +76,12 @@ export class SoundPlayer {
     } catch {
       // Sound is feedback only; playback failures must never block local play.
     }
+  }
+
+  private async resumeContext(): Promise<BrowserAudioContext | null> {
+    const context = this.getContext();
+    if (context?.state === "suspended") await context.resume();
+    return context;
   }
 
   private getContext(): BrowserAudioContext | null {

@@ -77,6 +77,8 @@ describe("match replay controls", { timeout: 15_000 }, () => {
   it("waits one interval, changes speed, pauses and restarts from the end", async () => {
     const ui = viewer();
     expect(ui.counter).toHaveTextContent("0 / 4");
+    expect(ui.description).toHaveTextContent("Wareegga: Xubin la tirtiray.");
+    expect(ui.description).toHaveTextContent("Wejiga: Dhigis.");
     expect(ui.button("Tallaabadii hore")).toBeDisabled();
     await fireEvent.click(ui.button("Ciyaar"));
     await vi.advanceTimersByTimeAsync(999);
@@ -142,7 +144,7 @@ describe("match replay controls", { timeout: 15_000 }, () => {
     await fireEvent.click(ui.button("Tallaabada xigta"));
     expect(mocks.play).not.toHaveBeenCalled();
     await fireEvent.click(ui.button("Codka shid"));
-    expect(mocks.unlock).toHaveBeenCalledOnce();
+    expect(mocks.unlock).toHaveBeenCalledExactlyOnceWith(null);
     await fireEvent.click(ui.button("Tallaabada xigta"));
     expect(mocks.play).toHaveBeenCalledExactlyOnceWith(["place"]);
     await fireEvent.click(ui.button("Tallaabadii hore"));

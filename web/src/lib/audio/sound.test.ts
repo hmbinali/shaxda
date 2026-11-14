@@ -63,6 +63,25 @@ describe("SoundPlayer", () => {
     await expect(new SoundPlayer().play(["place"])).resolves.toBeUndefined();
   });
 
+  it("unlocks silently without fetching or playing a cue", async () => {
+    const resume = vi.fn(async () => {});
+    class FakeAudioContext {
+      state = "suspended";
+      resume = resume;
+    }
+    const fetchCue = vi.fn();
+    vi.stubGlobal("AudioContext", FakeAudioContext);
+    vi.stubGlobal("fetch", fetchCue);
+
+    const player = new SoundPlayer();
+    const play = vi.spyOn(player, "play");
+    await player.unlock(null);
+
+    expect(resume).toHaveBeenCalledOnce();
+    expect(fetchCue).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
+  });
+
   it("shares one player and preloads every cue in parallel", async () => {
     let contextCount = 0;
     let activeFetches = 0;

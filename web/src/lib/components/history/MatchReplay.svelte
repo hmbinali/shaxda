@@ -7,7 +7,10 @@
   import Board from "$components/Board.svelte";
   import Button from "$components/ui/Button.svelte";
   import { getSoundPlayer } from "$lib/audio/sound";
-  import { buildAnnouncement } from "$lib/game/announce";
+  import {
+    buildAnnouncement,
+    buildStatusAnnouncement,
+  } from "$lib/game/announce";
   import { buildGameStatus, classifyActionFeedback } from "$lib/game/status";
   import { interpolate } from "$lib/history/presentation";
   import type { MatchReplayData } from "$lib/replay/data";
@@ -63,15 +66,18 @@
   );
 
   function describe({ state, cue }: ReplayFrame): string {
-    if (cue === null) return copy.startPosition;
     const status = buildGameStatus(state);
+    const playerName = (seat: PlayerId) => names[seat];
+    if (cue === null) {
+      return `${copy.startPosition} ${buildStatusAnnouncement(status, playerName)}`;
+    }
     const action =
       cue.action.type === "resign" && onlineEndReason
         ? reason
         : buildAnnouncement(
             { action: cue.action, formedJare: cue.jareLines.length > 0 },
             status,
-            (seat) => names[seat],
+            playerName,
           );
     const advantage = cue.firstAdvantage
       ? interpolate(copy.firstAdvantage[cue.firstAdvantage.by], {
@@ -193,7 +199,7 @@
 
   function toggleSound() {
     soundEnabled = !soundEnabled;
-    if (soundEnabled) void getSoundPlayer().unlock();
+    if (soundEnabled) void getSoundPlayer().unlock(null);
   }
 
   beforeNavigate(() => {

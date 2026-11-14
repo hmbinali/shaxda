@@ -27,7 +27,7 @@ export function buildAnnouncement(
 
   return joinAnnouncementParts([
     actionAnnouncement(lastAction, status, playerName),
-    statusAnnouncement(status, playerName),
+    buildStatusAnnouncement(status, playerName),
   ]);
 }
 
@@ -37,7 +37,7 @@ export function buildStateSummary(
 ): string {
   return joinAnnouncementParts([
     copy.announce.stateSynced,
-    statusAnnouncement(status, playerName),
+    buildStatusAnnouncement(status, playerName),
   ]);
 }
 
@@ -71,7 +71,7 @@ function actionAnnouncement(
   }
 }
 
-function statusAnnouncement(
+export function buildStatusAnnouncement(
   status: GameStatus,
   playerName: PlayerName,
 ): string {

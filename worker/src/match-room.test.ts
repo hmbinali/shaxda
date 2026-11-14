@@ -1679,7 +1679,7 @@ describe("match room hibernation spike", () => {
         await storage.put("log", { v: 1, matchNumber: 1, s: "A", a: ["P:O2"] });
       },
     );
-    await resignToGameOver(first, second, roomCode);
+    await finishByCallingRoom(roomCode);
     const entry = await loadOutbox(roomCode);
     expect(entry).toMatchObject({
       status: "stalled",
@@ -1740,15 +1740,7 @@ describe("match room hibernation spike", () => {
         },
       );
       if (!playBegan) await placeFirst(first, second, roomCode);
-      const saved = playBegan
-        ? null
-        : waitForMessageWhere(
-            first,
-            "matchStatus",
-            (status) => status.save?.status === "saved",
-          );
-      await resignToGameOver(first, second, roomCode);
-      await saved;
+      await finishByCallingRoom(roomCode);
       await expect(
         testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
       ).resolves.toBe(playBegan ? 0 : 1);
@@ -1791,6 +1783,27 @@ describe("match room hibernation spike", () => {
     expect(response.status).toBe(404);
   });
 });
+
+async function finishByCallingRoom(roomCode: string): Promise<void> {
+  // Await the whole handler, including D1 and coordinator I/O. A state frame
+  // alone only proves that the terminal storage write has reached the client.
+  await runInDurableObject(roomStub(roomCode), async (instance, state) => {
+    const socket = state
+      .getWebSockets()
+      .find((candidate) => candidate.deserializeAttachment()?.slot === "A");
+    if (!socket) throw new Error("Expected seat A");
+    const room = instance as DurableObject;
+    await room.webSocketMessage?.(
+      socket,
+      JSON.stringify({
+        v: protocolVersion,
+        type: "gameAction",
+        roomCode,
+        action: { type: "resign", player: "A" },
+      }),
+    );
+  });
+}
 
 async function accountRoom() {
   const roomCode = await createRoom();

@@ -67,9 +67,9 @@ applied. The public smoke checks passed and both Worker source paths returned 40
 | Google token retention  | `82dddae` and `a485e99`. Both account write hooks clear token values and expiry timestamps. Returning sign-in skips provider-token updates.                                                                                                 | Google callback succeeded. A new account confirmed no token values were stored and surfaced a retained expiry timestamp, which led to `a485e99` and a preview web redeploy. Cleared the two stale expiry timestamps. Returning Google sign-in left all token and expiry fields empty. A post-fix new-account check remains open.                                                                                                                                                                            | Returning sign-in and existing-row cleanup open.                   |
 
 The [account verification record](../ops/v11a-a2-release-verification.md#2026-11-14--wave-2-account-privacy-follow-up)
-records the post-fix preview login check. A new-account callback and a
-read-only D1 count still require an unused approved Google test account and
-authenticated preview D1 access.
+records two returning preview sessions and a read-only D1 check with all five
+token and expiry columns null on both current Google rows. A post-fix
+new-account callback still requires an unused approved Google test account.
 
 The preview online analytics switch suppressed every counter for a completed
 guest game. With the web analytics switch off, both beacon endpoints returned

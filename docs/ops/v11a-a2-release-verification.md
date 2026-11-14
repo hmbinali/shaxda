@@ -278,11 +278,13 @@ production data; recorded so the verified status above is not overstated.
   browser cases with fresh local D1. The browser cases cover the Google
   reauthentication redirect, request and cancellation, and a grace-period
   match followed by finalization.
-- The closeout pass reached the signed-out preview login page. A fresh callback
-  with `a485e99` remains open because no unused approved Google test account
-  was available. Wrangler also required Cloudflare authentication for the
-  read-only preview aggregate, so this pass recorded no D1 result. Follow the
-  [preview token retention procedure](v11a-accounts-runbook.md#preview-provider-token-retention)
-  when both are available.
+- The closeout confirmed two distinct signed-in preview accounts in Chrome
+  and the built-in browser. A read-only aggregate on `shaxda-db-preview`
+  found two Google provider rows and zero non-null values in each of the
+  access token, refresh token, ID token, access expiry, and refresh expiry
+  columns. Both current rows predate `a485e99`. The post-fix new-account
+  callback remains open until an unused approved Google test account is
+  available. Follow the
+  [preview token retention procedure](v11a-accounts-runbook.md#preview-provider-token-retention).
 - Production existing-row cleanup and the production Google sign-in check
   remain open.

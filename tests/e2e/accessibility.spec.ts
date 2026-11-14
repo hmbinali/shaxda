@@ -18,6 +18,11 @@ test.describe("Q1 accessibility audit", () => {
       page,
     }) => {
       await page.goto(route);
+      // The prerendered gameplay shells set their title when the client mounts.
+      // Assert that title before scanning the hydrated page.
+      if (route === "/local" || route === "/online") {
+        await expect(page).toHaveTitle(/.+\| Shaxda$/);
+      }
 
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

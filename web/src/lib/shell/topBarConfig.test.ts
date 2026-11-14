@@ -30,6 +30,7 @@ describe("account-aware top bar configuration", () => {
     const group = accountGroup(account);
     expect(group.items.map((item) => item.id)).toEqual([
       "profile",
+      "history",
       "account-settings",
       "logout",
     ]);
@@ -37,7 +38,8 @@ describe("account-aware top bar configuration", () => {
       label: "@mahamed",
       href: "/u/mahamed",
     });
-    expect(group.items[2]).toMatchObject({ formAction: "/logout" });
+    expect(group.items[1]).toMatchObject({ href: "/history" });
+    expect(group.items[3]).toMatchObject({ formAction: "/logout" });
     expect(defaultTopBar("/learn", account).actions[0]).toMatchObject({
       label: "@mahamed",
       shortLabel: "@mahamed",

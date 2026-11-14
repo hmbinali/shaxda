@@ -6,6 +6,7 @@ import type {
   PlayerId,
   PointId,
 } from "@shaxda/game-engine";
+import { matchIdSchema } from "@shaxda/shared";
 import type {
   MatchSave,
   RematchVote,
@@ -74,7 +75,7 @@ export type OnlineRematchStage =
 
 export class OnlineGameController {
   hasAuthoritativeState = $state(false);
-  save = $state<MatchSave | null>(null);
+  #latestSave = $state<MatchSave | null>(null);
   ratedStatus = $state<RatedMatchStatus>({});
   ratedVotes = $state<SeatAnswers>({ A: null, B: null });
   ratedPlayDisabled = $state(false);
@@ -98,6 +99,17 @@ export class OnlineGameController {
   stateSyncNonce = $state(0);
   lastServerError = $state<string | null>(null);
   matchNumber = $state(1);
+  save = $derived(
+    this.#latestSave?.matchNumber === this.matchNumber
+      ? this.#latestSave
+      : null,
+  );
+  savedMatchId = $derived(
+    this.save?.status === "saved" &&
+      matchIdSchema.safeParse(this.save.matchId).success
+      ? this.save.matchId
+      : null,
+  );
   rematchVotes = $state<RematchVotes>({ A: null, B: null });
   rematchStarting = $state(false);
   status = $derived(buildGameStatus(this.state));
@@ -413,7 +425,7 @@ export class OnlineGameController {
         this.idleSlot = message.idleSlot;
         this.claimableBy = message.claimableBy;
         this.claimReason = message.claimReason;
-        this.save = message.save ?? null;
+        this.#latestSave = message.save ?? null;
         this.ratedStatus = {
           mode: message.mode,
           ratedRequest: message.ratedRequest,
@@ -451,6 +463,9 @@ export class OnlineGameController {
       // The server confirmed a new logical match. Drop everything scoped to the
       // finished game; its replacement board arrives in the state broadcast.
       this.matchNumber = matchNumber;
+      // Rejoin can deliver matchStatus before it announces the current match.
+      if (this.#latestSave?.matchNumber !== matchNumber)
+        this.#latestSave = null;
       this.hasAuthoritativeState = false;
       this.selected = null;
       this.invalid = null;
@@ -514,7 +529,7 @@ export class OnlineGameController {
   private resetDisplayedRoomState(): void {
     this.state = createInitialState("A");
     this.hasAuthoritativeState = false;
-    this.save = null;
+    this.#latestSave = null;
     this.ratedStatus = {};
     this.ratedVotes = { A: null, B: null };
     this.ratedPlayDisabled = false;

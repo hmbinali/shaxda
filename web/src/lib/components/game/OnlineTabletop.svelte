@@ -6,6 +6,7 @@
   import { onMount } from "svelte";
   import Board from "$components/Board.svelte";
   import Button from "$components/ui/Button.svelte";
+  import { matchPath } from "$lib/site/metadata";
   import type { OnlineGameController } from "$lib/online/onlineGame.svelte";
   import {
     instructionKeyFor,
@@ -79,7 +80,7 @@
     onSelect: () => controller.requestRematch(),
     testId: "online-rematch",
   });
-  const resultActions = $derived.by((): GameResultAction[] => {
+  const rematchActions = $derived.by((): GameResultAction[] => {
     if (!controller.canRematch) {
       return [{ ...newMatchAction, variant: "primary" }];
     }
@@ -129,6 +130,26 @@
         return [rematchAction, newMatchAction];
     }
   });
+  const resultActions = $derived.by((): GameResultAction[] => {
+    const id = controller.savedMatchId;
+    if (id === null) return rematchActions;
+    return [
+      ...rematchActions,
+      {
+        id: "view-match",
+        label: copy.result.viewMatch,
+        href: matchPath(id),
+        testId: "online-view-match",
+      },
+    ];
+  });
+  const saveNotice = $derived(
+    controller.save?.status === "pending"
+      ? copy.result.saving
+      : controller.save?.status === "stalled"
+        ? copy.result.notSaved
+        : null,
+  );
   const resultNotice = $derived.by((): string | null => {
     if (!controller.canRematch) {
       return null;
@@ -292,7 +313,7 @@
             actions={resultActions}
             inertTargets={[topBar, topRailElement, bottomRailElement]}
           >
-            {#snippet details()}
+            {#snippet statusLine()}
               {#if controller.accountMatch && controller.ratedStatus.rated === null}
                 <p data-testid="rated-result-not-saved">
                   {ratedCopy.result.notSaved}
@@ -302,9 +323,7 @@
               {:else if controller.ratedStatus.rated === true}
                 <MatchRatingResult
                   rated
-                  save={controller.save?.matchNumber === controller.matchNumber
-                    ? controller.save
-                    : null}
+                  save={controller.save}
                   matchNumber={controller.matchNumber}
                 >
                   {#snippet children(view)}
@@ -336,6 +355,15 @@
                 </Button>
               {:else if controller.ratedPlayDisabled && controller.ratedRoom}
                 <p>{copy.errors.ratedPlayDisabled}</p>
+              {/if}
+              {#if saveNotice}
+                <p
+                  role="status"
+                  data-testid="online-save-status"
+                  class="text-sm text-board-100"
+                >
+                  {saveNotice}
+                </p>
               {/if}
             {/snippet}
           </GameResultOverlay>

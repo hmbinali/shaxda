@@ -28,8 +28,9 @@ starts only when the spec is frozen **and** its milestone is activated
 
 ## Current implementation planning
 
-As of 2026-11-14, all 17 milestone specs are frozen. H1 Match Persistence and
-X1a Product Analytics are activated for local implementation and verification.
+As of 2026-11-14, all 17 milestone specs are frozen. H1 Match Persistence,
+H2 Match History and Detail, and X1a Product Analytics are activated for local
+implementation and verification.
 R1 Rating System, R2 Rated Play Rules, and R6-core Ranking Integrity are
 activated together for local implementation from Wave 1 commit `5b94a5c`
 after E5. Public rated play stays disabled pending the wave 2 release gates.

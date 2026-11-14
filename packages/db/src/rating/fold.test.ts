@@ -53,9 +53,8 @@ it("replays the E5 weekly 12-game farming bursts with alternating seats", () => 
   expect(corrected.matches[1]?.rating_skip_reason).toBe("invalidated");
   expect(corrected.matches[3]?.rating_status).toBe("processed");
   expect(corrected.seats.some((s) => s.match_id === "2")).toBe(false);
-  expect(
-    corrected.players.find((p) => p.user_id === "farmer")?.rating,
-  ).not.toBe(capped.players.find((p) => p.user_id === "farmer")?.rating);
+  // The replacement was another identical win in the same rating period.
+  expect(corrected.players).toEqual(capped.players);
 });
 
 it("uses the exact 24-hour window and ingestion order for ties and late arrivals", () => {

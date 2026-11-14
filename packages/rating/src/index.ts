@@ -1,6 +1,6 @@
-import { RatingMathError, solveVolatility } from "./solver.ts";
+import { RatingMathError, solveVolatility } from "./solver";
 
-export { RatingMathError } from "./solver.ts";
+export { RatingMathError } from "./solver";
 
 export class RatingInputError extends Error {
   override name = "RatingInputError";

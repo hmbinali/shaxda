@@ -10,7 +10,7 @@ import {
   updateMatch,
   updatePeriod,
 } from "./index.ts";
-import { illinois } from "./solver.ts";
+import { illinois } from "./solver";
 
 const DAY = 86_400_000;
 

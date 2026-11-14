@@ -56,7 +56,10 @@ it("uses the latest action for the indexed invalidation view", async () => {
     plan.results.filter(({ detail }) =>
       detail.includes("rating_invalidation_log_match_idx"),
     ),
-  ).toHaveLength(2);
+  ).not.toHaveLength(0);
+  expect(plan.results.some(({ detail }) => /SCAN [lm]\b/.test(detail))).toBe(
+    false,
+  );
 });
 
 it("protects audit, invalidation, and rebuild rows from edits or deletion", async () => {

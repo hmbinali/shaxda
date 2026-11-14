@@ -69,8 +69,15 @@ The preview online analytics switch suppressed every counter for a completed
 guest game. With the web analytics switch off, both beacon endpoints returned
 204, local play accepted a move, and the cron retained the 90-day fixture and
 pruned the 91-day fixture. The admin page rendered for an allowlisted test
-account and returned 403 after the test allowlist was removed. The account-save
-check with game analytics disabled remains open.
+account and returned 403 after the test allowlist was removed. A focused
+local Workers test saved one played friendly invite with two account seats
+and found identical online counter snapshots with game analytics disabled.
+The live account-save check remains open. Preview D1 was reachable after
+Wrangler reauthentication and contained one saved match. The deployed game
+Worker had both flags enabled. The Chrome profile available for R2 was
+signed out, so the shared settings were held while waiting for two approved
+account sessions. See the
+[preview rehearsal and production reconciliation](../ops/x1a-analytics-runbook.md#x1b-online-counters).
 
 The preview correction rehearsal invalidated and then rescinded the rated
 test result at ledger sequence 1. Each operation changed and marked one

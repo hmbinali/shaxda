@@ -1,5 +1,6 @@
 <script lang="ts">
   import Trophy from "@lucide/svelte/icons/trophy";
+  import { resolve } from "$app/paths";
   import type { PlayerId } from "@shaxda/game-engine";
   import { messages } from "@shaxda/i18n";
   import { onMount } from "svelte";
@@ -16,6 +17,8 @@
   import type { GameResultAction } from "./gameResultActions";
   import InvalidToast from "./InvalidToast.svelte";
   import PlayerRail from "./PlayerRail.svelte";
+  import RatedDisclosure from "./RatedDisclosure.svelte";
+  import RatedLabel from "./RatedLabel.svelte";
   import TabletopShell from "./TabletopShell.svelte";
   import type { TransientToastMessage } from "$lib/notices/toast.svelte";
 
@@ -38,9 +41,21 @@
   }: Props = $props();
 
   const copy = messages.so.onlineGame;
+  const ratedCopy = messages.so.ratedPlay;
   const orientation = $derived({ orientation: "solo", viewer } as const);
   const seating = $derived(resolveSeating(orientation));
   const status = $derived(controller.status);
+  const consentPrompt = $derived(
+    controller.canAnswerConsent &&
+      controller.ratedStatus.consent?.[viewer] !== true,
+  );
+  const showRatedRematch = $derived(
+    controller.canRematch &&
+      controller.ratedRoom &&
+      !controller.ratedPlayDisabled &&
+      !controller.disclosureOutdated &&
+      controller.rematchStage !== "starting",
+  );
   let topRailElement = $state<HTMLElement | null>(null);
   let bottomRailElement = $state<HTMLElement | null>(null);
   let topBar = $state<HTMLElement | null>(null);
@@ -66,6 +81,31 @@
   const resultActions = $derived.by((): GameResultAction[] => {
     if (!controller.canRematch) {
       return [{ ...newMatchAction, variant: "primary" }];
+    }
+
+    if (controller.ratedRoom && controller.rematchStage !== "starting") {
+      const actions: GameResultAction[] = [];
+      if (controller.ratedStatus.mode !== "quick") {
+        actions.push({ ...rematchAction, label: ratedCopy.rematch.friendly });
+      }
+      if (showRatedRematch) {
+        actions.unshift({
+          ...rematchAction,
+          id: "rated-rematch",
+          label: ratedCopy.rematch.rated,
+          onSelect: () => controller.requestRematch(true),
+          testId: "online-rated-rematch",
+        });
+      }
+      if (controller.rematchStage === "opponentRequested") {
+        actions.push({
+          id: "rematch-decline",
+          label: copy.rematch.decline,
+          onSelect: () => controller.declineRematch(),
+          testId: "online-rematch-decline",
+        });
+      }
+      return [...actions, newMatchAction];
     }
 
     switch (controller.rematchStage) {
@@ -97,6 +137,8 @@
       case "requested":
         return copy.rematch.notices.requested;
       case "opponentRequested":
+        if (controller.ratedVotes[viewer === "A" ? "B" : "A"] === true)
+          return ratedCopy.rematch.opponentOfferedRated;
         return copy.rematch.notices.opponentRequested;
       case "declinedByMe":
         return copy.rematch.notices.declinedByMe;
@@ -128,7 +170,56 @@
 
 <h1 class="sr-only">{copy.heading}</h1>
 
-<div class="h-full min-h-full">
+<div class="grid h-full min-h-full grid-rows-[auto_1fr]">
+  <div>
+    {#if controller.matchModeLabel && status.phase !== "gameOver"}
+      <div class="mx-auto grid max-w-2xl gap-1 px-3 pt-2 text-center text-xs">
+        <strong data-testid="online-match-mode"
+          >{controller.matchModeLabel}</strong
+        >
+        {#if controller.ratedRoom || controller.ratedStatus.ratedRequest}
+          <a
+            class="underline"
+            href={resolve("/learn#tartan")}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {ratedCopy.disclosure.learnMore}
+          </a>
+        {/if}
+        {#if consentPrompt}
+          <div
+            class="grid justify-items-center gap-2 rounded-lg border border-board-700/20 p-2"
+            data-testid="rated-consent"
+          >
+            <p>{ratedCopy.consent.request}</p>
+            <RatedDisclosure />
+            <div class="flex flex-wrap justify-center gap-2">
+              <Button
+                size="compact"
+                variant="primary"
+                onclick={() => controller.answerConsent(true)}
+                >{ratedCopy.consent.accept}</Button
+              >
+              {#if controller.ratedStatus.consent?.[viewer] === null}
+                <Button
+                  size="compact"
+                  onclick={() => controller.answerConsent(false)}
+                  >{ratedCopy.consent.decline}</Button
+                >
+              {/if}
+            </div>
+          </div>
+        {/if}
+        {#if controller.disclosureOutdated}
+          <p>{copy.errors.disclosureOutdated}</p>
+          <Button size="compact" onclick={() => window.location.reload()}
+            >{messages.so.pwa.update.action}</Button
+          >
+        {/if}
+      </div>
+    {/if}
+  </div>
   <TabletopShell orientation="solo" compactRails={status.phase !== "placement"}>
     {#snippet topRail()}
       <PlayerRail
@@ -199,7 +290,39 @@
             testId="online-game-result"
             actions={resultActions}
             inertTargets={[topBar, topRailElement, bottomRailElement]}
-          />
+          >
+            {#snippet details()}
+              {#if controller.accountMatch && controller.ratedStatus.rated === null}
+                <p data-testid="rated-result-not-saved">
+                  {ratedCopy.result.notSaved}
+                </p>
+              {:else if controller.accountMatch && controller.ratedStatus.rated !== undefined}
+                <RatedLabel
+                  rated={controller.ratedStatus.rated === true}
+                  showDetail={controller.ratedStatus.rated === false ||
+                    controller.save?.matchNumber !== controller.matchNumber ||
+                    controller.save.status !== "stalled"}
+                />
+              {/if}
+              {#if showRatedRematch}
+                <RatedDisclosure />
+              {:else if controller.accountMatch && controller.ratedStatus.rated !== undefined}
+                <a
+                  class="text-xs underline"
+                  href={resolve("/learn#tartan")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {ratedCopy.disclosure.learnMore}
+                </a>
+              {/if}
+              {#if controller.disclosureOutdated}
+                <p>{copy.errors.disclosureOutdated}</p>
+              {:else if controller.ratedPlayDisabled && controller.ratedRoom}
+                <p>{copy.errors.ratedPlayDisabled}</p>
+              {/if}
+            {/snippet}
+          </GameResultOverlay>
         {/if}
       </div>
     {/snippet}

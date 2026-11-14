@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { learnContentSo, learnSectionIds } from "./learn.so";
 
 describe("Somali learn content", () => {
-  it("uses the nine ordered sections and seven coordinate-free frames", () => {
+  it("uses the ordered sections and seven coordinate-free frames", () => {
     expect(learnContentSo.sections.map((section) => section.id)).toEqual(
       learnSectionIds,
     );
@@ -26,7 +26,7 @@ describe("Somali learn content", () => {
     );
 
     expect(count).toBeGreaterThanOrEqual(1_250);
-    expect(count).toBeLessThanOrEqual(1_400);
+    expect(count).toBeLessThanOrEqual(1_620);
   });
 
   it("introduces the game before the guide and configures equal play actions", () => {

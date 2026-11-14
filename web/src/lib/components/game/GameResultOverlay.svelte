@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PlayerId } from "@shaxda/game-engine";
+  import type { Snippet } from "svelte";
   import { messages } from "@shaxda/i18n";
   import { modal } from "$lib/a11y/modal";
   import type { GameStatus } from "$lib/game/status";
@@ -14,6 +15,7 @@
     testId: string;
     actions: readonly GameResultAction[];
     inertTargets?: readonly (HTMLElement | null | undefined)[];
+    details?: Snippet;
   }
 
   let {
@@ -24,6 +26,7 @@
     testId,
     actions,
     inertTargets = [],
+    details,
   }: Props = $props();
 
   const copy = messages.so.localGame;
@@ -77,6 +80,8 @@
       </p>
     {/if}
 
+    {@render details?.()}
+
     <div
       class="actions"
       class:single={actions.length === 1}
@@ -122,6 +127,8 @@
   .result-panel {
     display: grid;
     width: min(100%, 20rem);
+    max-height: calc(100% - 0.5rem);
+    overflow-y: auto;
     justify-items: center;
     gap: 0.75rem;
     border: 1px solid rgb(234 216 194 / 0.28);

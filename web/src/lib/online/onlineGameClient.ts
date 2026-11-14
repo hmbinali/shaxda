@@ -3,8 +3,9 @@ import {
   protocolVersion,
   serverMessageSchema,
 } from "@shaxda/shared";
+import { RATED_DISCLOSURE_V } from "@shaxda/shared/rated-play";
 import type { GameAction } from "@shaxda/game-engine";
-import type { RematchVote, ServerMessage } from "@shaxda/shared";
+import type { ClientMessage, RematchVote, ServerMessage } from "@shaxda/shared";
 import type { TicketAction } from "@shaxda/shared/identity";
 import { httpOrigin, wsOrigin } from "./workerOrigin";
 
@@ -81,10 +82,12 @@ export class OnlineGameClient {
   async createRoom(
     turnstileToken?: string,
     identityTicket?: string,
+    ratedRequest = false,
   ): Promise<string> {
     const body = {
       ...(turnstileToken ? { turnstileToken } : {}),
       ...(identityTicket ? { identityTicket } : {}),
+      ...(ratedRequest ? { options: { ratedRequest } } : {}),
     };
     const response = await this.#fetch(`${this.#httpBase}/rooms`, {
       method: "POST",
@@ -285,7 +288,33 @@ export class OnlineGameClient {
     return true;
   }
 
-  sendRematchVote(vote: RematchVote, matchNumber?: number): boolean {
+  sendRateConsent(matchNumber: number, accept: boolean): boolean {
+    return this.sendRoomMessage({
+      type: "rateConsent",
+      matchNumber,
+      accept,
+      disclosureV: RATED_DISCLOSURE_V,
+    });
+  }
+
+  sendRematchVote(
+    vote: RematchVote,
+    matchNumber?: number,
+    rated = false,
+  ): boolean {
+    return this.sendRoomMessage({
+      type: "rematch",
+      matchNumber,
+      vote,
+      ...(rated ? { rated, disclosureV: RATED_DISCLOSURE_V } : {}),
+    });
+  }
+
+  private sendRoomMessage(
+    body:
+      | Omit<Extract<ClientMessage, { type: "rateConsent" }>, "v" | "roomCode">
+      | Omit<Extract<ClientMessage, { type: "rematch" }>, "v" | "roomCode">,
+  ): boolean {
     if (
       this.#socket === null ||
       this.#roomCode === null ||
@@ -296,10 +325,8 @@ export class OnlineGameClient {
 
     const message = clientMessageSchema.parse({
       v: protocolVersion,
-      type: "rematch",
-      matchNumber,
       roomCode: this.#roomCode,
-      vote,
+      ...body,
     });
     this.#socket.send(JSON.stringify(message));
     return true;

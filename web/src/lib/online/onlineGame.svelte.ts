@@ -1,4 +1,5 @@
 import { createInitialState, getActingPlayer } from "@shaxda/game-engine";
+import { messages } from "@shaxda/i18n";
 import type {
   GameAction,
   GameState,
@@ -9,6 +10,7 @@ import type {
   MatchSave,
   RematchVote,
   RematchVotes,
+  SeatAnswers,
   ServerMessage,
 } from "@shaxda/shared";
 import {
@@ -36,6 +38,10 @@ export type OnlineMatchEndReason = Extract<
   ServerMessage,
   { type: "matchEnded" }
 >["reason"];
+type RatedMatchStatus = Pick<
+  Extract<ServerMessage, { type: "matchStatus" }>,
+  "mode" | "ratedRequest" | "consent" | "rated"
+>;
 
 export interface InvalidFeedback {
   reason: PointInteractionInvalidReason | "actionRejected" | "notYourTurn";
@@ -69,6 +75,12 @@ export type OnlineRematchStage =
 export class OnlineGameController {
   hasAuthoritativeState = $state(false);
   save = $state<MatchSave | null>(null);
+  ratedStatus = $state<RatedMatchStatus>({});
+  ratedVotes = $state<SeatAnswers>({ A: null, B: null });
+  ratedPlayDisabled = $state(false);
+  disclosureOutdated = $state(false);
+  firstMoveDeclined = $state(false);
+  firstMove = $state<GameAction | null>(null);
   state = $state<GameState>(createInitialState("A"));
   roomCode = $state<string | null>(null);
   mySlot = $state<PlayerId | null>(null);
@@ -96,6 +108,47 @@ export class OnlineGameController {
       : null,
   );
   started = $derived(this.presence.A !== null && this.presence.B !== null);
+  accountMatch = $derived(
+    this.presence.A?.kind === "account" && this.presence.B?.kind === "account",
+  );
+  ratedRoom = $derived(
+    this.accountMatch && this.ratedStatus.ratedRequest === true,
+  );
+  canAnswerConsent = $derived.by(
+    () =>
+      this.boardInteractive &&
+      this.ratedRoom &&
+      this.ratedStatus.mode === "invite" &&
+      this.matchNumber === 1 &&
+      this.ratedStatus.rated === null &&
+      !this.ratedPlayDisabled &&
+      !this.disclosureOutdated,
+  );
+  consentPending = $derived(
+    this.canAnswerConsent &&
+      this.ratedStatus.consent !== undefined &&
+      Object.values(this.ratedStatus.consent).includes(null) &&
+      !Object.values(this.ratedStatus.consent).includes(false),
+  );
+  matchModeLabel = $derived.by(() => {
+    const copy = messages.so.ratedPlay;
+    const { mode, ratedRequest, consent, rated } = this.ratedStatus;
+    if (!this.started || rated === undefined) return null;
+    if (!this.accountMatch)
+      return ratedRequest ? copy.lobby.needsAccounts : null;
+    if (!ratedRequest) return copy.mode.friendly;
+    if (mode === "quick") return copy.lobby.quick;
+    if (rated === true || (consent?.A === true && consent.B === true))
+      return copy.lobby.agreed;
+    if (this.matchNumber > 1) return copy.rematch.startedFriendly;
+    if (this.ratedPlayDisabled)
+      return messages.so.onlineGame.errors.ratedPlayDisabled;
+    if (rated === false && this.firstMoveDeclined)
+      return copy.lobby.startedUnagreed;
+    if (consent?.A === false || consent?.B === false)
+      return copy.lobby.declined;
+    return rated === false ? copy.lobby.startedUnagreed : copy.lobby.pending;
+  });
   opponentConnected = $derived(
     this.mySlot === null ? null : this.connections[otherSlot(this.mySlot)],
   );
@@ -149,6 +202,7 @@ export class OnlineGameController {
   #feedbackNonce = 0;
   #actionNonce = 0;
   #pendingAction: GameAction | null = null;
+  #creatorConsent = false;
 
   constructor(options: OnlineGameControllerOptions = {}) {
     this.#client = options.client ?? new OnlineGameClient();
@@ -175,12 +229,15 @@ export class OnlineGameController {
       action: RoomTicketAction,
       roomCode: string,
     ) => Promise<string | null>,
+    ratedRequest = false,
   ): Promise<string> {
     const roomCode = await this.#client.createRoom(
       turnstileToken,
       identityTicket,
+      ratedRequest,
     );
     this.joinRoom(roomCode, guestId, displayName, requestTicket);
+    this.#creatorConsent = ratedRequest;
     return roomCode;
   }
 
@@ -235,7 +292,37 @@ export class OnlineGameController {
       return;
     }
 
+    if (this.consentPending) {
+      this.firstMove = result.action;
+      return;
+    }
     this.sendAction(result.action);
+  }
+
+  confirmFirstMove(): void {
+    const action = this.firstMove;
+    this.firstMove = null;
+    if (action === null || !this.canInteract) return;
+    this.firstMoveDeclined = true;
+    if (this.canAnswerConsent) this.answerConsent(false);
+    this.sendAction(action);
+  }
+
+  answerConsent(accept: boolean): void {
+    if (this.canAnswerConsent)
+      this.#client.sendRateConsent(this.matchNumber, accept);
+  }
+
+  autoConsent(): void {
+    if (
+      this.#creatorConsent &&
+      this.mySlot !== null &&
+      this.canAnswerConsent &&
+      this.ratedStatus.consent?.[this.mySlot] === null &&
+      this.#client.sendRateConsent(this.matchNumber, true)
+    ) {
+      this.#creatorConsent = false;
+    }
   }
 
   resign(): void {
@@ -263,13 +350,14 @@ export class OnlineGameController {
     }
   }
 
-  requestRematch(): void {
+  requestRematch(rated = false): void {
     // The opponent's standing request turns this vote into the second half of a
     // mutual agreement, so the server starts the next match straight away.
     this.sendRematchVote(
       "accept",
       this.mySlot !== null &&
         this.rematchVotes[otherSlot(this.mySlot)] === "accept",
+      rated,
     );
   }
 
@@ -284,13 +372,17 @@ export class OnlineGameController {
     this.resetDisplayedRoomState();
   }
 
-  private sendRematchVote(vote: RematchVote, starting: boolean): void {
+  private sendRematchVote(
+    vote: RematchVote,
+    starting: boolean,
+    rated = false,
+  ): void {
     if (!this.canRematch) {
       this.markInvalid("actionRejected");
       return;
     }
 
-    const sent = this.#client.sendRematchVote(vote, this.matchNumber);
+    const sent = this.#client.sendRematchVote(vote, this.matchNumber, rated);
     if (!sent) {
       this.markInvalid("actionRejected");
       return;
@@ -326,16 +418,28 @@ export class OnlineGameController {
         this.claimableBy = message.claimableBy;
         this.claimReason = message.claimReason;
         this.save = message.save ?? null;
+        this.ratedStatus = {
+          mode: message.mode,
+          ratedRequest: message.ratedRequest,
+          consent: message.consent,
+          rated: message.rated,
+        };
+        if (!this.consentPending) this.firstMove = null;
+        this.autoConsent();
         return;
       case "matchEnded":
         this.onlineEndReason = message.reason;
         return;
       case "rematchStatus":
         this.receiveRematchStatus(message.matchNumber, message.votes);
+        this.ratedVotes = message.ratedVotes ?? { A: null, B: null };
         return;
       case "error":
         this.#pendingAction = null;
         this.rematchStarting = false;
+        if (message.code === "ratedPlayDisabled") this.ratedPlayDisabled = true;
+        if (message.code === "disclosureOutdated")
+          this.disclosureOutdated = true;
         this.lastServerError = message.code;
         this.markInvalid("actionRejected");
         return;
@@ -358,6 +462,8 @@ export class OnlineGameController {
       this.onlineEndReason = null;
       this.lastServerError = null;
       this.#pendingAction = null;
+      this.firstMove = null;
+      this.firstMoveDeclined = false;
     }
 
     this.rematchVotes = votes;
@@ -371,6 +477,7 @@ export class OnlineGameController {
       pendingAction ?? inferOpponentAction(previousState, nextState);
     this.state = nextState;
     this.hasAuthoritativeState = true;
+    this.autoConsent();
     this.selected = null;
     this.invalid = null;
     this.lastServerError = null;
@@ -413,6 +520,13 @@ export class OnlineGameController {
     this.state = createInitialState("A");
     this.hasAuthoritativeState = false;
     this.save = null;
+    this.ratedStatus = {};
+    this.ratedVotes = { A: null, B: null };
+    this.ratedPlayDisabled = false;
+    this.disclosureOutdated = false;
+    this.firstMove = null;
+    this.firstMoveDeclined = false;
+    this.#creatorConsent = false;
     this.mySlot = null;
     this.presence = { A: null, B: null };
     this.connections = { A: false, B: false };

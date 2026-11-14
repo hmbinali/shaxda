@@ -45,3 +45,5 @@ export const playerRatingViewSchema = z.discriminatedUnion("rated", [
     provisional: z.boolean(),
   }),
 ]);
+
+export type PlayerRatingView = z.infer<typeof playerRatingViewSchema>;

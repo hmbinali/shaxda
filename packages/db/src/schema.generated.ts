@@ -19,6 +19,11 @@ export const user = sqliteTable("user", {
   username: text("username"),
   usernameChangedAt: integer("username_changed_at", { mode: "timestamp_ms" }),
   avatarMode: text("avatar_mode").default("initial"),
+  deletionRequestedAt: integer("deletion_requested_at", {
+    mode: "timestamp_ms",
+  }),
+  deletionDueAt: integer("deletion_due_at", { mode: "timestamp_ms" }),
+  deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
 });
 
 export const session = sqliteTable(

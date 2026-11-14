@@ -22,6 +22,8 @@ export * from "./schema.generated";
 //   - CHECK `user_username_normalized_check`;
 //   - CHECK `user_avatar_mode_check`;
 //   - NOT NULL on `user.avatar_mode`.
+// Migration 0005 adds `user_deletion_due_check`, `user_deleted_check`, and
+// the partial indexes `user_deletion_due_idx` and `user_deleted_at_idx`.
 //
 // `migrations/meta/` therefore does not describe them either, and it is left
 // that way on purpose: syncing the snapshot by hand would make the next

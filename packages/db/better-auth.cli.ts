@@ -39,6 +39,9 @@ export const auth = betterAuth({
         input: false,
         returned: true,
       },
+      deletionRequestedAt: { type: "date", input: false, returned: false },
+      deletionDueAt: { type: "date", input: false, returned: false },
+      deletedAt: { type: "date", input: false, returned: false },
     },
   },
 });

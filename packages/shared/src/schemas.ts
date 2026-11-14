@@ -123,6 +123,27 @@ export const roomCodeSchema = z
   .string()
   .length(ROOM_CODE_LENGTH)
   .regex(roomCodePattern);
+export const MATCH_ID_LENGTH = 20;
+export const matchIdSchema = z
+  .string()
+  .length(MATCH_ID_LENGTH)
+  .regex(roomCodePattern);
+export const roomOptionsSchema = z.strictObject({
+  ratedRequest: z.boolean().default(false),
+});
+export const matchModeSchema = z.enum(["invite", "quick"]);
+const matchNumberSchema = z.number().int().positive();
+export const matchSaveSchema = z.discriminatedUnion("status", [
+  z.object({ matchNumber: matchNumberSchema, status: z.literal("pending") }),
+  z.object({ matchNumber: matchNumberSchema, status: z.literal("stalled") }),
+  z.object({
+    matchNumber: matchNumberSchema,
+    status: z.literal("saved"),
+    matchId: matchIdSchema,
+  }),
+]);
+export type MatchSave = z.infer<typeof matchSaveSchema>;
+
 export const guestIdSchema = z.string().min(8).max(128);
 export const guestDisplayNameSchema = z.string().min(1).max(40);
 export const identityTicketSchema = z
@@ -201,6 +222,7 @@ export const gameActionClientMessageSchema = z.object({
   ...envelopeBase,
   type: z.literal("gameAction"),
   roomCode: roomCodeSchema,
+  matchNumber: matchNumberSchema.optional(),
   action: gameActionSchema,
 });
 
@@ -208,6 +230,7 @@ export const claimWinClientMessageSchema = z.object({
   ...envelopeBase,
   type: z.literal("claimWin"),
   roomCode: roomCodeSchema,
+  matchNumber: matchNumberSchema.optional(),
 });
 
 export const rematchVoteSchema = z.enum(["accept", "decline"]);
@@ -216,6 +239,7 @@ export const rematchClientMessageSchema = z.object({
   ...envelopeBase,
   type: z.literal("rematch"),
   roomCode: roomCodeSchema,
+  matchNumber: matchNumberSchema.optional(),
   vote: rematchVoteSchema,
 });
 
@@ -297,6 +321,13 @@ export const matchStatusServerMessageSchema = z.object({
   idleSlot: playerSlotSchema.nullable(),
   claimableBy: playerSlotSchema.nullable(),
   claimReason: onlineMatchEndReasonSchema.nullable(),
+  mode: matchModeSchema.optional(),
+  ratedRequest: z.boolean().optional(),
+  consent: z
+    .object({ A: z.boolean().nullable(), B: z.boolean().nullable() })
+    .optional(),
+  rated: z.boolean().nullable().optional(),
+  save: matchSaveSchema.optional(),
 });
 
 export const matchEndedServerMessageSchema = z.object({

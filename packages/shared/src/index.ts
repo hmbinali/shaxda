@@ -18,3 +18,12 @@ export const healthResponseSchema = z.object({
 });
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
+
+export {
+  compactReplaySchema,
+  parseStoredReplay,
+  matchPayloadSchema,
+  matchPayloadHash,
+  MAX_STORED_REPLAY_BYTES,
+} from "./match";
+export type { MatchPayload } from "./match";

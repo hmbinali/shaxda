@@ -8,6 +8,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./rated-play": {
+      "types": "./src/rated-play.ts",
+      "default": "./src/rated-play.ts"
+    },
     "./identity": {
       "types": "./src/identity/ticket.ts",
       "default": "./src/identity/ticket.ts"

@@ -5,3 +5,5 @@ GOOGLE_CLIENT_ID=replace-with-google-oauth-client-id
 GOOGLE_CLIENT_SECRET=replace-with-google-oauth-client-secret
 # Must exactly match worker/.dev.vars ONLINE_IDENTITY_SECRET.
 ONLINE_IDENTITY_SECRET=replace-with-the-same-random-online-identity-secret
+ANALYTICS_SALT=replace-with-a-random-analytics-salt-at-least-32-characters
+ADMIN_USER_IDS=

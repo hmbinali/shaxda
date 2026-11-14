@@ -7,7 +7,16 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": ".svelte-kit/cloudflare/_worker.js",
   "workers_dev": true,
+  "triggers": { "crons": ["* * * * *"] },
+  "ratelimits": [
+    {
+      "name": "ANALYTICS_RATE_LIMIT",
+      "namespace_id": "1802",
+      "simple": { "limit": 120, "period": 60 },
+    },
+  ],
   "vars": {
+    "ANALYTICS_ENABLED": "true",
     "AUTH_BASE_URL": "https://shaxda-web-preview.shaxda.workers.dev",
   },
   "d1_databases": [

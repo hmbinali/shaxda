@@ -19,23 +19,25 @@ describe("server auth hook", () => {
     authMocks.svelteKitHandler.mockReset();
   });
 
-  it.each(["/local", "/online"])(
-    "resolves %s without accessing auth bindings",
-    async (routeId) => {
-      const event = requestEvent(routeId, routeId);
-      const response = new Response("game");
-      const resolve = vi
-        .fn<Parameters<Handle>[0]["resolve"]>()
-        .mockResolvedValue(response);
+  it.each([
+    "/local",
+    "/online",
+    "/api/analytics/active",
+    "/api/analytics/event",
+  ])("resolves %s without accessing auth bindings", async (routeId) => {
+    const event = requestEvent(routeId, routeId);
+    const response = new Response("game");
+    const resolve = vi
+      .fn<Parameters<Handle>[0]["resolve"]>()
+      .mockResolvedValue(response);
 
-      await expect(handle({ event, resolve })).resolves.toBe(response);
+    await expect(handle({ event, resolve })).resolves.toBe(response);
 
-      expect(event.locals).toEqual({ session: null, user: null });
-      expect(resolve).toHaveBeenCalledWith(event);
-      expect(authMocks.getAuth).not.toHaveBeenCalled();
-      expect(authMocks.svelteKitHandler).not.toHaveBeenCalled();
-    },
-  );
+    expect(event.locals).toEqual({ session: null, user: null });
+    expect(resolve).toHaveBeenCalledWith(event);
+    expect(authMocks.getAuth).not.toHaveBeenCalled();
+    expect(authMocks.svelteKitHandler).not.toHaveBeenCalled();
+  });
 
   it.each([
     ["/login", "/login"],

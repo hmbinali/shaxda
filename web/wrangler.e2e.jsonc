@@ -11,7 +11,16 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": ".svelte-kit/e2e/cloudflare/_worker.js",
   "workers_dev": true,
+  "ratelimits": [
+    {
+      "name": "ANALYTICS_RATE_LIMIT",
+      "namespace_id": "1803",
+      "simple": { "limit": 120, "period": 60 },
+    },
+  ],
   "vars": {
+    "ANALYTICS_ENABLED": "true",
+    "ANALYTICS_SALT": "shaxda-analytics-e2e-test-salt-0000000000000001",
     "AUTH_BASE_URL": "http://127.0.0.1:4173",
     "BETTER_AUTH_SECRET": "shaxda-e2e-only-secret-48-characters-long-000000",
     "ONLINE_IDENTITY_SECRET": "shaxda-online-identity-dev-test-secret-000000000001",

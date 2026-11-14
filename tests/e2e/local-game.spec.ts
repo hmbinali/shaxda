@@ -238,7 +238,16 @@ test.describe("L1 local game", () => {
       "true",
     );
 
+    const counter = page.waitForResponse((response) =>
+      response.url().endsWith("/api/analytics/event"),
+    );
     await page.locator('[data-point-id="O5"]').click();
+    const recorded = await counter;
+    expect(recorded.status()).toBe(204);
+    expect(recorded.request().postDataJSON()).toEqual({
+      v: 1,
+      event: "local_completed",
+    });
 
     await expect(page.getByTestId("game-result")).toContainText(
       "Guuleystay: Ciyaaryahan A",

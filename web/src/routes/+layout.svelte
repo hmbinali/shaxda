@@ -1,6 +1,8 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { onMount } from "svelte";
+  import ActiveBeacon from "$lib/analytics/ActiveBeacon.svelte";
+  import type { ActiveIdentity } from "@shaxda/shared/analytics/events";
   import AnalyticsBeacon from "$lib/analytics/AnalyticsBeacon.svelte";
   import AppTopBar from "$lib/components/AppTopBar.svelte";
   import PwaNotices from "$lib/components/PwaNotices.svelte";
@@ -10,6 +12,16 @@
   import "../app.css";
 
   let { children, data } = $props();
+
+  const activeIdentity = $derived<ActiveIdentity | undefined>(
+    page.route.id === "/local" || page.route.id === "/online"
+      ? undefined
+      : data.account?.status === "complete"
+        ? `account:${data.account.username}`
+        : data.account?.status === "incomplete"
+          ? "account"
+          : "guest",
+  );
 
   const pwa = createPwaController();
   const shell = createAppShell();
@@ -112,6 +124,7 @@
 </script>
 
 <AnalyticsBeacon />
+<ActiveBeacon identity={activeIdentity} />
 
 <div class="flex h-dvh flex-col overflow-hidden bg-board-50 text-board-900">
   <div class="flex min-h-0 flex-1 flex-col" data-testid="shell-background">

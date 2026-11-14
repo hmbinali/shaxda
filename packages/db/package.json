@@ -11,6 +11,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./analytics": {
+      "types": "./src/analytics/index.ts",
+      "default": "./src/analytics/index.ts"
     }
   },
   "scripts": {

@@ -7,7 +7,11 @@
 
   const copy = siteContent.so.errorPage;
   const errorCopy = $derived(
-    page.status === 404 ? copy.notFound : copy.unexpected,
+    page.status === 404
+      ? copy.notFound
+      : page.status === 403
+        ? copy.forbidden
+        : copy.unexpected,
   );
 </script>
 

@@ -40,7 +40,7 @@ import type { PlayerSlot, RoomInboundMessage } from "./protocol";
 
 import { saveMatch } from "@shaxda/db/match";
 import type { SaveMatchResult } from "@shaxda/db/match";
-import { writesLedgerRow } from "@shaxda/shared/rated-play";
+import { RATED_DISCLOSURE_V, writesLedgerRow } from "@shaxda/shared/rated-play";
 import {
   createOutboxEntry,
   MAX_UNSAVED,
@@ -95,6 +95,7 @@ type SeatIdentity =
     };
 
 type RematchVotes = Record<PlayerSlot, RematchVote | null>;
+type RematchDisclosures = Record<PlayerSlot, number | null>;
 
 type RoomState = {
   roomCode: string;
@@ -115,6 +116,7 @@ type RoomState = {
   claimReason: OnlineMatchEndReason | null;
   onlineEndReason: OnlineMatchEndReason | null;
   rematch: RematchVotes;
+  rematchDisclosure: RematchDisclosures;
   options: { mode: MatchPayload["mode"]; ratedRequest: boolean };
   consent: Record<PlayerSlot, { accept: boolean; disclosureV: number } | null>;
   rated: boolean | null;
@@ -147,6 +149,7 @@ export interface MatchRoomEnv {
   MATCH_COORDINATOR: DurableObjectNamespace;
   DB?: D1Database;
   RATINGS?: { processNow(): Promise<{ accepted: true }> };
+  RATED_PLAY_ENABLED?: string;
   ONLINE_IDENTITY_SECRET?: string;
   ONLINE_IDENTITY_SECRET_PREVIOUS?: string;
 }
@@ -227,6 +230,9 @@ export class MatchRoom implements DurableObject {
         return;
       case "claimWin":
         await this.handleClaimWin(ws, room, parsed.message, now);
+        return;
+      case "rateConsent":
+        await this.handleRateConsent(ws, room, parsed.message, now);
         return;
       case "rematch":
         await this.handleRematch(ws, room, parsed.message, now);
@@ -353,6 +359,7 @@ export class MatchRoom implements DurableObject {
       claimReason: null,
       onlineEndReason: null,
       rematch: emptyRematchVotes(),
+      rematchDisclosure: { A: null, B: null },
       options: {
         mode: "invite",
         ratedRequest: body.data.options?.ratedRequest ?? false,
@@ -675,6 +682,81 @@ export class MatchRoom implements DurableObject {
     );
   }
 
+  private async handleRateConsent(
+    ws: WebSocket,
+    room: RoomState,
+    message: Extract<RoomInboundMessage, { type: "rateConsent" }>,
+    now: number,
+  ): Promise<void> {
+    if (message.roomCode !== room.roomCode) {
+      this.sendError(ws, "roomMismatch", "Room code does not match this room.");
+      return;
+    }
+    const attachment = this.authorizeSocket(room, ws);
+    if (!attachment) {
+      this.sendError(ws, "notJoined", "Join the room before answering.");
+      return;
+    }
+    if (!this.checkMatchNumber(ws, room, message.matchNumber)) return;
+    if (!this.checkRatedRequest(ws, room)) return;
+    if (
+      room.options.mode !== "invite" ||
+      room.matchNumber !== 1 ||
+      room.playBeganAt !== null ||
+      deserialize(room.gameState).phase === "gameOver"
+    ) {
+      this.sendError(ws, "consentClosed", "Rated consent is closed.");
+      return;
+    }
+    if (!this.checkDisclosure(ws, message.disclosureV)) return;
+
+    const current = room.consent[attachment.slot];
+    if (
+      current?.accept === message.accept &&
+      current.disclosureV === message.disclosureV
+    ) {
+      ws.send(JSON.stringify(this.matchStatus(room)));
+      return;
+    }
+
+    const updatedRoom: RoomState = {
+      ...room,
+      lastActivityAt: now,
+      consent: {
+        ...room.consent,
+        [attachment.slot]: {
+          accept: message.accept,
+          disclosureV: message.disclosureV,
+        },
+      },
+    };
+    await this.persistRoom(updatedRoom);
+    this.broadcastMatchStatus(updatedRoom);
+  }
+
+  private checkRatedRequest(ws: WebSocket, room: RoomState): boolean {
+    if (
+      room.options.ratedRequest &&
+      room.seats.A?.kind === "account" &&
+      room.seats.B?.kind === "account"
+    )
+      return true;
+    this.sendError(ws, "consentUnavailable", "Rated play is unavailable.");
+    return false;
+  }
+
+  private checkDisclosure(ws: WebSocket, disclosureV?: number): boolean {
+    if (this.env.RATED_PLAY_ENABLED !== "true") {
+      this.sendError(ws, "ratedPlayDisabled", "Rated play is paused.");
+      return false;
+    }
+    if (disclosureV !== RATED_DISCLOSURE_V) {
+      this.sendError(ws, "disclosureOutdated", "Reload the rated disclosure.");
+      return false;
+    }
+    return true;
+  }
+
   private async handleRematch(
     ws: WebSocket,
     room: RoomState,
@@ -714,6 +796,14 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
+    const ratedVote = message.vote === "accept" && message.rated === true;
+    if (ratedVote) {
+      if (!this.checkRatedRequest(ws, room)) return;
+      if (!this.checkDisclosure(ws, message.disclosureV)) return;
+    } else if (message.vote === "accept" && room.options.mode === "quick") {
+      this.sendError(ws, "ratedOnlyRematch", "Quick rematches must be rated.");
+      return;
+    }
     if (
       message.vote === "accept" &&
       Object.keys(room.unsaved).length >= MAX_UNSAVED
@@ -726,16 +816,23 @@ export class MatchRoom implements DurableObject {
       return;
     }
     const votes = applyRematchVote(room.rematch, attachment.slot, message.vote);
-    if (sameRematchVotes(votes, room.rematch)) {
+    const disclosures = { ...room.rematchDisclosure };
+    for (const seat of PLAYER_SLOTS) {
+      if (votes[seat] !== "accept") disclosures[seat] = null;
+    }
+    disclosures[attachment.slot] = ratedVote ? RATED_DISCLOSURE_V : null;
+    if (
+      sameRematchVotes(votes, room.rematch) &&
+      disclosures[attachment.slot] === room.rematchDisclosure[attachment.slot]
+    ) {
       // A retried vote changes nothing, so keep the room untouched and just
       // resync the sender.
-      await this.refreshActivityIfStale(room, now);
       this.sendRematchStatus(ws, room);
       return;
     }
 
     if (votes.A === "accept" && votes.B === "accept") {
-      await this.startRematch(room, now);
+      await this.startRematch(room, now, disclosures);
       return;
     }
 
@@ -743,6 +840,7 @@ export class MatchRoom implements DurableObject {
       ...room,
       lastActivityAt: now,
       rematch: votes,
+      rematchDisclosure: disclosures,
     };
     await this.persistRoom(updatedRoom);
     this.broadcastRematchStatus(updatedRoom);
@@ -860,11 +958,14 @@ export class MatchRoom implements DurableObject {
         ...currentLog,
         a: [...currentLog.a, encodeAction(action)],
       };
-      if (action.type !== "resign" && room.playBeganAt === null) {
+      if (state.phase !== "gameOver" && room.playBeganAt === null) {
         room.playBeganAt = now;
-        // R2 supplies the consent handshake. H1 games are always friendly.
-        room.rated = false;
-        room.consentPolicyV = null;
+        room.rated =
+          room.options.ratedRequest &&
+          room.seats.A?.kind === "account" &&
+          room.seats.B?.kind === "account" &&
+          PLAYER_SLOTS.every((seat) => consentAnswer(room, seat) === true);
+        room.consentPolicyV = room.rated ? RATED_DISCLOSURE_V : null;
       }
 
       const writes: Record<string, unknown> = log ? { [LOG_KEY]: log } : {};
@@ -999,9 +1100,11 @@ export class MatchRoom implements DurableObject {
       if (updated && result.status === "saved" && this.env.RATINGS) {
         const ratings = this.env.RATINGS;
         this.ctx.waitUntil(
-          Promise.resolve().then(() => ratings.processNow()).catch(() => {
-            console.error("ratingHintFailed", { matchId: result.matchId });
-          }),
+          Promise.resolve()
+            .then(() => ratings.processNow())
+            .catch(() => {
+              console.error("ratingHintFailed", { matchId: result.matchId });
+            }),
         );
       }
       await this.reconcileRetention();
@@ -1139,8 +1242,16 @@ export class MatchRoom implements DurableObject {
     await this.scheduleAlarm(room);
   }
 
-  private async startRematch(room: RoomState, now: number): Promise<void> {
+  private async startRematch(
+    room: RoomState,
+    now: number,
+    disclosures: RematchDisclosures,
+  ): Promise<void> {
     const startingSeat = otherSlot(deserialize(room.gameState).startingPlayer);
+    const consentFor = (seat: PlayerSlot) => ({
+      accept: disclosures[seat] === RATED_DISCLOSURE_V,
+      disclosureV: RATED_DISCLOSURE_V,
+    });
     const updatedRoom = this.reconcileClaimability(
       this.ensureTurnStarted(
         {
@@ -1154,7 +1265,10 @@ export class MatchRoom implements DurableObject {
           claimReason: null,
           onlineEndReason: null,
           rematch: emptyRematchVotes(),
-          consent: { A: null, B: null },
+          rematchDisclosure: { A: null, B: null },
+          consent: room.options.ratedRequest
+            ? { A: consentFor("A"), B: consentFor("B") }
+            : { A: null, B: null },
           rated: null,
           consentPolicyV: null,
           playBeganAt: null,
@@ -1329,6 +1443,7 @@ export class MatchRoom implements DurableObject {
     const liveConnections = this.liveConnections(room);
     const connections = { ...room.connections };
     const rematch = { ...room.rematch };
+    const rematchDisclosure = { ...room.rematchDisclosure };
     for (const slot of PLAYER_SLOTS) {
       if (!room.slots[slot]) {
         continue;
@@ -1346,11 +1461,12 @@ export class MatchRoom implements DurableObject {
       };
       // A seat that is gone cannot be waiting on, or agreeing to, a rematch.
       rematch[slot] = null;
+      rematchDisclosure[slot] = null;
     }
 
     const rematchChanged = !sameRematchVotes(rematch, room.rematch);
     const updatedRoom = this.reconcileClaimability(
-      { ...room, lastActivityAt: now, connections, rematch },
+      { ...room, lastActivityAt: now, connections, rematch, rematchDisclosure },
       now,
     );
     await this.persistRoom(updatedRoom);
@@ -1522,6 +1638,10 @@ export class MatchRoom implements DurableObject {
         roomCode: room.roomCode,
         matchNumber: room.matchNumber,
         votes: { A: room.rematch.A, B: room.rematch.B },
+        ratedVotes: {
+          A: ratedRematchVote(room, "A"),
+          B: ratedRematchVote(room, "B"),
+        },
       }),
     );
   }
@@ -1587,8 +1707,8 @@ export class MatchRoom implements DurableObject {
       mode: room.options.mode,
       ratedRequest: room.options.ratedRequest,
       consent: {
-        A: room.consent.A?.accept ?? null,
-        B: room.consent.B?.accept ?? null,
+        A: consentAnswer(room, "A"),
+        B: consentAnswer(room, "B"),
       },
       rated: room.rated,
       save: room.lastSave ?? undefined,
@@ -1771,6 +1891,7 @@ export class MatchRoom implements DurableObject {
       claimReason: stored.claimReason ?? null,
       onlineEndReason: stored.onlineEndReason ?? null,
       rematch: normalizeRematchVotes(stored.rematch),
+      rematchDisclosure: stored.rematchDisclosure ?? { A: null, B: null },
       options: stored.options ?? { mode: "invite", ratedRequest: false },
       consent: stored.consent ?? { A: null, B: null },
       rated: stored.rated ?? null,
@@ -1783,6 +1904,12 @@ export class MatchRoom implements DurableObject {
       holdsUnsaved: stored.holdsUnsaved ?? false,
     };
     const liveConnections = this.liveConnections(baseRoom);
+    if (baseRoom.options.mode === "quick") {
+      for (const seat of PLAYER_SLOTS) {
+        if (ratedRematchVote(baseRoom, seat) === false)
+          baseRoom.rematch[seat] = null;
+      }
+    }
     const connections: Partial<Record<PlayerSlot, ConnectionState>> = {};
 
     for (const slot of PLAYER_SLOTS) {
@@ -1978,6 +2105,17 @@ function otherSlot(slot: PlayerSlot): PlayerSlot {
 
 function emptyRematchVotes(): RematchVotes {
   return { A: null, B: null };
+}
+
+function consentAnswer(room: RoomState, seat: PlayerSlot): boolean | null {
+  const answer = room.consent[seat];
+  return answer?.disclosureV === RATED_DISCLOSURE_V ? answer.accept : null;
+}
+
+function ratedRematchVote(room: RoomState, seat: PlayerSlot): boolean | null {
+  return room.rematch[seat] === "accept"
+    ? room.rematchDisclosure[seat] === RATED_DISCLOSURE_V
+    : null;
 }
 
 function normalizeRematchVotes(stored: unknown): RematchVotes {

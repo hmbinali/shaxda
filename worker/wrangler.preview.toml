@@ -9,6 +9,7 @@ workers_dev = true
 enabled = true
 
 [vars]
+RATED_PLAY_ENABLED = "false"
 ALLOWED_ORIGIN = "https://shaxda-web-preview.shaxda.workers.dev"
 
 [[durable_objects.bindings]]

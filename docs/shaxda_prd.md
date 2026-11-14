@@ -750,9 +750,10 @@ after play begins. Endings before play begins and games with a guest
 produce no ledger rows.
 
 Invite games are friendly by default and private to their two participants.
-Rated results and replays are public and require both players to consent
-before play begins. R2 introduces the consent handshake, so H1 saves only
-friendly games.
+Rated results and replays are public. R2 requires both account seats to accept
+the current disclosure before the first accepted non-terminal action. Each
+rematch requires fresh consent, and the game Worker's rated-play switch
+refuses new consent without rewriting recorded answers.
 
 See the [H1 contract](specs/h1-match-persistence.md) for the ledger and
 retry rules.

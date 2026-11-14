@@ -1,4 +1,5 @@
 export const RATING_POLICY_V = 1;
+export const RATED_DISCLOSURE_V = 1;
 export const PAIR_CAP = 3;
 export const PAIR_CAP_WINDOW_MS = 86_400_000;
 

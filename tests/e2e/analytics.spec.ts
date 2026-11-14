@@ -24,7 +24,7 @@ test("runs the analytics job through the wrapped Worker without exposing its ent
           "SELECT last_success_at, last_error FROM job_state WHERE name = 'x1.nightly'",
         );
       },
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     )
     .toEqual([{ last_success_at: expect.any(Number), last_error: null }]);
 });

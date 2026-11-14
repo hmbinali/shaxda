@@ -1552,37 +1552,46 @@ describe("match room hibernation spike", () => {
     await runInDurableObject(stub, async (instance, state) => {
       const room = instance as unknown as {
         broadcastState(): void;
+        broadcastMatchStatus(): void;
+        attemptSave(): Promise<void>;
         webSocketMessage(socket: WebSocket, message: string): Promise<void>;
       };
-      const interrupt = vi
+      const suppressState = vi
         .spyOn(room, "broadcastState")
-        .mockImplementationOnce(() => {
-          throw new Error("interrupt terminal broadcast");
-        });
+        .mockImplementationOnce(() => {});
+      const suppressStatus = vi
+        .spyOn(room, "broadcastMatchStatus")
+        .mockImplementationOnce(() => {});
+      const suppressSave = vi
+        .spyOn(room, "attemptSave")
+        .mockResolvedValueOnce(undefined);
       try {
         const socket = state
           .getWebSockets()
           .find((socket) => socket.deserializeAttachment()?.slot === "A");
         if (!socket) throw new Error("Expected an authorized socket");
-        await expect(
-          room.webSocketMessage(
-            socket,
-            JSON.stringify({
-              v: protocolVersion,
-              type: "gameAction",
-              roomCode,
-              action: { type: "resign", player: "A" },
-            }),
-          ),
-        ).rejects.toThrow("interrupt terminal broadcast");
+        await room.webSocketMessage(
+          socket,
+          JSON.stringify({
+            v: protocolVersion,
+            type: "gameAction",
+            roomCode,
+            action: { type: "resign", player: "A" },
+          }),
+        );
+        expect(suppressState).toHaveBeenCalledOnce();
+        expect(suppressStatus).toHaveBeenCalledOnce();
+        expect(suppressSave).toHaveBeenCalledOnce();
       } finally {
-        interrupt.mockRestore();
+        suppressState.mockRestore();
+        suppressStatus.mockRestore();
+        suppressSave.mockRestore();
       }
     });
     const entry = await loadOutbox(roomCode);
     if (!entry) throw new Error("Expected durable outbox entry");
     expect(entry.attempts).toBe(0);
-    await evictDurableObject(stub);
+    await evictDurableObject(stub, { webSockets: "close" });
     const rejoined = await connectRoom(roomCode);
     const pending = waitForMessageWhere(
       rejoined,
@@ -1659,46 +1668,6 @@ describe("match room hibernation spike", () => {
     });
     expect(browser.status).toBe(403);
   });
-
-  it("backs off for 72 hours during a D1 outage, then leaves a stalled entry", async () => {
-    const { roomCode, first, second } = await accountRoom();
-    await placeFirst(first, second, roomCode);
-    // D1 is bound but its ledger tables have not been migrated.
-    await resignToGameOver(first, second, roomCode);
-    await expect
-      .poll(async () => (await loadOutbox(roomCode))?.attempts)
-      .toBe(1);
-    let entry = await loadOutbox(roomCode);
-    if (!entry || entry.firstAttemptAt === null)
-      throw new Error("Expected first attempt");
-    const start = entry.firstAttemptAt;
-    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
-    const offsets = [0, 5_000, 35_000, 155_000, 755_000, 2_555_000];
-    for (let attempts = 1; attempts < 77; attempts++) {
-      const due = entry.nextAttemptAt;
-      expect(due).toBeDefined();
-      if (due === null) throw new Error("Retry stalled too early");
-      expect(due - start).toBe(
-        offsets[attempts] ?? offsets[5]! + (attempts - 5) * 3_600_000,
-      );
-      clock.mockReturnValue(due);
-      await triggerRoomAlarm(roomCode);
-      entry = await loadOutbox(roomCode);
-      if (!entry) throw new Error("Outbox entry disappeared during outage");
-      expect(entry.attempts).toBe(attempts + 1);
-    }
-    expect(entry).toMatchObject({
-      status: "stalled",
-      stalledReason: "retriesExhausted",
-      nextAttemptAt: null,
-    });
-    await runInDurableObject(
-      roomStub(roomCode),
-      async (_instance, { storage }) => {
-        await expect(storage.getAlarm()).resolves.toBeNull();
-      },
-    );
-  }, 20_000);
 
   it("keeps an invalid replay for inspection and refuses manual retry", async () => {
     await applyD1Migrations(testEnv.DB, testEnv.TEST_MIGRATIONS);

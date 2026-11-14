@@ -36,7 +36,19 @@ export type OutboxEntry = OutboxSummary & {
 export const RETRY_DELAYS = [
   5_000, 30_000, 120_000, 600_000, 1_800_000, 3_600_000,
 ] as const;
-export const RETRY_WINDOW = 72 * 3_600_000;
+const RETRY_WINDOW = 72 * 3_600_000;
+export function nextAutomaticAttempt(
+  firstAttemptAt: number,
+  now: number,
+  attempts: number,
+): number | null {
+  const delay =
+    RETRY_DELAYS[Math.min(attempts - 1, RETRY_DELAYS.length - 1)] ??
+    RETRY_DELAYS[0];
+  const next = now + delay;
+  return attempts >= 77 || next > firstAttemptAt + RETRY_WINDOW ? null : next;
+}
+
 export const MAX_UNSAVED = 3;
 export const outboxKey = (matchNumber: number) => `outbox:${matchNumber}`;
 

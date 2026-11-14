@@ -47,7 +47,7 @@ import {
   outboxKey,
   outboxSummary,
   RETRY_DELAYS,
-  RETRY_WINDOW,
+  nextAutomaticAttempt,
 } from "./match-outbox";
 import type { MatchLog, OutboxEntry, OutboxSummary } from "./match-outbox";
 
@@ -1028,15 +1028,12 @@ export class MatchRoom implements DurableObject {
         ? "D1 ledger write failed."
         : "DB binding unavailable.";
       if (!manual) {
-        const delay =
-          RETRY_DELAYS[
-            Math.min(updated.attempts - 1, RETRY_DELAYS.length - 1)
-          ] ?? RETRY_DELAYS[0];
-        const next = now + delay;
-        if (
-          next > (updated.firstAttemptAt ?? now) + RETRY_WINDOW ||
-          updated.attempts >= 77
-        ) {
+        const next = nextAutomaticAttempt(
+          updated.firstAttemptAt ?? now,
+          now,
+          updated.attempts,
+        );
+        if (next === null) {
           updated.stalledReason = "retriesExhausted";
           console.error("matchSaveStalled", scope);
         } else {

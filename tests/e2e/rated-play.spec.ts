@@ -1,7 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { seedAccount } from "./fixtures/auth";
 import { inviteRoomCode, ledgerQuery } from "./fixtures/ledger";
-import { actingSeat, placeOnline, resignOnline } from "./fixtures/online";
+import {
+  actingSeat,
+  isolateRatedRoomQuota,
+  placeOnline,
+  resignOnline,
+} from "./fixtures/online";
 
 test("records two-account agreement and a mixed-vote friendly rematch", async ({
   browser,
@@ -9,6 +14,7 @@ test("records two-account agreement and a mixed-vote friendly rematch", async ({
   page,
 }) => {
   test.setTimeout(120_000);
+  await isolateRatedRoomQuota(page, 11);
   const opponent = await browser.newContext();
   const a = await seedAccount(context);
   const b = await seedAccount(opponent);
@@ -94,6 +100,7 @@ test("saves a declined rated invitation as friendly", async ({
   page,
 }) => {
   test.setTimeout(120_000);
+  await isolateRatedRoomQuota(page, 12);
   const opponent = await browser.newContext();
   const a = await seedAccount(context);
   const b = await seedAccount(opponent);

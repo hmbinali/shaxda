@@ -11,7 +11,11 @@ import {
 } from "@shaxda/db/rating-admin";
 import { seedAccount } from "./fixtures/auth";
 import { inviteRoomCode, ledgerQuery } from "./fixtures/ledger";
-import { placeOnline, resignOnline } from "./fixtures/online";
+import {
+  isolateRatedRoomQuota,
+  placeOnline,
+  resignOnline,
+} from "./fixtures/online";
 
 test("shows confirmed ratings and a correction for a played rated match", async ({
   browser,
@@ -19,6 +23,7 @@ test("shows confirmed ratings and a correction for a played rated match", async 
   page,
 }) => {
   test.setTimeout(120_000);
+  await isolateRatedRoomQuota(page, 13);
   const opponent = await browser.newContext();
   const a = await seedAccount(context);
   const b = await seedAccount(opponent);

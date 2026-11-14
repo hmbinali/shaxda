@@ -48,3 +48,21 @@ export async function resignOnline(page: Page): Promise<void> {
     .getByRole("button", { name: "Xaqiiji" })
     .click();
 }
+
+// Browser runs share loopback and leave completed rooms available for
+// rematches. Give rated scenarios their own client identity at the local
+// room-create boundary while retaining the production coordinator limits.
+export async function isolateRatedRoomQuota(page: Page, scenario: number) {
+  await page.route(
+    (url) => url.hostname === "127.0.0.1" && url.pathname === "/rooms",
+    async (route) => {
+      const request = route.request();
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          "cf-connecting-ip": `192.0.2.${scenario}`,
+        },
+      });
+    },
+  );
+}

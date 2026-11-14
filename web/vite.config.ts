@@ -13,9 +13,9 @@ import { defineConfig } from "vitest/config";
 // It also cannot be told where to *move* the generated service worker: that path
 // is hardcoded to `.svelte-kit/output`, and its `outDir` option means the build
 // directory to the generator but the parent of `client/` to the mover, so the
-// two cannot both be satisfied. `scripts/start-web-e2e.mjs` performs the move
-// for the E2E build instead, and `scripts/check-e2e-bundle.mjs` fails if the
-// service worker is missing.
+// two cannot both be satisfied. `scripts/start-web-e2e.mjs` moves the generated
+// files into Wrangler's E2E assets, and `scripts/check-e2e-bundle.mjs` fails if
+// the service worker is missing.
 const kitOutDir = resolve(
   import.meta.dirname,
   process.env.SHAXDA_KIT_OUT_DIR ?? ".svelte-kit",

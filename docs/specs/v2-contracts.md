@@ -745,16 +745,13 @@ pauses rating decisions immediately. Environments are: dev
 
 ### 10.4 Shared local D1 in e2e
 
-The game Worker's `wrangler dev --persist-to X` and the web preview's
-`getPlatformProxy({ persist: { path: "X/v3" } })` share one SQLite file when
-both configs use the same `database_id` (`local-e2e-database`). Playwright
-starts the servers one after another (game, then web) and each launcher
-deletes its own state directory, so the shared directory gets **one owner**:
-the game launcher cleans it and applies the migrations before starting; the
-web launcher and the account-seeding fixture only use it. Tests that read the
-ledger wait for `matchStatus.save.status = "saved"` first. `pnpm
-check:e2e-isolation` keeps passing because both Workers run with explicit
-env files.
+Both E2E launchers use `wrangler dev --persist-to X` and the same
+`database_id` (`local-e2e-database`), so they share one SQLite file. Playwright
+starts the game Worker first. Its launcher owns cleanup and applies the
+migrations before starting. The web launcher serves the wrapped Worker
+entry, and the account-seeding fixture uses the same database. Tests that
+read the match ledger wait for `matchStatus.save.status = "saved"` first.
+Both Workers use explicit env files for `pnpm check:e2e-isolation`.
 
 ---
 

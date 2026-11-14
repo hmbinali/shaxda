@@ -1,5 +1,29 @@
 import { expect, test } from "@playwright/test";
 import { seedAccount } from "./fixtures/auth";
+import { ledgerQuery } from "./fixtures/ledger";
+
+test("runs the analytics job through the wrapped Worker without exposing its entries", async ({
+  request,
+}) => {
+  for (const path of ["/_worker.js", "/_kit_worker.js"]) {
+    expect((await request.get(path)).status()).toBe(404);
+  }
+
+  const response = await request.get("/cdn-cgi/handler/scheduled", {
+    params: { cron: "15 0 * * *" },
+  });
+  expect(response.ok()).toBe(true);
+  await expect
+    .poll(() =>
+      ledgerQuery<{
+        last_success_at: number | null;
+        last_error: string | null;
+      }>(
+        "SELECT last_success_at, last_error FROM job_state WHERE name = 'x1.nightly'",
+      ),
+    )
+    .toEqual([{ last_success_at: expect.any(Number), last_error: null }]);
+});
 
 test("records an active browser once across a reload", async ({ page }) => {
   const active = "/api/analytics/active";

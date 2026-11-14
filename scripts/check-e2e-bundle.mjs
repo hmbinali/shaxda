@@ -12,9 +12,8 @@ import { resolve } from "node:path";
 import { repoRoot } from "./lib/e2e-state.mjs";
 import { readE2eBuildFixture, webRoot } from "./lib/e2e-env.mjs";
 
-// `vite preview` serves `output/`; `cloudflare/` is the copy the deploy would
-// upload. Scan what the suite actually runs against.
-const bundleRoot = resolve(webRoot, ".svelte-kit/e2e/output");
+// Wrangler serves `cloudflare/` and its entry imports the server bundle.
+const bundleRoot = resolve(webRoot, ".svelte-kit/e2e");
 
 async function readText(path) {
   try {
@@ -89,7 +88,12 @@ const failures = [];
 // hardcoded path, so a change to the E2E out-dir can silently drop it and the
 // offline specs then time out waiting for `navigator.serviceWorker.ready`.
 const relative = files.map((path) => path.slice(bundleRoot.length + 1));
-for (const required of ["client/sw.js", "client/manifest.webmanifest"]) {
+for (const required of [
+  "cloudflare/sw.js",
+  "cloudflare/manifest.webmanifest",
+  "cloudflare/_worker.js",
+  "cloudflare/_kit_worker.js",
+]) {
   if (!relative.includes(required)) {
     failures.push(`${required} is missing from the E2E bundle.`);
   }

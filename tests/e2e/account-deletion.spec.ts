@@ -9,7 +9,9 @@ test("requests deletion, gates the account, and restores access on cancellation"
   context,
 }) => {
   const account = await seedAccount(context, { alias: "deletion_alias" });
+  const ratingPath = `/api/players/${account.username}/rating`;
   try {
+    expect((await page.request.get(ratingPath)).status()).toBe(200);
     await page.goto("/account");
     await page.getByRole("link", { name: "Tirtir akoonkayga" }).click();
     await page
@@ -27,6 +29,7 @@ test("requests deletion, gates the account, and restores access on cancellation"
       ),
     ).toBe(false);
     expect((await page.request.get("/u/deletion_alias")).status()).toBe(404);
+    expect((await page.request.get(ratingPath)).status()).toBe(404);
     await signInFixture(context, account.id);
     expect((await page.request.get("/api/online/identity")).status()).toBe(403);
     await page.goto("/history");
@@ -37,6 +40,7 @@ test("requests deletion, gates the account, and restores access on cancellation"
       200,
     );
     expect((await page.request.get("/api/online/identity")).status()).toBe(200);
+    expect((await page.request.get(ratingPath)).status()).toBe(200);
   } finally {
     account.cleanup();
   }

@@ -1,3 +1,4 @@
+import { ACTIVE_PUBLIC_USER } from "@shaxda/db";
 import { isProvisional } from "@shaxda/rating";
 
 export async function readPlayerRating(
@@ -10,7 +11,7 @@ export async function readPlayerRating(
       `
     SELECT r.rating, r.rd, r.volatility, r.last_rated_at
       FROM user u LEFT JOIN player_rating r ON r.user_id = u.id
-     WHERE u.username = ?
+     WHERE u.username = ? AND ${ACTIVE_PUBLIC_USER}
   `,
     )
     .bind(username)

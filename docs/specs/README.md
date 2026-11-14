@@ -72,12 +72,11 @@ pruned the 91-day fixture. The admin page rendered for an allowlisted test
 account and returned 403 after the test allowlist was removed. A focused
 local Workers test saved one played friendly invite with two account seats
 and found identical online counter snapshots with game analytics disabled.
-The live account-save check remains open. Preview D1 was reachable after
-Wrangler reauthentication and contained one saved match. Game Worker version
-`165224a8` had both flags enabled. R2 confirmed the first approved account
-was signed in and the second session was still needed. The shared settings
-were held for the joint rehearsal. See the
-[preview rehearsal and production reconciliation](../ops/x1a-analytics-runbook.md#x1b-online-counters).
+The joint R2 and X1b preview rehearsal then saved one friendly account
+invite at ledger sequence 2 with game analytics disabled. Both browsers
+acknowledged the save. All eight online counter rows matched the baseline.
+The original game Worker version was restored and its health verified. See
+the [preview evidence and production reconciliation](../ops/x1a-analytics-runbook.md#preview-evidence-for-2026-11-14).
 
 The preview correction rehearsal invalidated and then rescinded the rated
 test result at ledger sequence 1. Each operation changed and marked one
@@ -90,13 +89,13 @@ preview rebuild found one processed result, no held or pending results,
 and zero drift. The live browser rerun was blocked by the saved preview
 site permission, and only one Chrome profile was reachable.
 
-| Remaining live rated check                                                        | Evidence so far                                                                                                                                                         |
-| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M1 friendly save and privacy, declined invite, and M9 mixed-vote friendly rematch | Covered by local Playwright. Two authenticated preview browser sessions are needed.                                                                                     |
-| M2 three placements and resignation                                               | The earlier live rated game verified consent, a public result, history, replay, and rating processing with one placement. The full three-placement case passed locally. |
-| M4 fourth same-pair rated game in 24 hours                                        | The local D1 tests verified the pair cap and its rating decision. The live public label remains to be checked.                                                          |
-| M7 ending before the first move                                                   | Local Worker tests verified the empty ledger and outbox. Live room and counter verification remains open.                                                               |
-| Older cached build and rated switch off and on                                    | Local Worker tests covered older votes and the switch. The two-account preview rehearsal remains open, including a friendly save with game analytics disabled.          |
+| Remaining live rated check                                                        | Evidence so far                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1 friendly save and privacy, declined invite, and M9 mixed-vote friendly rematch | Covered by local Playwright. Two authenticated preview browser sessions are needed.                                                                                                                       |
+| M2 three placements and resignation                                               | The earlier live rated game verified consent, a public result, history, replay, and rating processing with one placement. The full three-placement case passed locally.                                   |
+| M4 fourth same-pair rated game in 24 hours                                        | The local D1 tests verified the pair cap and its rating decision. The live public label remains to be checked.                                                                                            |
+| M7 ending before the first move                                                   | Local Worker tests verified the empty ledger and outbox. Live room and counter verification remains open.                                                                                                 |
+| Older cached build and rated switch off and on                                    | Local Worker tests covered older votes and the rated switch. The joint X1b rehearsal verified a friendly save with game analytics disabled. The older-client and rated-switch preview checks remain open. |
 
 Native Somali copy review remains open under Q4. See the
 [analytics runbook](../ops/x1a-analytics-runbook.md), the

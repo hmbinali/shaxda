@@ -97,13 +97,14 @@ values. The R2 friendly account invite can cover both rehearsals.
    Wait for the configuration to take effect. Take the counter baseline
    below before creating a new room. Use the test's first UTC day as the
    literal lower bound in both reads, including if midnight passes.
-2. Create and join a friendly invite using the two accounts. Make three
-   legal placements, resign, and wait for both clients to acknowledge the
-   save. Open the private match from one participant's history. In preview
-   D1, check the test room's new match has `mode='invite'`, `rated=0`,
-   `action_count=4`, and two `match_player` rows. Compare the same
-   counter fields with the baseline. Expect one new save and an identical
-   set of online counter rows, counts, and update times.
+2. Create and join a friendly invite using the two accounts. Play to a
+   board win or resign after three legal placements. Wait for both clients
+   to acknowledge the save, then open the private match from one
+   participant's history. In preview D1, check the test room's new match has
+   `mode='invite'`, `rated=0`, the observed action count, and two
+   `match_player` rows for distinct accounts. Compare the same counter
+   fields with the baseline. Expect one new save and an identical set of
+   online counter rows, counts, and update times.
 3. Record the UTC test window, game Worker version, ledger sequence, save
    acknowledgement, and counter deltas. Handle concurrent preview activity
    by repeating in a quiet window if it prevents a clear comparison. Restore
@@ -111,8 +112,8 @@ values. The R2 friendly account invite can cover both rehearsals.
    verify the restored deployment and health before releasing the window.
 
 Use `pnpm --filter @shaxda/web exec wrangler d1 execute shaxda-db-preview
---config wrangler.preview.jsonc --remote --json` with `--command` or
-`--file`. The counter snapshot uses:
+--config wrangler.preview.jsonc --remote --json` with `--command`. The
+counter snapshot uses:
 
 ```sql
 SELECT day, event, count, updated_at
@@ -120,6 +121,19 @@ FROM event_daily
 WHERE day >= 'YYYY-MM-DD' AND event GLOB 'online_*'
 ORDER BY day, event;
 ```
+
+#### Preview evidence for 2026-11-14
+
+Times below are UTC. The game Worker served version
+`b83dc15f-5cbb-4db6-ad73-412f7cab8db3` at 100% with
+`ANALYTICS_ENABLED="false"` and `RATED_PLAY_ENABLED="true"`.
+
+| Check                              | Result                                                                                                                                                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline at 18:12:16               | One saved match, maximum sequence 1. Eight online counter rows, sum 11.                                                                                                                                         |
+| Friendly invite, 18:12:38–18:13:53 | Both browsers acknowledged the same friendly save. Preview match `M2DACF6V2696D7N8JXZL`, sequence 2, match number 1, two distinct account seats, 68 actions, seat A win by `opponentBelowThree`.                |
+| D1 read at 18:14:45                | Two saved matches, maximum sequence 2. All eight online rows had identical dates, events, counts and update times, with a total delta of zero.                                                                  |
+| Restoration verified at 18:14:57   | Original game version `165224a8-dc5b-47de-b806-d5f4c1d6c44f` served 100% with both original flags enabled. Binding inventory and plain variables matched the original version. Preview game health returned OK. |
 
 ### Production reconciliation for seven completed UTC days
 
@@ -139,7 +153,8 @@ seven dates have ended.
 
 ```sh
 pnpm --filter @shaxda/web exec wrangler d1 execute shaxda-db \
-  --config wrangler.jsonc --remote --json --file /tmp/shaxda-x1b-reconcile.sql
+  --config wrangler.jsonc --remote --json \
+  --command "$(cat /tmp/shaxda-x1b-reconcile.sql)"
 ```
 
 ```sql

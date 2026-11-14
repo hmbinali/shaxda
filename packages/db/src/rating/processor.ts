@@ -1,3 +1,7 @@
+import type {
+  D1Database,
+  D1PreparedStatement,
+} from "@cloudflare/workers-types";
 import { RATING_ALGORITHM_V } from "@shaxda/rating";
 import { PAIR_CAP_WINDOW_MS, RATING_POLICY_V } from "@shaxda/shared/rated-play";
 import {
@@ -200,9 +204,10 @@ export async function processPendingRatings(
     let current: LedgerEvent | undefined;
     try {
       const { results } = await pendingEvents(db, cursor, budget - decided);
-      for (current of results) {
+      for (const row of results) {
+        current = row;
         if (expiresAt - now() < MIN_REMAINING_MS) break;
-        const decision = await readDecision(db, current);
+        const decision = await readDecision(db, row);
         const decidedAt = now();
         await db.batch([
           guard(db, token, decidedAt, cursor, 0),
@@ -211,15 +216,15 @@ export async function processPendingRatings(
             .prepare(
               "UPDATE rating_processor_state SET cursor_seq = ?, updated_at = ? WHERE id = 1",
             )
-            .bind(current.seq, decidedAt),
+            .bind(row.seq, decidedAt),
           db.prepare("DELETE FROM rating_fence"),
         ]);
-        cursor = current.seq;
+        cursor = row.seq;
         decided++;
         if (decision.heldCode) {
           console.error("ratingHeld", {
-            seq: current.seq,
-            matchId: current.id,
+            seq: row.seq,
+            matchId: row.id,
             code: decision.heldCode,
           });
         }

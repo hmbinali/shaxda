@@ -12,7 +12,7 @@ const start = Date.parse("2026-11-14T00:15:00Z");
 const all = vi.fn();
 const bind = vi.fn(() => ({ all }));
 const prepare = vi.fn(() => ({ bind }));
-const env = { DB: { prepare } } as Parameters<typeof scheduled>[1];
+const env = { DB: { prepare } } as unknown as Parameters<typeof scheduled>[1];
 
 async function tick(now: number, cron = "* * * * *") {
   const pending: Promise<unknown>[] = [];

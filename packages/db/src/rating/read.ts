@@ -1,3 +1,4 @@
+import type { D1Database } from "@cloudflare/workers-types";
 import type { MatchRating, SeatRating } from "./fold";
 
 interface MatchStatus {

@@ -1,3 +1,7 @@
+import type {
+  D1Database,
+  D1PreparedStatement,
+} from "@cloudflare/workers-types";
 import type { LedgerEvent } from "./fold";
 
 export const EVENT_SELECT = `

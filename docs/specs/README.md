@@ -30,6 +30,8 @@ starts only when the spec is frozen **and** its milestone is activated
 
 As of 2026-11-14, all 17 milestone specs are frozen. H1 Match Persistence and
 X1a Product Analytics are activated for local implementation and verification.
+R1 Rating System and R2 Rated Play Rules are jointly activated for local
+implementation from Wave 1 commit `5b94a5c`.
 Sponsorship (S1–S3) and publishing work are scheduled later.
 
 The [build guide](../build_guide.md) maps the specs to session assignments,

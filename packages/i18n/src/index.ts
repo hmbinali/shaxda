@@ -1,4 +1,5 @@
 import { learnContentSo } from "./content/learn.so";
+import { ratedPlaySo } from "./content/rated-play.so";
 import { legalContentSo } from "./content/legal.so";
 
 export * from "./content/learn.so";
@@ -14,6 +15,7 @@ const publicDescription =
 export const messages = {
   so: {
     appName: "Shaxda",
+    ratedPlay: ratedPlaySo,
     foundationLabel: "Qandaraasyada F1",
     foundationSummary:
       "Qaab-dhismeedka shaxda, xeerarka, iyo ciyaarta martida ayaa diyaar u ah marxaladaha xiga.",
@@ -290,6 +292,15 @@ export const messages = {
         savingEarlierGames:
           "Ciyaarihii hore weli waa la kaydinayaa; dib-u-ciyaarka mar kale isku day wax yar kadib.",
         staleMatch: "Tallaabadaas waxay ku socotay ciyaar dhammaatay.",
+        // TODO(translation-review): Review the rated-play errors before public enablement.
+        consentClosed: "Nooca ciyaarta hadda lama beddeli karo.",
+        consentUnavailable: "Tartan looma heli karo qolkan.",
+        disclosureOutdated:
+          "Xeerarka Tartanka waa la cusboonaysiiyay; fadlan dib u soo rar bogga.",
+        ratedOnlyRematch:
+          "Kulanka degdegga ah dib-u-ciyaarkiisu waa Tartan oo keliya.",
+        ratedPlayDisabled:
+          "Tartanku hadda waa hakad; ciyaartu waa Saaxiibtinimo.",
         rematchUnavailable:
           "Dib-u-ciyaar waxaa la codsan karaa marka ciyaartu dhammaato.",
         rateLimited: "Codsiyo badan ayaa yimid; sug wax yar.",

@@ -1,3 +1,4 @@
+import { roomCodeSchema } from "@shaxda/shared";
 import { z } from "zod";
 
 export const CREATE_WINDOW_MS = 60_000;
@@ -15,6 +16,12 @@ const reserveRequestSchema = z.object({
 
 const releaseRequestSchema = z.object({
   roomCode: z.string().min(1).max(64),
+  roomCreatedAt: z.number().int().optional(),
+});
+const holdRequestSchema = z.object({
+  roomCode: roomCodeSchema,
+  roomCreatedAt: z.number().int(),
+  holdsUnsaved: z.boolean(),
 });
 
 type CoordinatorDenyCode =
@@ -22,7 +29,15 @@ type CoordinatorDenyCode =
 
 type CoordinatorState = {
   createAttemptsByIp: Record<string, number[]>;
-  activeRooms: Record<string, { ip: string; createdAt: number }>;
+  activeRooms: Record<
+    string,
+    {
+      ip: string | null;
+      createdAt: number;
+      roomCreatedAt?: number;
+      holdsUnsaved?: true;
+    }
+  >;
 };
 
 export class RoomCoordinator implements DurableObject {
@@ -45,6 +60,35 @@ export class RoomCoordinator implements DurableObject {
       return this.release(request);
     }
 
+    if (
+      request.method === "POST" &&
+      url.pathname === "/internal/coordinator/hold"
+    ) {
+      return this.hold(request);
+    }
+    if (
+      request.method === "GET" &&
+      url.pathname === "/internal/coordinator/unsaved"
+    ) {
+      const after = url.searchParams.get("after");
+      if (after !== null && !roomCodeSchema.safeParse(after).success) {
+        return Response.json({ error: "invalidRequest" }, { status: 400 });
+      }
+      const state = await this.readState();
+      const codes = Object.keys(state.activeRooms)
+        .sort()
+        .filter(
+          (code) =>
+            state.activeRooms[code]?.holdsUnsaved &&
+            (after === null || code > after),
+        )
+        .slice(0, 51);
+      const rooms = codes.slice(0, 50);
+      return Response.json({
+        rooms,
+        nextAfter: codes.length > 50 ? rooms.at(-1) : null,
+      });
+    }
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -95,9 +139,62 @@ export class RoomCoordinator implements DurableObject {
 
     const state = await this.readState();
     const activeRooms = { ...state.activeRooms };
+    const current = activeRooms[parsed.data.roomCode];
+    if (
+      current?.holdsUnsaved &&
+      current.roomCreatedAt !== parsed.data.roomCreatedAt
+    ) {
+      return Response.json({ ok: true });
+    }
+    if (
+      parsed.data.roomCreatedAt !== undefined &&
+      current?.roomCreatedAt !== undefined &&
+      current.roomCreatedAt !== parsed.data.roomCreatedAt
+    ) {
+      return Response.json({ ok: true });
+    }
     delete activeRooms[parsed.data.roomCode];
     await this.persistState({ ...state, activeRooms });
 
+    return Response.json({ ok: true });
+  }
+
+  private async hold(request: Request): Promise<Response> {
+    const parsed = holdRequestSchema.safeParse(
+      await request.json().catch(() => null),
+    );
+    if (!parsed.success)
+      return Response.json({ error: "invalidRequest" }, { status: 400 });
+    const { roomCode, roomCreatedAt, holdsUnsaved } = parsed.data;
+    const now = Date.now();
+    const state = this.pruneState(await this.readState(), now);
+    const current = state.activeRooms[roomCode];
+    if (
+      current?.roomCreatedAt !== undefined &&
+      current.roomCreatedAt !== roomCreatedAt
+    ) {
+      return Response.json({ error: "roomMismatch" }, { status: 409 });
+    }
+
+    if (holdsUnsaved) {
+      state.activeRooms[roomCode] = {
+        ip: current?.ip ?? null,
+        createdAt: current?.createdAt ?? roomCreatedAt,
+        roomCreatedAt,
+        holdsUnsaved: true,
+      };
+    } else if (current) {
+      if (
+        now - current.createdAt >= ACTIVE_ROOM_TTL_MS ||
+        current.ip === null
+      ) {
+        delete state.activeRooms[roomCode];
+      } else {
+        const { ip, createdAt } = current;
+        state.activeRooms[roomCode] = { ip, createdAt, roomCreatedAt };
+      }
+    }
+    await this.persistState(state);
     return Response.json({ ok: true });
   }
 
@@ -118,14 +215,15 @@ export class RoomCoordinator implements DurableObject {
       return { ok: false, code: "rateLimited", state };
     }
 
-    const activeRoomCount = Object.keys(state.activeRooms).length;
+    const activeRooms = Object.values(state.activeRooms).filter(
+      (room) => !room.holdsUnsaved,
+    );
+    const activeRoomCount = activeRooms.length;
     if (activeRoomCount >= ACTIVE_MAX_GLOBAL) {
       return { ok: false, code: "capacityFull", state };
     }
 
-    const activeForIp = Object.values(state.activeRooms).filter(
-      (room) => room.ip === ip,
-    ).length;
+    const activeForIp = activeRooms.filter((room) => room.ip === ip).length;
     if (activeForIp >= ACTIVE_MAX_PER_IP) {
       return { ok: false, code: "tooManyRooms", state };
     }
@@ -158,7 +256,7 @@ export class RoomCoordinator implements DurableObject {
 
     const activeRooms: CoordinatorState["activeRooms"] = {};
     for (const [roomCode, room] of Object.entries(state.activeRooms)) {
-      if (now - room.createdAt < ACTIVE_ROOM_TTL_MS) {
+      if (room.holdsUnsaved || now - room.createdAt < ACTIVE_ROOM_TTL_MS) {
         activeRooms[roomCode] = room;
       }
     }
@@ -183,7 +281,9 @@ export class RoomCoordinator implements DurableObject {
   }
 
   private async scheduleAlarm(state: CoordinatorState): Promise<void> {
-    const activeRooms = Object.values(state.activeRooms);
+    const activeRooms = Object.values(state.activeRooms).filter(
+      (room) => !room.holdsUnsaved,
+    );
     if (activeRooms.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;

@@ -2,10 +2,16 @@ import {
   applyAction,
   createInitialState,
   deserialize,
+  encodeAction,
+  REPLAY_VERSION,
   getActingPlayer,
   serialize,
 } from "@shaxda/game-engine";
-import type { SerializedGameState } from "@shaxda/game-engine";
+import type {
+  GameAction,
+  GameState,
+  SerializedGameState,
+} from "@shaxda/game-engine";
 import {
   allowedGoogleAvatarUrl,
   avatarColorForUserId,
@@ -21,12 +27,34 @@ import {
   serverMessageSchema,
   stateServerMessageSchema,
 } from "@shaxda/shared";
-import type { AvatarMode, RematchVote } from "@shaxda/shared";
+import type {
+  AvatarMode,
+  MatchPayload,
+  MatchSave,
+  RematchVote,
+} from "@shaxda/shared";
 import { verifyIdentityTicket } from "@shaxda/shared/identity";
 import type { IdentityTicketPayload } from "@shaxda/shared/identity";
 import { roomInboundSchema, roomInitRequestSchema } from "./protocol";
 import type { PlayerSlot, RoomInboundMessage } from "./protocol";
 
+import { saveMatch } from "@shaxda/db/match";
+import type { SaveMatchResult } from "@shaxda/db/match";
+import { writesLedgerRow } from "@shaxda/shared/rated-play";
+import {
+  createOutboxEntry,
+  MAX_UNSAVED,
+  outboxKey,
+  outboxSummary,
+  RETRY_DELAYS,
+  RETRY_WINDOW,
+} from "./match-outbox";
+import type { MatchLog, OutboxEntry, OutboxSummary } from "./match-outbox";
+
+import { discardRequestSchema, entryRequestSchema, opsJson } from "./match-ops";
+
+const LOG_KEY = "log";
+const HOLD_RETRY_MS = 60_000;
 const ROOM_STATE_KEY = "room";
 const IDLE_TIMEOUT_MS = 60 * 60 * 1_000;
 const DISCONNECT_GRACE_MS = 45_000;
@@ -87,6 +115,16 @@ type RoomState = {
   claimReason: OnlineMatchEndReason | null;
   onlineEndReason: OnlineMatchEndReason | null;
   rematch: RematchVotes;
+  options: { mode: MatchPayload["mode"]; ratedRequest: boolean };
+  consent: Record<PlayerSlot, { accept: boolean; disclosureV: number } | null>;
+  rated: boolean | null;
+  consentPolicyV: number | null;
+  playBeganAt: number | null;
+  unsaved: Record<number, OutboxSummary>;
+  lastSave: MatchSave | null;
+  expiredAt: number | null;
+  holdSynced: boolean;
+  holdsUnsaved: boolean;
 };
 
 type SocketAttachment = {
@@ -107,11 +145,15 @@ type JoinedSocketAttachment = {
 
 export interface MatchRoomEnv {
   MATCH_COORDINATOR: DurableObjectNamespace;
+  DB?: D1Database;
   ONLINE_IDENTITY_SECRET?: string;
   ONLINE_IDENTITY_SECRET_PREVIOUS?: string;
 }
 
 export class MatchRoom implements DurableObject {
+  private readonly attemptsInProgress = new Set<number>();
+  private holdInProgress = false;
+  private cleanupInProgress = false;
   constructor(
     private readonly ctx: DurableObjectState,
     private readonly env: MatchRoomEnv,
@@ -124,6 +166,9 @@ export class MatchRoom implements DurableObject {
       return this.initializeRoom(request);
     }
 
+    if (url.pathname.startsWith("/internal/ops/"))
+      return this.handleOps(request, url.pathname);
+
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return Response.json(
         { error: "Expected WebSocket upgrade" },
@@ -132,7 +177,7 @@ export class MatchRoom implements DurableObject {
     }
 
     const room = await this.readRoom();
-    if (!room) {
+    if (!room || room.expiredAt !== null) {
       return Response.json({ error: "Room not found" }, { status: 404 });
     }
 
@@ -167,7 +212,7 @@ export class MatchRoom implements DurableObject {
     }
 
     const room = await this.refreshStoredActivity();
-    if (!room) {
+    if (!room || room.expiredAt !== null) {
       this.sendError(ws, "roomNotFound", "Room not found.");
       return;
     }
@@ -216,21 +261,49 @@ export class MatchRoom implements DurableObject {
   }
 
   async alarm(): Promise<void> {
-    const room = await this.readRoom();
+    let room = await this.readRoom();
+    const now = Date.now();
     if (!room) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
 
-    const now = Date.now();
-    if (now - room.lastActivityAt >= IDLE_TIMEOUT_MS) {
-      for (const socket of this.ctx.getWebSockets()) {
-        socket.close(1001, "Room expired.");
+    const due = Object.keys(room.unsaved)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .filter(
+        (number) => (room?.unsaved[number]?.nextAttemptAt ?? Infinity) <= now,
+      );
+    for (const number of due) {
+      try {
+        await this.attemptSave(number);
+      } catch {
+        console.error("matchSaveAttemptFailed", {
+          roomCode: room.roomCode,
+          matchNumber: number,
+        });
       }
+    }
 
-      await this.releaseCoordinatorRoom(room.roomCode);
-      await this.ctx.storage.deleteAll();
+    room = await this.readRoom();
+    if (!room) return;
+    if (
+      room.expiredAt !== null ||
+      now - room.lastActivityAt >= IDLE_TIMEOUT_MS
+    ) {
+      if (room.expiredAt === null) {
+        room = { ...room, expiredAt: now };
+        await this.persistRoom(this.updateHold(room));
+        for (const socket of this.ctx.getWebSockets())
+          socket.close(1001, "Room expired.");
+      }
+      await this.reconcileRetention();
       return;
+    }
+    if (!room.holdSynced) {
+      await this.reconcileRetention();
+      room = await this.readRoom();
+      if (!room || room.expiredAt !== null) return;
     }
 
     const updatedRoom = this.reconcileClaimability(
@@ -261,6 +334,8 @@ export class MatchRoom implements DurableObject {
     }
 
     const now = Date.now();
+    const startingSeat =
+      (crypto.getRandomValues(new Uint8Array(1))[0] ?? 0) % 2 === 0 ? "A" : "B";
     const room: RoomState = {
       roomCode: body.data.roomCode,
       createdAt: now,
@@ -269,7 +344,7 @@ export class MatchRoom implements DurableObject {
       slots: {},
       seats: {},
       matchNumber: 1,
-      gameState: serialize(createInitialState("A")),
+      gameState: serialize(createInitialState(startingSeat)),
       connections: {},
       turnStartedAt: null,
       nudgedTurnAt: null,
@@ -277,9 +352,24 @@ export class MatchRoom implements DurableObject {
       claimReason: null,
       onlineEndReason: null,
       rematch: emptyRematchVotes(),
+      options: {
+        mode: "invite",
+        ratedRequest: body.data.options?.ratedRequest ?? false,
+      },
+      consent: { A: null, B: null },
+      rated: null,
+      consentPolicyV: null,
+      playBeganAt: null,
+      unsaved: {},
+      lastSave: null,
+      expiredAt: null,
+      holdSynced: true,
+      holdsUnsaved: false,
     };
 
-    await this.persistRoom(room);
+    await this.persistRoom(room, {
+      [LOG_KEY]: emptyLog(room.matchNumber, startingSeat),
+    });
 
     return Response.json({ ok: true });
   }
@@ -359,7 +449,7 @@ export class MatchRoom implements DurableObject {
     // Ticket verification is a non-storage await. Re-read under the Durable
     // Object input gate before assigning a seat or recording a JTI.
     const authoritativeRoom = await this.readRoom();
-    if (!authoritativeRoom) {
+    if (!authoritativeRoom || authoritativeRoom.expiredAt !== null) {
       this.sendError(ws, "roomNotFound", "Room not found.");
       return;
     }
@@ -476,6 +566,8 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
+    if (!this.checkMatchNumber(ws, room, message.matchNumber)) return;
+
     if (!room.slots.A || !room.slots.B) {
       await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "waitingForOpponent", "Wait for an opponent.");
@@ -489,7 +581,10 @@ export class MatchRoom implements DurableObject {
     }
 
     const state = deserialize(room.gameState);
-    if (getActingPlayer(state) !== attachment.slot) {
+    if (
+      message.action.type !== "resign" &&
+      getActingPlayer(state) !== attachment.slot
+    ) {
       await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notYourTurn", "It is not your turn.");
       return;
@@ -512,9 +607,13 @@ export class MatchRoom implements DurableObject {
       claimReason: null,
       onlineEndReason: null,
     };
-    await this.persistRoom(updatedRoom);
-    this.broadcastState(updatedRoom);
-    this.broadcastMatchStatus(updatedRoom);
+    await this.recordAction(
+      updatedRoom,
+      state,
+      result.state,
+      message.action,
+      now,
+    );
   }
 
   private async handleClaimWin(
@@ -536,6 +635,8 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
+    if (!this.checkMatchNumber(ws, room, message.matchNumber)) return;
+
     const reason = this.claimReasonFor(room, attachment.slot, now);
     if (reason === null) {
       await this.refreshActivityIfStale(room, now);
@@ -545,7 +646,8 @@ export class MatchRoom implements DurableObject {
 
     const state = deserialize(room.gameState);
     const opponent = otherSlot(attachment.slot);
-    const result = applyAction(state, { type: "resign", player: opponent });
+    const action = { type: "resign", player: opponent } as const;
+    const result = applyAction(state, action);
     if (!result.ok || result.state.winner === null) {
       await this.refreshActivityIfStale(room, now);
       this.sendError(ws, "notClaimable", "Claim win is not available.");
@@ -562,10 +664,14 @@ export class MatchRoom implements DurableObject {
       claimReason: reason,
       onlineEndReason: reason,
     };
-    await this.persistRoom(updatedRoom);
-    this.broadcastState(updatedRoom);
-    this.broadcastMatchStatus(updatedRoom);
-    this.broadcastMatchEnded(updatedRoom, result.state.winner, reason);
+    await this.recordAction(
+      updatedRoom,
+      state,
+      result.state,
+      action,
+      now,
+      reason,
+    );
   }
 
   private async handleRematch(
@@ -591,6 +697,8 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
+    if (!this.checkMatchNumber(ws, room, message.matchNumber)) return;
+
     if (
       !room.slots.A ||
       !room.slots.B ||
@@ -605,6 +713,17 @@ export class MatchRoom implements DurableObject {
       return;
     }
 
+    if (
+      message.vote === "accept" &&
+      Object.keys(room.unsaved).length >= MAX_UNSAVED
+    ) {
+      this.sendError(
+        ws,
+        "savingEarlierGames",
+        "Earlier games are still saving.",
+      );
+      return;
+    }
     const votes = applyRematchVote(room.rematch, attachment.slot, message.vote);
     if (sameRematchVotes(votes, room.rematch)) {
       // A retried vote changes nothing, so keep the room untouched and just
@@ -628,26 +747,419 @@ export class MatchRoom implements DurableObject {
     this.broadcastRematchStatus(updatedRoom);
   }
 
+  private async handleOps(request: Request, path: string): Promise<Response> {
+    if (request.method === "GET" && path === "/internal/ops/outbox") {
+      const room = await this.readRoom();
+      if (!room) return opsJson({ error: "noEntry" }, 404);
+      const numbers = Object.keys(room.unsaved)
+        .map(Number)
+        .sort((a, b) => a - b);
+      const entries = await this.ctx.storage.get<OutboxEntry>(
+        numbers.map(outboxKey),
+      );
+      return opsJson({
+        roomCode: room.roomCode,
+        roomCreatedAt: room.createdAt,
+        expired: room.expiredAt !== null,
+        entries: [...entries.values()].map((entry) => ({
+          matchNumber: entry.payload.matchNumber,
+          matchId: entry.payload.id,
+          status: entry.status,
+          stalledReason: entry.stalledReason,
+          attempts: entry.attempts,
+          firstAttemptAt: entry.firstAttemptAt,
+          nextAttemptAt: entry.nextAttemptAt,
+          lastError: entry.lastError,
+          endedAt: entry.payload.endedAt,
+          actionCount: entry.payload.actionCount,
+          mode: entry.payload.mode,
+          rated: entry.payload.rated,
+          payloadHash: entry.payloadHash,
+        })),
+      });
+    }
+    const discard = path === "/internal/ops/discard";
+    if (
+      request.method !== "POST" ||
+      (!discard && path !== "/internal/ops/retry")
+    ) {
+      return opsJson({ error: "notFound" }, 404);
+    }
+
+    const body = (
+      discard ? discardRequestSchema : entryRequestSchema
+    ).safeParse(await request.json().catch(() => null));
+    if (!body.success) return opsJson({ error: "invalidRequest" }, 400);
+    const { roomCode, matchNumber, matchId } = body.data;
+    const key = outboxKey(matchNumber);
+    const values = await this.ctx.storage.get<RoomState | OutboxEntry>([
+      ROOM_STATE_KEY,
+      key,
+    ]);
+    const stored = values.get(ROOM_STATE_KEY) as RoomState | undefined;
+    const entry = values.get(key) as OutboxEntry | undefined;
+    if (!stored || stored.roomCode !== roomCode || !entry)
+      return opsJson({ error: "noEntry" }, 404);
+    if (entry.payload.id !== matchId)
+      return opsJson({ error: "entryMismatch" }, 409);
+    if (this.attemptsInProgress.has(matchNumber))
+      return opsJson({ error: "attemptInProgress" }, 409);
+    if (!discard) {
+      if (entry.stalledReason === "replayMismatch")
+        return opsJson({ error: "notRetryable" }, 409);
+      await this.attemptSave(matchNumber, true);
+      const remaining = await this.ctx.storage.get<OutboxEntry>(key);
+      return opsJson({ status: remaining?.status ?? "saved" });
+    }
+
+    const room = this.normalizeRoom(stored);
+    delete room.unsaved[matchNumber];
+    if (room.lastSave?.matchNumber === matchNumber)
+      room.lastSave = { matchNumber, status: "stalled" };
+    this.updateHold(room);
+    const remove = this.ctx.storage.delete(key);
+    const write = this.persistRoom(room);
+    await Promise.all([remove, write]);
+    if (room.expiredAt === null) this.broadcastMatchStatus(room);
+    await this.reconcileRetention();
+    return opsJson({ status: "discarded" });
+  }
+
+  private checkMatchNumber(
+    ws: WebSocket,
+    room: RoomState,
+    matchNumber: number | undefined,
+  ): boolean {
+    if (matchNumber === undefined || matchNumber === room.matchNumber)
+      return true;
+    this.sendError(ws, "staleMatch", "The action belongs to another match.");
+    return false;
+  }
+
+  private async recordAction(
+    room: RoomState,
+    previous: GameState,
+    state: GameState,
+    action: GameAction,
+    now: number,
+    claim?: OnlineMatchEndReason,
+  ): Promise<void> {
+    const entry = await this.ctx.blockConcurrencyWhile(async () => {
+      const stored = await this.ctx.storage.get<MatchLog>(LOG_KEY);
+      const isInitial =
+        !stored &&
+        serialize(previous) ===
+          serialize(createInitialState(previous.startingPlayer));
+      const currentLog =
+        stored ??
+        (isInitial
+          ? emptyLog(room.matchNumber, previous.startingPlayer)
+          : undefined);
+      const log = currentLog && {
+        ...currentLog,
+        a: [...currentLog.a, encodeAction(action)],
+      };
+      if (action.type !== "resign" && room.playBeganAt === null) {
+        room.playBeganAt = now;
+        // R2 supplies the consent handshake. H1 games are always friendly.
+        room.rated = false;
+        room.consentPolicyV = null;
+      }
+
+      const writes: Record<string, unknown> = log ? { [LOG_KEY]: log } : {};
+      const A = room.seats.A;
+      const B = room.seats.B;
+      let entry: OutboxEntry | undefined;
+      if (
+        state.endReason !== null &&
+        A?.kind === "account" &&
+        B?.kind === "account"
+      ) {
+        if ((!log || log.matchNumber !== room.matchNumber) && !isInitial) {
+          console.info("matchLogMissing", {
+            roomCode: room.roomCode,
+            matchNumber: room.matchNumber,
+          });
+        } else if (
+          log?.matchNumber === room.matchNumber &&
+          room.playBeganAt !== null &&
+          writesLedgerRow({
+            seatKinds: { A: A.kind, B: B.kind },
+            playBegan: true,
+            endedBy: claim ? "claim" : "action",
+          })
+        ) {
+          entry = await createOutboxEntry(
+            log,
+            { ...state, endReason: state.endReason },
+            {
+              roomCode: room.roomCode,
+              roomCreatedAt: room.createdAt,
+              mode: room.options.mode,
+              rated: room.rated ? 1 : 0,
+              consentPolicyV: room.consentPolicyV,
+              startedAt: room.playBeganAt,
+              endedAt: now,
+              onlineEndReason:
+                claim === "opponentAbandoned"
+                  ? "abandoned"
+                  : claim === "opponentIdleTimeout"
+                    ? "idle"
+                    : null,
+              userIds: { A: A.userId, B: B.userId },
+            },
+          );
+          room.unsaved = {
+            ...room.unsaved,
+            [room.matchNumber]: outboxSummary(entry),
+          };
+          room.lastSave = {
+            matchNumber: room.matchNumber,
+            status: entry.status,
+          };
+          writes[outboxKey(room.matchNumber)] = entry;
+          this.updateHold(room);
+        }
+      }
+      await this.persistRoom(room, writes);
+      return entry;
+    });
+
+    this.broadcastState(room);
+    this.broadcastMatchStatus(room);
+    if (claim && state.winner !== null)
+      this.broadcastMatchEnded(room, state.winner, claim);
+
+    if (entry?.status === "pending") await this.attemptSave(room.matchNumber);
+    else if (entry) await this.reconcileRetention();
+  }
+
+  private async attemptSave(
+    matchNumber: number,
+    manual = false,
+  ): Promise<void> {
+    if (this.attemptsInProgress.has(matchNumber)) return;
+    this.attemptsInProgress.add(matchNumber);
+    try {
+      const key = outboxKey(matchNumber);
+      const entry = await this.ctx.storage.get<OutboxEntry>(key);
+      if (!entry || entry.stalledReason === "replayMismatch") return;
+      if (!manual && entry.status !== "pending") return;
+
+      const now = Date.now();
+      if (!manual && entry.firstAttemptAt === null) {
+        // If the object stops during D1 commit, the alarm can retry within
+        // the original window.
+        await this.ctx.storage.put(key, { ...entry, firstAttemptAt: now });
+      }
+      const result: SaveMatchResult = this.env.DB
+        ? await saveMatch(this.env.DB, entry.payload, entry.payloadHash)
+        : { status: "failed", error: new Error("DB binding unavailable") };
+
+      const updated = await this.ctx.storage.transaction(async (storage) => {
+        const values = await storage.get<RoomState | OutboxEntry>([
+          ROOM_STATE_KEY,
+          key,
+        ]);
+        const stored = values.get(ROOM_STATE_KEY) as RoomState | undefined;
+        const current = values.get(key) as OutboxEntry | undefined;
+        if (!stored || !current || current.payload.id !== entry.payload.id)
+          return;
+        const room = this.normalizeRoom(stored);
+        const latest = room.lastSave?.matchNumber === matchNumber;
+        if (result.status === "saved") {
+          delete room.unsaved[matchNumber];
+          if (latest)
+            room.lastSave = {
+              matchNumber,
+              status: "saved",
+              matchId: result.matchId,
+            };
+          await storage.delete(key);
+        } else {
+          const failed = this.recordSaveFailure(current, result, now, manual);
+          room.unsaved = {
+            ...room.unsaved,
+            [matchNumber]: outboxSummary(failed),
+          };
+          if (latest) room.lastSave = { matchNumber, status: failed.status };
+          await storage.put(key, failed);
+        }
+        this.updateHold(room);
+        await storage.put(ROOM_STATE_KEY, room);
+        await this.scheduleAlarm(room, storage);
+        return { room, latest };
+      });
+
+      if (updated?.latest && updated.room.expiredAt === null) {
+        const latest = await this.readRoom();
+        if (latest?.expiredAt === null) this.broadcastMatchStatus(latest);
+      }
+      await this.reconcileRetention();
+    } finally {
+      this.attemptsInProgress.delete(matchNumber);
+    }
+  }
+
+  private recordSaveFailure(
+    entry: OutboxEntry,
+    failure: Exclude<SaveMatchResult, { status: "saved" }>,
+    now: number,
+    manual: boolean,
+  ): OutboxEntry {
+    const updated = { ...entry };
+    const scope = {
+      roomCode: entry.payload.roomCode,
+      matchNumber: entry.payload.matchNumber,
+      matchId: entry.payload.id,
+    };
+    if (!manual) {
+      updated.attempts++;
+      updated.firstAttemptAt ??= now;
+    }
+    if (failure.status === "conflict") {
+      updated.lastError = "Ledger payload hash conflict.";
+      updated.stalledReason = "integrity";
+      console.error("matchSaveIntegrity", scope);
+    } else {
+      // D1 may include statement data in error strings. Keep a fixed diagnostic
+      // here so operator output and logs cannot expose account ids or replays.
+      updated.lastError = this.env.DB
+        ? "D1 ledger write failed."
+        : "DB binding unavailable.";
+      if (!manual) {
+        const delay =
+          RETRY_DELAYS[
+            Math.min(updated.attempts - 1, RETRY_DELAYS.length - 1)
+          ] ?? RETRY_DELAYS[0];
+        const next = now + delay;
+        if (
+          next > (updated.firstAttemptAt ?? now) + RETRY_WINDOW ||
+          updated.attempts >= 77
+        ) {
+          updated.stalledReason = "retriesExhausted";
+          console.error("matchSaveStalled", scope);
+        } else {
+          updated.nextAttemptAt = next;
+          console.warn("matchSaveRetry", {
+            ...scope,
+            attempts: updated.attempts,
+            nextAttemptAt: next,
+          });
+        }
+      }
+    }
+    if (updated.stalledReason) {
+      updated.status = "stalled";
+      updated.nextAttemptAt = null;
+    }
+    return updated;
+  }
+
+  private updateHold(room: RoomState): RoomState {
+    const entries = Object.values(room.unsaved);
+    const hold =
+      entries.length > 0 &&
+      (room.expiredAt !== null ||
+        entries.some(
+          (entry) => entry.attempts > 0 || entry.status === "stalled",
+        ));
+    if (hold !== room.holdsUnsaved) {
+      room.holdsUnsaved = hold;
+      room.holdSynced = false;
+    }
+    return room;
+  }
+
+  private async reconcileRetention(): Promise<void> {
+    let room = await this.readRoom();
+    if (!room) return;
+
+    if (
+      room.expiredAt !== null &&
+      Object.keys(room.unsaved).length === 0 &&
+      !this.holdInProgress
+    ) {
+      if (this.cleanupInProgress) return;
+      this.cleanupInProgress = true;
+      try {
+        await this.releaseCoordinatorRoom(room);
+        const remove = this.ctx.storage.deleteAll();
+        const alarm = this.ctx.storage.deleteAlarm();
+        await Promise.all([remove, alarm]);
+      } catch {
+        await this.scheduleAlarm(room);
+      } finally {
+        this.cleanupInProgress = false;
+      }
+      return;
+    }
+
+    if (!room.holdSynced && !this.holdInProgress) {
+      this.holdInProgress = true;
+      const sent = room;
+      try {
+        const coordinator = this.env.MATCH_COORDINATOR.get(
+          this.env.MATCH_COORDINATOR.idFromName("global"),
+        );
+        const response = await coordinator.fetch(
+          "https://shaxda.internal/internal/coordinator/hold",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              roomCode: sent.roomCode,
+              roomCreatedAt: sent.createdAt,
+              holdsUnsaved: sent.holdsUnsaved,
+            }),
+          },
+        );
+        room = await this.readRoom();
+        if (
+          response.ok &&
+          room?.createdAt === sent.createdAt &&
+          room.holdsUnsaved === sent.holdsUnsaved
+        ) {
+          await this.persistRoom({ ...room, holdSynced: true });
+        }
+      } catch {
+        // The stored unsynced flag keeps the hold eligible for an alarm retry.
+      } finally {
+        this.holdInProgress = false;
+      }
+      room = await this.readRoom();
+      if (!room) return;
+    }
+    await this.scheduleAlarm(room);
+  }
+
   private async startRematch(room: RoomState, now: number): Promise<void> {
+    const startingSeat = otherSlot(deserialize(room.gameState).startingPlayer);
     const updatedRoom = this.reconcileClaimability(
       this.ensureTurnStarted(
         {
           ...room,
           lastActivityAt: now,
           matchNumber: room.matchNumber + 1,
-          gameState: serialize(createInitialState("A")),
+          gameState: serialize(createInitialState(startingSeat)),
           turnStartedAt: null,
           nudgedTurnAt: null,
           claimableBy: null,
           claimReason: null,
           onlineEndReason: null,
           rematch: emptyRematchVotes(),
+          consent: { A: null, B: null },
+          rated: null,
+          consentPolicyV: null,
+          playBeganAt: null,
         },
         now,
       ),
       now,
     );
-    await this.persistRoom(updatedRoom);
+    await this.persistRoom(updatedRoom, {
+      [LOG_KEY]: emptyLog(updatedRoom.matchNumber, startingSeat),
+    });
     // Announce the new match generation before its board so clients drop the
     // finished game's result before the fresh state arrives.
     this.broadcastRematchStatus(updatedRoom);
@@ -802,7 +1314,7 @@ export class MatchRoom implements DurableObject {
 
   private async handleSocketDisconnect(ws: WebSocket): Promise<void> {
     const room = await this.readRoom();
-    if (!room || !this.authorizeSocket(room, ws)) {
+    if (!room || room.expiredAt !== null || !this.authorizeSocket(room, ws)) {
       return;
     }
     ws.serializeAttachment(null);
@@ -1066,6 +1578,14 @@ export class MatchRoom implements DurableObject {
       idleSlot,
       claimableBy: room.claimableBy,
       claimReason: room.claimReason,
+      mode: room.options.mode,
+      ratedRequest: room.options.ratedRequest,
+      consent: {
+        A: room.consent.A?.accept ?? null,
+        B: room.consent.B?.accept ?? null,
+      },
+      rated: room.rated,
+      save: room.lastSave ?? undefined,
     });
   }
 
@@ -1109,9 +1629,13 @@ export class MatchRoom implements DurableObject {
     return updatedRoom;
   }
 
-  private async persistRoom(room: RoomState): Promise<void> {
-    await this.ctx.storage.put(ROOM_STATE_KEY, room);
-    await this.scheduleAlarm(room);
+  private async persistRoom(
+    room: RoomState,
+    entries: Record<string, unknown> = {},
+  ): Promise<void> {
+    const write = this.ctx.storage.put({ [ROOM_STATE_KEY]: room, ...entries });
+    const alarm = this.scheduleAlarm(room);
+    await Promise.all([write, alarm]);
   }
 
   private async readRoom(): Promise<RoomState | null> {
@@ -1120,10 +1644,33 @@ export class MatchRoom implements DurableObject {
     return stored ? this.normalizeRoom(stored) : null;
   }
 
-  private async scheduleAlarm(room: RoomState): Promise<void> {
-    const deadlines = [room.lastActivityAt + IDLE_TIMEOUT_MS];
+  private async scheduleAlarm(
+    room: RoomState,
+    storage: Pick<DurableObjectTransaction, "setAlarm" | "deleteAlarm"> = this
+      .ctx.storage,
+  ): Promise<void> {
+    const deadlines: number[] = [];
+    const now = Date.now();
+    if (
+      !room.holdSynced ||
+      (room.expiredAt !== null && Object.keys(room.unsaved).length === 0)
+    ) {
+      deadlines.push(now + HOLD_RETRY_MS);
+    }
+    for (const [matchNumber, entry] of Object.entries(room.unsaved)) {
+      if (entry.nextAttemptAt !== null) {
+        deadlines.push(
+          entry.nextAttemptAt <= now &&
+            this.attemptsInProgress.has(Number(matchNumber))
+            ? now + RETRY_DELAYS[0]
+            : entry.nextAttemptAt,
+        );
+      }
+    }
+    if (room.expiredAt === null)
+      deadlines.push(room.lastActivityAt + IDLE_TIMEOUT_MS);
 
-    if (this.isActiveMatch(room)) {
+    if (room.expiredAt === null && this.isActiveMatch(room)) {
       for (const slot of PLAYER_SLOTS) {
         const connection = room.connections[slot];
         const claimant = otherSlot(slot);
@@ -1161,7 +1708,8 @@ export class MatchRoom implements DurableObject {
       }
     }
 
-    await this.ctx.storage.setAlarm(Math.min(...deadlines));
+    if (deadlines.length === 0) await storage.deleteAlarm();
+    else await storage.setAlarm(Math.min(...deadlines));
   }
 
   private normalizeRoom(stored: Partial<RoomState>): RoomState {
@@ -1217,6 +1765,16 @@ export class MatchRoom implements DurableObject {
       claimReason: stored.claimReason ?? null,
       onlineEndReason: stored.onlineEndReason ?? null,
       rematch: normalizeRematchVotes(stored.rematch),
+      options: stored.options ?? { mode: "invite", ratedRequest: false },
+      consent: stored.consent ?? { A: null, B: null },
+      rated: stored.rated ?? null,
+      consentPolicyV: stored.consentPolicyV ?? null,
+      playBeganAt: stored.playBeganAt ?? null,
+      unsaved: stored.unsaved ?? {},
+      lastSave: stored.lastSave ?? null,
+      expiredAt: stored.expiredAt ?? null,
+      holdSynced: stored.holdSynced ?? true,
+      holdsUnsaved: stored.holdsUnsaved ?? false,
     };
     const liveConnections = this.liveConnections(baseRoom);
     const connections: Partial<Record<PlayerSlot, ConnectionState>> = {};
@@ -1315,18 +1873,26 @@ export class MatchRoom implements DurableObject {
     return true;
   }
 
-  private async releaseCoordinatorRoom(roomCode: string): Promise<void> {
+  private async releaseCoordinatorRoom(room: RoomState): Promise<void> {
     const coordinator = this.env.MATCH_COORDINATOR.get(
       this.env.MATCH_COORDINATOR.idFromName("global"),
     );
-    await coordinator.fetch(
+    const response = await coordinator.fetch(
       new Request("https://shaxda.internal/internal/coordinator/release", {
         method: "POST",
-        body: JSON.stringify({ roomCode }),
+        body: JSON.stringify({
+          roomCode: room.roomCode,
+          roomCreatedAt: room.createdAt,
+        }),
         headers: { "Content-Type": "application/json" },
       }),
     );
+    if (!response.ok) throw new Error("Coordinator release failed.");
   }
+}
+
+function emptyLog(matchNumber: number, startingSeat: PlayerSlot): MatchLog {
+  return { v: REPLAY_VERSION, matchNumber, s: startingSeat, a: [] };
 }
 
 function presencePlayer(seat: SeatIdentity | undefined): {

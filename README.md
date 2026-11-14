@@ -6,9 +6,16 @@ V1.0 shipped local 2-player play, guest invite online play, public Somali
 rules/learning pages, and PWA installability. V1.1-A (accounts, Google login)
 has also shipped, and V1.1-A2 (authenticated online identity — letting a
 signed-in account own a seat in an online room via short-lived tickets) is
-active. Match persistence, history, leaderboard, replay viewer, and
-English/i18n remain later V1.1 milestones. See
-[`AGENTS.md`](AGENTS.md) for the full scope and non-negotiables.
+deployed. Its remaining production checks are tracked in the
+[release verification record](docs/ops/v11a-a2-release-verification.md).
+
+V2 has 17 frozen milestone specs awaiting implementation and activation.
+They cover match persistence, history, replay, ratings, leaderboard, quick
+match, analytics, account deletion, and sponsorship. The current preparation
+focus is the game and account features, with sponsorship and publishing
+scheduled later. English/i18n is outside V2. See the
+[build and parallel-session plan](docs/build_guide.md), the
+[spec register](docs/specs/README.md), and [`AGENTS.md`](AGENTS.md).
 
 ## Source-of-truth docs
 

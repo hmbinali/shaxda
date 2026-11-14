@@ -26,6 +26,19 @@ A spec being `frozen` does **not** activate its milestone. Implementation
 starts only when the spec is frozen **and** its milestone is activated
 (`AGENTS.md`).
 
+## Current implementation planning
+
+As of 2026-11-14, all 17 milestone specs are frozen and await implementation.
+No V2 milestone is activated. The current request covers preparation and a
+parallel-session plan for the game and account features. Sponsorship (S1–S3)
+and publishing work are scheduled later.
+
+The [build guide](../build_guide.md) maps the specs to session assignments,
+merge order, and shared-file ownership. E5 still precedes R1/R3 activation,
+and E6 still precedes H2/R3/R4/R5 implementation. These checks are part of
+preparation. Their results determine whether a contract-change commit is
+needed before the dependent feature work.
+
 ## Spec index
 
 Register IDs are defined in the tables below. "Wave" is the build wave in
@@ -188,10 +201,10 @@ M1–M10 have no sponsor effect.
 | M9  | Rematch row, `rated = 0`, other seat starts | A and B only; the first game stays public                                   | `skipped:friendly`                                                               | Nothing public; the head-to-head card lists it                     | Rematch counts started and completed; `saved_friendly`      | Quick rooms refuse a friendly rematch (`ratedOnlyRematch`, QM6) |
 | M10 | M2 unchanged                                | M2 public; B shown as "Xubin la tirtiray" everywhere, OG included           | A's and B's M2 events unchanged                                                  | `/u/B` 404; B leaves the leaderboard; A's record unchanged         | M2 still counted; B's activity rows age out (P12)           | A3: from the request B gets no tickets (P11); K2: no re-queue   |
 
-## Release-only items
+## Remaining activation, implementation, and release checks
 
-The freeze leaves only these open. Each blocks a release or an activation,
-never a spec.
+The freeze leaves the following checks open. The final column identifies the
+implementation, activation, or release step each check controls.
 
 | Item                        | Open                                                                                        | Blocks                                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |

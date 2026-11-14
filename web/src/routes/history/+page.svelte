@@ -26,7 +26,7 @@
 <PageMeta
   title={copy.title}
   description={copy.description}
-  path="/history"
+  path={copy.path}
   noindex
 />
 

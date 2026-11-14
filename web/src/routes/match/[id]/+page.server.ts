@@ -71,7 +71,7 @@ export const load: PageServerLoad = async ({
           description: interpolate(copy.pageDescription[result], names),
           noindex: false,
         }
-      : { ...copy.privateMeta, noindex: true },
+      : { title: copy.title, description: copy.description, noindex: true },
     shareTitle: match.rated ? interpolate(copy.share.shareTitle, names) : null,
     headline: interpolate(copy.headline[result], names),
     reason,

@@ -1,14 +1,17 @@
 <script lang="ts">
+  import { siteContent } from "@shaxda/i18n";
   import { ratedLabel, type RatingDecision } from "$lib/rated-play/label";
 
   let {
     rated,
     decision,
     showDetail = true,
+    corrected = false,
   }: {
     rated: boolean;
     decision?: RatingDecision | null;
     showDetail?: boolean;
+    corrected?: boolean;
   } = $props();
   const label = $derived(ratedLabel(rated, decision));
 </script>
@@ -20,5 +23,8 @@
   >
   {#if showDetail && label.detail}
     <span>{label.detail}</span>
+  {/if}
+  {#if corrected && rated && !(decision?.status === "skipped" && decision.reason === "invalidated")}
+    <span>{siteContent.so.rating.corrected}</span>
   {/if}
 </div>

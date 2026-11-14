@@ -45,6 +45,22 @@ test("records two-account agreement and a mixed-vote friendly rematch", async ({
       winner_seat: "A",
       action_count: 4,
     });
+    await expect(page.getByTestId("match-rating-pending")).toBeVisible();
+    const sweep = await page.request.get("/cdn-cgi/handler/scheduled", {
+      params: { cron: "* * * * *" },
+    });
+    expect(sweep.ok()).toBe(true);
+    await expect(page.getByTestId("match-rating-confirmed")).toContainText(
+      "+162",
+    );
+    await expect(joiner.getByTestId("match-rating-confirmed")).toContainText(
+      "−162",
+    );
+    expect(
+      ledgerQuery(
+        `SELECT rating_policy_v, rating_status FROM match_rating WHERE match_id = '${first!.id}'`,
+      ),
+    ).toEqual([{ rating_policy_v: 1, rating_status: "processed" }]);
 
     await page.getByTestId("online-rated-rematch").click();
     await expect(joiner.getByTestId("online-game-result-notice")).toContainText(

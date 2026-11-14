@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { legalActions } from "./actions";
-import { applyAction } from "./reducer";
 import {
   decodeCompactReplay,
   encodeAction,
@@ -8,9 +6,8 @@ import {
   MAX_REPLAY_ACTIONS,
   summarizeReplay,
 } from "./replay";
-import { serialize } from "./serialization";
-import { createInitialState } from "./state";
-import type { GameAction, GameState, PlayerId } from "./types";
+import type { GameAction } from "./types";
+import { maximumReplay } from "./fixtures/e4-maximum";
 
 describe("compact replay", () => {
   it("encodes all action kinds and replays an off-turn resignation", () => {
@@ -97,77 +94,30 @@ describe("compact replay", () => {
   });
 
   it("round-trips the maximal legal game under the E4 bound", () => {
-    const game = maximalGame();
-    const replay = encodeCompactReplay("A", game.actions);
-    expect(replay.a).toHaveLength(MAX_REPLAY_ACTIONS);
-    expect(new TextEncoder().encode(JSON.stringify(replay))).toHaveLength(
-      13_922,
+    expect(maximumReplay.a).toHaveLength(MAX_REPLAY_ACTIONS);
+    expect(
+      new TextEncoder().encode(JSON.stringify(maximumReplay)),
+    ).toHaveLength(13_922);
+    const decoded = decodeCompactReplay(maximumReplay);
+    expect(decoded).toMatchObject({
+      ok: true,
+      state: {
+        phase: "gameOver",
+        endReason: "opponentBelowThree",
+        winner: "B",
+      },
+    });
+    if (!decoded.ok) throw new Error(decoded.error);
+    expect(encodeCompactReplay(maximumReplay.s, decoded.actions)).toEqual(
+      maximumReplay,
     );
-    const decoded = decodeCompactReplay(replay);
-    expect(decoded.ok && serialize(decoded.state)).toEqual(
-      serialize(game.state),
-    );
-  }, 60_000);
-});
-
-// E4 construction. Hold each capture until the 80th movement turn and
-// let each side capture eight times before the final capture.
-function maximalGame(): { state: GameState; actions: GameAction[] } {
-  let seed = 0x4eed_beef;
-  const pick = <T>(values: T[]): T | undefined => {
-    seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0;
-    return values[Math.floor((seed / 0x1_0000_0000) * values.length)];
-  };
-  const advance = (state: GameState, action: GameAction): GameState => {
-    const result = applyAction(state, action);
-    if (!result.ok) throw new Error(result.error);
-    return result.state;
-  };
-
-  for (let game = 0; game < 8; game++) {
-    let state = createInitialState("A");
-    const actions: GameAction[] = [];
-    for (let turn = 0; turn < 26; turn++) {
-      const action = pick(
-        legalActions(state).filter((a) => a.type !== "resign"),
-      );
-      if (!action) throw new Error("Missing opening action");
-      actions.push(action);
-      state = advance(state, action);
-    }
-    for (let capture = 0; capture < 17; capture++) {
-      const capturer: PlayerId = capture < 8 ? "A" : "B";
-      let found = false;
-      for (let walk = 0; walk < 400 && !found; walk++) {
-        let trial = state;
-        const steps: GameAction[] = [];
-        for (let turn = 0; turn < 80; turn++) {
-          const target = turn === 79 ? "capture" : "movement";
-          if (turn === 79 && trial.currentPlayer !== capturer) break;
-          const action = pick(
-            legalActions(trial).flatMap((action) => {
-              if (action.type !== "move") return [];
-              const next = advance(trial, action);
-              return next.phase === target ? [{ action, next }] : [];
-            }),
-          );
-          if (!action) break;
-          steps.push(action.action);
-          trial = action.next;
-        }
-        if (trial.phase !== "capture") continue;
-        const removal = pick(
-          legalActions(trial).filter((action) => action.type === "capture"),
-        );
-        if (!removal) throw new Error("Jare has no legal capture");
-        state = advance(trial, removal);
-        actions.push(...steps, removal);
-        found = true;
+    let quiet = 0;
+    for (const action of decoded.actions.slice(26)) {
+      if (action.type === "move") quiet++;
+      if (action.type === "capture") {
+        expect(quiet).toBe(80);
+        quiet = 0;
       }
-      if (!found) break;
-      if (capture === 16 && state.phase === "gameOver")
-        return { state, actions };
     }
-  }
-  throw new Error("Could not regenerate the E4 maximum");
-}
+  });
+});

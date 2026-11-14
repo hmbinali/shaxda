@@ -239,7 +239,7 @@ async function main() {
       if (answer !== String(high)) return 1;
       const token = crypto.randomUUID();
       const clock = await databaseTime(db);
-      if (!(await acquireMaintenance(db, token, high, clock))) return 1;
+      if ((await acquireMaintenance(db, token, high, clock)) === null) return 1;
       const paused = await readRatingSnapshot(db);
       const current = verifyRebuild(paused);
       const start = performance.now();

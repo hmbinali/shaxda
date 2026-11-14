@@ -273,18 +273,22 @@ export async function acquireMaintenance(
   token: string,
   high: number,
   now: number,
-): Promise<boolean> {
-  const result = await db
-    .prepare(
-      `
+): Promise<0 | 1 | null> {
+  const [before, lease] = await db.batch([
+    db.prepare("SELECT maintenance FROM rating_processor_state WHERE id = 1"),
+    db
+      .prepare(
+        `
       UPDATE rating_processor_state
          SET lease_token = ?, lease_expires_at = ?, maintenance = 1, updated_at = ?
        WHERE id = 1 AND cursor_seq = ? AND (lease_token IS NULL OR lease_expires_at <= ?)
     `,
-    )
-    .bind(token, now + 60_000, now, high, now)
-    .run();
-  return result.meta.changes === 1;
+      )
+      .bind(token, now + 60_000, now, high, now),
+  ]);
+  if (lease?.meta.changes !== 1) return null;
+  const state = before?.results[0] as Pick<ProcessorState, "maintenance">;
+  return state.maintenance === 1 ? 1 : 0;
 }
 
 function clearNext(db: D1Database) {

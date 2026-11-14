@@ -247,3 +247,73 @@ it("reports a full-precision seat drift and keeps friendly results private", asy
   await correct("rebuild-ratings", null);
   expect(verifyRebuild(await readRatingSnapshot(db)).diffs).toEqual([]);
 });
+
+it("allows a second pause and resume at the same ledger high-water mark", async () => {
+  const before = await readRatingSnapshot(db);
+  const first = await correct("pause-ratings", null);
+  await correct("resume-ratings", null);
+  const second = await correct("pause-ratings", null);
+  expect(second.digest).not.toBe(first.digest);
+  await correct("resume-ratings", null);
+  const after = await readRatingSnapshot(db);
+  expect(after.state).toMatchObject({
+    cursor_seq: before.state.cursor_seq,
+    maintenance: 0,
+  });
+});
+
+it("keeps ratings available when another apply publishes while a duplicate waits", async () => {
+  const input = request("invalidate-match", ids[0]!);
+  const plan = await planRatingAdmin(db, input);
+  let release: () => void = () => {};
+  const stageGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let staged: () => void = () => {};
+  const ready = new Promise<void>((resolve) => {
+    staged = resolve;
+  });
+  const original = applyRatingAdmin(
+    db,
+    input,
+    plan.digest,
+    {},
+    {
+      afterStaging: async () => {
+        staged();
+        await stageGate;
+      },
+    },
+  );
+  await Promise.race([ready, original]);
+  // Observe the duplicate's pre-lease snapshot and release the original
+  // after the duplicate has checked its plan against the old published data.
+  let sawPlan = false;
+  const duplicateDb = {
+    batch: db.batch.bind(db),
+    prepare(sql: string) {
+      if (!sawPlan && sql === "SELECT rated FROM match WHERE id = ?") {
+        sawPlan = true;
+        return {
+          bind: (id: string) => ({
+            first: async (column: string) => {
+              const result = await db.prepare(sql).bind(id).first(column);
+              release();
+              await original;
+              return result;
+            },
+          }),
+        };
+      }
+      return db.prepare(sql);
+    },
+  } as unknown as D1Database;
+  await expect(
+    applyRatingAdmin(duplicateDb, input, plan.digest),
+  ).resolves.toMatchObject({ outcome: "noop" });
+  expect(sawPlan).toBe(true);
+  expect(await original).toMatchObject({ outcome: "applied" });
+  const after = await readRatingSnapshot(db);
+  expect(after.state.maintenance).toBe(0);
+  expect(verifyRebuild(after).diffs).toEqual([]);
+});

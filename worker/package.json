@@ -7,7 +7,7 @@
     "build": "tsc --noEmit",
     "deploy": "wrangler deploy --config wrangler.production.toml",
     "deploy:preview": "wrangler deploy --config wrangler.preview.toml",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --persist-to ../web/.wrangler/state",
     "format": "prettier --write .",
     "lint": "eslint .",
     "test": "vitest run --config vitest.config.ts --passWithNoTests",

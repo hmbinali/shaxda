@@ -12,6 +12,7 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -19,23 +20,28 @@ import {
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import {
-  cleanE2eStateDirectory,
+  resolveE2eStatePath,
   repoRoot,
   testResultsRoot,
 } from "./lib/e2e-state.mjs";
-import { E2E_ENV_FILE, buildE2eEnv, readE2eFixture } from "./lib/e2e-env.mjs";
+import {
+  E2E_ENV_FILE,
+  buildE2eEnv,
+  e2eOrigins,
+  readE2eBuildFixture,
+} from "./lib/e2e-env.mjs";
 import { spawnGroup } from "./lib/spawn-group.mjs";
 import { fingerprintTree } from "./lib/fs-tree.mjs";
 
-export const WEB_E2E_STATE = "wrangler-web-e2e";
+export const SHARED_E2E_STATE = "wrangler-e2e";
 export const WEB_DEV_STATE_BASELINE = "dev-state-baseline.web.json";
 
 const web = resolve(repoRoot, "web");
 const outDir = ".svelte-kit/e2e";
 const devState = resolve(web, ".wrangler/state");
 
-// Guarded: refuses any path that is not strictly inside `test-results/`.
-cleanE2eStateDirectory(WEB_E2E_STATE);
+// The game launcher creates and migrates this state before web starts.
+const sharedState = resolveE2eStatePath(SHARED_E2E_STATE);
 
 // A developer's own `web/.wrangler/state` may legitimately exist. Never delete
 // or rewrite it — fingerprint it so the suite can prove E2E left it alone.
@@ -45,11 +51,16 @@ writeFileSync(
   `${JSON.stringify({ path: devState, ...fingerprintTree(devState) }, null, 2)}\n`,
 );
 
-const env = buildE2eEnv(process.env, await readE2eFixture(), {
+const origins = e2eOrigins();
+const fixture = await readE2eBuildFixture();
+const authEnv = resolve(sharedState, "web.env");
+const webEnv = readFileSync(resolve(web, E2E_ENV_FILE), "utf8");
+writeFileSync(authEnv, `${webEnv}\nAUTH_BASE_URL=${origins.web}\n`);
+const env = buildE2eEnv(process.env, fixture, {
   SHAXDA_KIT_OUT_DIR: outDir,
   SHAXDA_WRANGLER_CONFIG: "wrangler.e2e.jsonc",
-  SHAXDA_WRANGLER_PERSIST: `../test-results/${WEB_E2E_STATE}`,
-  SHAXDA_WRANGLER_ENV_FILES: E2E_ENV_FILE,
+  SHAXDA_WRANGLER_PERSIST: sharedState,
+  SHAXDA_WRANGLER_ENV_FILES: authEnv,
 });
 
 function step(label, command, args, options = {}) {
@@ -94,20 +105,6 @@ step("Building the E2E bundle", "pnpm", [
 ]);
 moveServiceWorkerIntoClient();
 step("Checking the E2E bundle", "node", ["../scripts/check-e2e-bundle.mjs"]);
-step("Applying E2E migrations", "pnpm", [
-  "exec",
-  "wrangler",
-  "d1",
-  "migrations",
-  "apply",
-  "shaxda-db-e2e",
-  "--config",
-  "wrangler.e2e.jsonc",
-  "--local",
-  "--persist-to",
-  `../test-results/${WEB_E2E_STATE}`,
-]);
-
 // Same child environment and same `SHAXDA_KIT_OUT_DIR`, so the artifact that was
 // just built is exactly the artifact that gets served.
 // `--strictPort` matters: without it `vite preview` quietly moves to the next
@@ -124,7 +121,7 @@ spawnGroup(
     "--host",
     "127.0.0.1",
     "--port",
-    "4173",
+    new URL(origins.web).port,
     "--strictPort",
   ],
   { cwd: web, stdio: "inherit", env },

@@ -1,5 +1,10 @@
-import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import {
+  cloudflareTest,
+  readD1Migrations,
+} from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
+
+const migrations = await readD1Migrations("../packages/db/migrations");
 
 export default defineConfig({
   plugins: [
@@ -15,6 +20,8 @@ export default defineConfig({
       // merged over the Wrangler-derived ones, which pins the test environment.
       miniflare: {
         bindings: {
+          TEST_MIGRATIONS: migrations,
+          MATCH_OPS_TOKEN: "shaxda-local-match-ops-fixture-000000000001",
           ALLOWED_ORIGIN: "http://127.0.0.1:4173",
           // Empty on purpose: the Worker skips Turnstile when this is unset.
           TURNSTILE_SECRET: "",

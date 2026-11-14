@@ -5,6 +5,20 @@ import { readEnvFile } from "./env-file.mjs";
 export const E2E_ENV_FILE = ".env.e2e";
 export const webRoot = resolve(repoRoot, "web");
 
+export function e2eOrigins(env = process.env) {
+  function origin(key, fallback) {
+    const port = env[key] ?? fallback;
+    if (!/^[1-9][0-9]{0,4}$/.test(port) || Number(port) > 65_535) {
+      throw new Error(`Invalid loopback port in ${key}.`);
+    }
+    return `http://127.0.0.1:${port}`;
+  }
+  const web = origin("SHAXDA_E2E_WEB_PORT", "4173");
+  const worker = origin("SHAXDA_E2E_WORKER_PORT", "8787");
+  if (web === worker) throw new Error("Give the E2E Workers different ports.");
+  return { web, worker };
+}
+
 /**
  * Public build values Vite inlines. `loadEnv` re-applies prefixed `process.env`
  * keys *after* merging the `.env` files, so an exported value beats
@@ -40,6 +54,15 @@ export async function readE2eFixture() {
     throw new Error(`Missing the tracked E2E fixture web/${E2E_ENV_FILE}.`);
   }
   return fixture;
+}
+
+export async function readE2eBuildFixture(env = process.env) {
+  const { web, worker } = e2eOrigins(env);
+  return {
+    ...(await readE2eFixture()),
+    PUBLIC_SITE_ORIGIN: web,
+    PUBLIC_WORKER_ORIGIN: worker,
+  };
 }
 
 /**

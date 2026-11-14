@@ -1,3 +1,4 @@
+import { e2eOrigins } from "../../scripts/lib/e2e-env.mjs";
 import { expect, test, type Page } from "@playwright/test";
 import { seedAccount } from "./fixtures/auth";
 import { openAccountPanel } from "./fixtures/panel";
@@ -94,7 +95,7 @@ test("a complete account resolves through Better Auth and keeps private data pri
     await expect(page).toHaveURL(new RegExp(`/u/${account.username}$`));
 
     await page.goto("/login?returnTo=https://evil.example");
-    await expect(page).toHaveURL("http://127.0.0.1:4173/");
+    await expect(page).toHaveURL(`${e2eOrigins().web}/`);
   } finally {
     account.cleanup();
   }
@@ -115,7 +116,7 @@ test("auth API reaches the handler and logout clears the session", async ({
       throw new Error("Expected a complete account.");
     await openAccountPanel(page, `@${account.username}`);
     await page.getByRole("menuitem", { name: "Ka bax akoonka" }).click();
-    await expect(page).toHaveURL("http://127.0.0.1:4173/");
+    await expect(page).toHaveURL(`${e2eOrigins().web}/`);
     await openAccountPanel(page);
     await expect(page.getByRole("menuitem", { name: "Gal" })).toBeVisible();
   } finally {
@@ -130,7 +131,7 @@ test("sharing copies the canonical URL of the current username", async ({
   const account = await seedAccount(context, { alias: "share_e2e_alias" });
   if (account.username === null)
     throw new Error("Expected a complete account.");
-  const canonical = `http://127.0.0.1:4173/u/${account.username}`;
+  const canonical = `${e2eOrigins().web}/u/${account.username}`;
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   try {
     // An old alias still redirects, and the page it lands on shares only the
@@ -186,7 +187,7 @@ test("the profile share action uses the Web Share sheet when available", async (
     const shared = await page.evaluate(
       () => (window as unknown as { __shared?: ShareData }).__shared,
     );
-    expect(shared?.url).toBe(`http://127.0.0.1:4173/u/${account.username}`);
+    expect(shared?.url).toBe(`${e2eOrigins().web}/u/${account.username}`);
     expect(JSON.stringify(shared)).not.toContain(account.email);
     expect(JSON.stringify(shared)).not.toContain(account.id);
   } finally {

@@ -1,0 +1,38 @@
+name = "shaxda-worker-e2e"
+main = "src/index.ts"
+compatibility_date = "2026-07-05"
+
+[observability]
+enabled = true
+
+# Dev/test only. Preview and production use Wrangler secrets instead.
+[vars]
+ONLINE_IDENTITY_SECRET = "shaxda-online-identity-dev-test-secret-000000000001"
+
+[[durable_objects.bindings]]
+name = "MATCH_ROOM"
+class_name = "MatchRoom"
+
+[[durable_objects.bindings]]
+name = "MATCH_COORDINATOR"
+class_name = "RoomCoordinator"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MatchRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["RoomCoordinator"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shaxda-db-e2e"
+database_id = "local-e2e-database"
+migrations_dir = "../packages/db/migrations"
+migrations_table = "d1_migrations"
+
+[[ratelimits]]
+name = "MATCH_OPS_RATE_LIMIT"
+namespace_id = "1002"
+simple = { limit = 20, period = 60 }

@@ -10,7 +10,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { repoRoot } from "./lib/e2e-state.mjs";
-import { readE2eFixture, webRoot } from "./lib/e2e-env.mjs";
+import { readE2eBuildFixture, webRoot } from "./lib/e2e-env.mjs";
 
 // `vite preview` serves `output/`; `cloudflare/` is the copy the deploy would
 // upload. Scan what the suite actually runs against.
@@ -82,7 +82,7 @@ function findAll(needle) {
     .map(([path]) => path.slice(bundleRoot.length + 1));
 }
 
-const fixture = await readE2eFixture();
+const fixture = await readE2eBuildFixture();
 const failures = [];
 
 // The PWA plugin moves the service worker into the client bundle using a

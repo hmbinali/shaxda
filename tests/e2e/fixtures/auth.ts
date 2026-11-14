@@ -105,7 +105,7 @@ function execute(command: string): void {
           "wrangler.e2e.jsonc",
           "--local",
           "--persist-to",
-          "../test-results/wrangler-web-e2e",
+          "../test-results/wrangler-e2e",
           "--command",
           command,
         ],

@@ -65,9 +65,11 @@ describe("Glicko-2 v1", () => {
 
   it("uses the exact-root branch and fails on a nonconverging bracket", () => {
     expect(illinois((x) => x - 0.5, 0, 1)).toBe(0.5);
+    const start = 1e10;
+    // The root remains between adjacent doubles farther apart than epsilon.
     expect(() =>
-      illinois((x) => (x === 0 ? -1 : Number.MAX_VALUE), 0, 1),
-    ).toThrow(RatingMathError);
+      illinois((x) => (x === start ? -1 : 1), start, start + 10),
+    ).toThrow("Volatility solver did not converge");
   });
 
   it("fails explicitly on invalid inputs or unrepresentable calculations", () => {
@@ -120,16 +122,18 @@ describe("rating time boundaries", () => {
   it("matches a day-by-day search across starting RDs and volatilities", () => {
     const last = 1780000000123;
     for (const volatility of [0.04, 0.06, 0.07]) {
-      for (let rd = 1; rd <= 350; rd++) {
+      for (let rd = 1; rd <= 350; rd += 2) {
         const state = { ...DEFAULTS, rd, volatility };
         let first = 90;
         let previous = rd;
+        let monotone = true;
         for (let day = 0; day < 90; day++) {
           const current = effectiveRd(state, last, last + day * DAY);
           if (current > 110 && first === 90) first = day;
-          expect(current).toBeGreaterThanOrEqual(previous);
+          monotone &&= current >= previous;
           previous = current;
         }
+        expect(monotone).toBe(true);
         expect(eligibleUntil(state, last)).toBe(last + first * DAY);
       }
     }

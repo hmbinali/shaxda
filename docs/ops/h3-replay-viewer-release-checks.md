@@ -4,6 +4,14 @@ H3 uses the existing match ledger and access check. It deploys with the web
 Worker. The game Worker, D1 schema, bindings, and scheduled jobs require no
 changes.
 
+## Local verification
+
+On 2026-11-14, the four focused Vitest files passed all 71 tests, including
+the 1,403-action fixture and its seek budget. Eight focused Playwright cases
+passed across two runs on local Workers and D1. They covered a signed-out
+rated replay, position sharing, friendly replay privacy, saved-room board
+parity, history, and the Pixel 5 viewport.
+
 ## Preview
 
 1. Open a newly saved friendly match as each player. Replay to the final

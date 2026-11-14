@@ -146,6 +146,7 @@ type JoinedSocketAttachment = {
 export interface MatchRoomEnv {
   MATCH_COORDINATOR: DurableObjectNamespace;
   DB?: D1Database;
+  RATINGS?: { processNow(): Promise<{ accepted: true }> };
   ONLINE_IDENTITY_SECRET?: string;
   ONLINE_IDENTITY_SECRET_PREVIOUS?: string;
 }
@@ -994,6 +995,14 @@ export class MatchRoom implements DurableObject {
       if (updated?.latest && updated.room.expiredAt === null) {
         const latest = await this.readRoom();
         if (latest?.expiredAt === null) this.broadcastMatchStatus(latest);
+      }
+      if (updated && result.status === "saved" && this.env.RATINGS) {
+        const ratings = this.env.RATINGS;
+        this.ctx.waitUntil(
+          Promise.resolve().then(() => ratings.processNow()).catch(() => {
+            console.error("ratingHintFailed", { matchId: result.matchId });
+          }),
+        );
       }
       await this.reconcileRetention();
     } finally {

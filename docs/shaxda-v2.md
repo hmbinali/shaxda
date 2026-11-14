@@ -508,7 +508,7 @@ The BRD governs policy, prices, fulfilment, and claims. Specs:
 ### A3 — Account Deletion
 
 Spec: [`docs/specs/a3-account-deletion.md`](specs/a3-account-deletion.md).
-Activation is Q1.
+Q1 approved A3 for V2 before public rated play.
 
 **Goal.** Self-service deletion that keeps opponents' histories intact:
 seven-day cancelable grace, then a scrubbed tombstone, with every username
@@ -526,7 +526,7 @@ A wave's gate must pass in preview before its production enablement.
 | ----- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0     | `/legal` fix; this revision; proofs E1–E4.                                                                   | Contracts frozen; proofs recorded.                                                                                                                                                                                         |
 | 1     | H1, H2, X1a.                                                                                                 | Account games save durably, including across rematch and D1 outage; both players see private history; stalled saves listable; real-game e2e green. All saved games are friendly (no consent UI yet), so nothing is public. |
-| 2     | R2 consent + policy, R1, R6-core, X1b; A3 before production enablement if Q1 = yes.                          | Consent works on new clients and fails safe on old ones; M1–M10 pass; rebuild zero drift; invalidate/rescind rehearsed on preview.                                                                                         |
+| 2     | R2 consent + policy, R1, R6-core, X1b; A3 must be live before public rated play.                             | Consent works on new clients and fails safe on old ones; M1–M10 pass; rebuild zero drift; invalidate/rescind rehearsed on preview.                                                                                         |
 | 3     | K1 (with minimum telemetry), then a community beta at scheduled play windows.                                | Two real devices find, start, and finish a game; no-show recovery; waits measured; an empty queue has no alarm.                                                                                                            |
 | 4     | H3, H4, R3, R4, R5 (H3 and H4 may start any time after wave 1).                                              | Replays and stats verified; public records and ranks agree; E5/E6 recorded; private data absent from every public path.                                                                                                    |
 | Pilot | BRD approved (Q5) → S1 (P14) + S2-min → S3a; needs ≥ 30 days of X1 data. S3b after a first delivered report. | No paid placement without a working report, approved creative, owner, and a 60 s takedown.                                                                                                                                 |
@@ -576,7 +576,7 @@ the BRD's truthful-claims rule.
 Decisions live in the register in
 [`docs/specs/README.md`](specs/README.md#decision-register): F1–F8 are
 founder-confirmed, P1–P21 are defaults that stand until the founder
-overrides them, and Q1–Q5 are the only open questions. The earlier decision
+overrides them. Q1 is approved, and Q2–Q5 remain open. The earlier decision
 log maps as follows:
 
 | Earlier ID | Earlier decision                                                      | Now                                                                    |
@@ -598,8 +598,8 @@ log maps as follows:
 
 ## 17. Open Questions
 
-Only the register's Q1–Q5 remain open, each tied to what it blocks: Q1 (ship
-A3 in V2, and when), Q2 (pilot surfaces and local `result`), Q3 (current
+The register tracks four open questions: Q2 (pilot surfaces and local
+`result`), Q3 (current
 players, play times, budget), Q4 (Somali glossary review), Q5 (prices,
 currency, contact, content policy, `/legal` contact).
 

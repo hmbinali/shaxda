@@ -59,12 +59,12 @@ test("requires a recent session and initiates Google reauthentication", async ({
     await page.goto("/account/delete");
     const pageOrigin = new URL(page.url()).origin;
     const stale = await page.request.post("/account/delete?/request", {
-      headers: { Origin: pageOrigin },
+      headers: { Origin: pageOrigin, Accept: "application/json" },
       form: { confirm: account.email, acknowledge: "on" },
     });
-    expect(stale.status()).toBe(403);
+    expect(await stale.json()).toMatchObject({ type: "failure", status: 403 });
     const google = await page.request.post("/account/delete?/reauth", {
-      headers: { Origin: pageOrigin },
+      headers: { Origin: pageOrigin, Accept: "text/html" },
       form: {},
       maxRedirects: 0,
     });

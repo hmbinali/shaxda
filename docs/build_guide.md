@@ -27,7 +27,7 @@ The following existing prerequisites need explicit session ownership.
 | Local baseline       | Use the pinned runtime and lockfile, then record `pnpm check` and `pnpm test:e2e` results                            | Feature branches need a reproducible starting point |
 | E5 rating simulation | Reproducible local simulation of 20–300 players, provisional duration, leaderboard eligibility, and pair-cap effects | R1 and R3 activation                                |
 | E6 query study       | Seed 5,000 matches for one account, record query plans and rows read for every query named in contracts §12          | H2, R3, R4, and R5 implementation                   |
-| A3 timing, Q1        | Founder decision on account deletion timing, with the register recommending completion by rated public play          | A3 activation and wave-2 production enablement      |
+| A3 timing, Q1        | Approved on 2026-11-14 for V2 before public rated play                                                               | A3 activation and wave-2 production enablement      |
 
 Run E5 and E6 against the frozen contracts in disposable local fixtures.
 Preserve the scripts, seeds, commands, versions, and results so feature
@@ -87,14 +87,14 @@ resumes.
 | ------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Private history                 | H2; remaining X1a work                                                      | H2 starts after H1 and E6. Its rating-status slice waits for R1's migration. Use H1's writer and shared database fixtures.                                                                                                                      |
 | Rated play                      | R1 processor/rating package; R2 consent/policy/UI; R6-core correction tools | Start R1 and R2 together after H1, X1a, and E5. Land R2's shared policy before R1 consumes it. Merge R1's rating migration, then R6-core's migration, then R1's processor. R6-core completion is required for rated public play.                |
-| Online measurement and deletion | X1b; A3 if Q1 confirms its activation                                       | X1b follows H1 and X1a, with the game-Worker edits coordinated after R2. A3 follows H1/X1a and the token-retention fix, then integrates the readers built by H2/R1. Keep its auth hooks and shared cron edits under one owner at a time.        |
+| Online measurement and deletion | X1b; A3                                                                     | X1b follows H1 and X1a, with the game-Worker edits coordinated after R2. A3 follows H1/X1a and the token-retention fix, then integrates the readers built by H2/R1. Keep its auth hooks and shared cron edits under one owner at a time.        |
 | Replay, statistics, matching    | H3; H4; K1                                                                  | H3/H4 may begin after wave 1; H4 also uses X1a's dispatcher. K1 waits for H1/R1/R2/X1b. Serialize H4 and K1's MatchRoom edits. Merge H3 and H4's match-page integration in sequence.                                                            |
 | Leaderboard and profiles        | R3, then R4, then R5                                                        | R3 needs R1/R2/R6-core plus E5/E6. R4 also needs H2/H4 and R3. R5 follows R4. Integrate A3's reader helper if A3 has landed. These three features share profile, ranking, and query contracts and follow that order.                            |
 | Later queue and integrity work  | K2; R6-detect                                                               | K2 follows K1 and the activation evidence in K2 §10.1. R6-detect follows the evidence in its spec. Schedule these once the evidence exists.                                                                                                     |
 | Later commercial work           | S1 with S2-min, then S3a/S3b                                                | Resume after the founder returns to sponsorship. Existing prerequisites include approved commercial decisions, 30 days of X1 production data, and working reporting. S3b follows a delivered report; token links and the PDF remain later work. |
 
-A3 is included in this plan with the register's recommended timing. Q1 is
-still open. Commercial questions Q2/Q5, community and budget inputs Q3, and
+Q1 approved A3 for V2 before public rated play. Commercial questions
+Q2/Q5, community and budget inputs Q3, and
 Somali review Q4 are tracked in the register at the release they affect.
 
 ## Shared-file coordination

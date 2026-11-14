@@ -28,15 +28,14 @@ starts only when the spec is frozen **and** its milestone is activated
 
 ## Current implementation planning
 
-As of 2026-11-14, all 17 milestone specs are frozen. H1 Match Persistence is
-activated for local implementation and verification from baseline `7c91b50`.
+As of 2026-11-14, all 17 milestone specs are frozen. H1 Match Persistence and
+X1a Product Analytics are activated for local implementation and verification.
 Sponsorship (S1–S3) and publishing work are scheduled later.
 
 The [build guide](../build_guide.md) maps the specs to session assignments,
-merge order, and shared-file ownership. E5 still precedes R1/R3 activation,
-and E6 still precedes H2/R3/R4/R5 implementation. These checks are part of
-preparation. Their results determine whether a contract-change commit is
-needed before the dependent feature work.
+merge order, and shared-file ownership. E5 passed its reporting gate and E6
+passed for H2. The R3 snapshot remains a draft under the contract-change
+process below.
 
 ## Spec index
 

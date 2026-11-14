@@ -43,14 +43,13 @@ release record. Schedule its local fix and regression test before the A3
 auth changes touch the same options and hooks. Production cleanup and browser
 verification belong to the later release work.
 
-The 2026-11-14 local check passed formatting, hibernation checks, E2E
-environment isolation, lint, and type checking. The existing 1,000-game fuzz
-test in `packages/game-engine/src/engine.fuzz.test.ts` reached its 30-second
-timeout both during concurrent tests and in a sequential package run using
-Node 24.18.0. Resolve that baseline test-runtime issue before relying on a
-green `pnpm check`. Preserve its seeded-game coverage while investigating.
-The full check stopped at that failure, so dedicated Worker checks and E2E
-verification remain pending for the local baseline.
+The 2026-11-14 baseline passed `pnpm check` with Node 24.18.0 and pnpm 9.15.4.
+The fuzz test runs all 1,000 original seeds in 20 batches, with the original
+assertions and action limit for every seed. The browser suite passed all 74
+cases on a full rerun in a temporary copy using alternate loopback ports.
+One guest rematch case timed out in the initial full run and passed both in
+isolation and in the rerun. Both `pnpm check` and all 74 browser cases also
+passed on `73772b9`, which includes the Lucide import change.
 
 An uncached `pnpm run build --force` passed for all seven packages using
 Node 24.18.0 and the existing cached pnpm 9.15.4 executable. Invoking that

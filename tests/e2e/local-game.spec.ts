@@ -278,25 +278,25 @@ test.describe("L1 local game", () => {
         element.getAnimations().map((animation) => animation.finished),
       );
     });
-    const pieceBox = await page
-      .locator('[data-point-id="O3"] [data-testid="board-piece"]')
-      .boundingBox();
-    const hitBox = await page
-      .locator('[data-point-id="O3"] [data-testid="board-hit-target"]')
-      .boundingBox();
-
-    expect(pieceBox).not.toBeNull();
-    expect(hitBox).not.toBeNull();
-    expect(
-      Math.hypot(
-        (pieceBox?.x ?? 0) +
-          (pieceBox?.width ?? 0) / 2 -
-          ((hitBox?.x ?? 0) + (hitBox?.width ?? 0) / 2),
-        (pieceBox?.y ?? 0) +
-          (pieceBox?.height ?? 0) / 2 -
-          ((hitBox?.y ?? 0) + (hitBox?.height ?? 0) / 2),
-      ),
-    ).toBeLessThan((hitBox?.width ?? 0) / 2);
+    // Measure both elements in one frame while the tabletop settles.
+    await expect
+      .poll(() =>
+        page.locator('[data-point-id="O3"]').evaluate((point) => {
+          const piece = point
+            .querySelector('[data-testid="board-piece"]')
+            ?.getBoundingClientRect();
+          const target = point
+            .querySelector('[data-testid="board-hit-target"]')
+            ?.getBoundingClientRect();
+          if (!piece || !target || target.width === 0) return Infinity;
+          const distance = Math.hypot(
+            piece.x + piece.width / 2 - target.x - target.width / 2,
+            piece.y + piece.height / 2 - target.y - target.height / 2,
+          );
+          return distance / (target.width / 2);
+        }),
+      )
+      .toBeLessThan(1);
     await expect(page.locator('[data-point-id="O5"]')).toHaveAttribute(
       "data-capture-target",
       "true",

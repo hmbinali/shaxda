@@ -12,6 +12,9 @@ passed across two runs on local Workers and D1. They covered a signed-out
 rated replay, position sharing, friendly replay privacy, saved-room board
 parity, history, and the Pixel 5 viewport.
 
+The follow-up at `232bc3d` passed `pnpm check` and all 89 Playwright tests
+with `pnpm test:e2e --timeout=120000` against isolated local Workers and D1.
+
 ## Preview
 
 On 2026-11-14 the [preview app manifest](https://shaxda-web-preview.shaxda.workers.dev/_app/immutable/entry/app.CRQ3R4qL.js)
@@ -42,8 +45,9 @@ sharing were absent. The H3 preview smoke checks are open.
 
 The frozen [H3 specification](../specs/h3-replay-viewer.md#95-end-to-end-and-the-device-gate)
 requires Chrome on a physical entry-level Android phone. Status: **open**.
+The only Android target found on 2026-11-14 identified itself as an emulator.
 
-1. On preview, play a real saved match from the beginning to the result.
+1. On preview, play a real saved rated match from the beginning to the result.
    Exercise Play, Pause, Previous, Next, Start, End, each speed, and position
    sharing in portrait orientation. Confirm that sound starts off, the cue
    and final overlay remain legible, and Android's **Remove animations**

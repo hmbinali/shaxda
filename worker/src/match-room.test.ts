@@ -1549,18 +1549,36 @@ describe("match room hibernation spike", () => {
     const { roomCode, first, second } = await accountRoom();
     await placeFirst(first, second, roomCode);
     const stub = roomStub(roomCode);
-    await runInDurableObject(stub, (instance) => {
-      vi.spyOn(
-        instance as unknown as { broadcastState(): void },
-        "broadcastState",
-      ).mockImplementationOnce(() => {
-        throw new Error("interrupt terminal broadcast");
-      });
+    await runInDurableObject(stub, async (instance, state) => {
+      const room = instance as unknown as {
+        broadcastState(): void;
+        webSocketMessage(socket: WebSocket, message: string): Promise<void>;
+      };
+      const interrupt = vi
+        .spyOn(room, "broadcastState")
+        .mockImplementationOnce(() => {
+          throw new Error("interrupt terminal broadcast");
+        });
+      try {
+        const socket = state
+          .getWebSockets()
+          .find((socket) => socket.deserializeAttachment()?.slot === "A");
+        if (!socket) throw new Error("Expected an authorized socket");
+        await expect(
+          room.webSocketMessage(
+            socket,
+            JSON.stringify({
+              v: protocolVersion,
+              type: "gameAction",
+              roomCode,
+              action: { type: "resign", player: "A" },
+            }),
+          ),
+        ).rejects.toThrow("interrupt terminal broadcast");
+      } finally {
+        interrupt.mockRestore();
+      }
     });
-    sendAction(first, roomCode, { type: "resign", player: "A" });
-    await expect
-      .poll(async () => (await loadOutbox(roomCode))?.status)
-      .toBe("pending");
     const entry = await loadOutbox(roomCode);
     if (!entry) throw new Error("Expected durable outbox entry");
     expect(entry.attempts).toBe(0);

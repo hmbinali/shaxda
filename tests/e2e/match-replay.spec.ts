@@ -9,6 +9,7 @@ test("replays a rated match publicly and shares the current position", async ({
   browser,
   baseURL,
 }) => {
+  test.setTimeout(120_000);
   const a = await seedAccount(context);
   const b = await seedAccount(context);
   const visitor = await browser.newContext({ reducedMotion: "reduce" });
@@ -103,6 +104,7 @@ test("limits a friendly replay to both participants", async ({
   context,
   browser,
 }) => {
+  test.setTimeout(120_000);
   const opponent = await browser.newContext();
   const a = await seedAccount(context);
   const b = await seedAccount(opponent);

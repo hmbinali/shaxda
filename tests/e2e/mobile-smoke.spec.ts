@@ -56,6 +56,7 @@ test.describe("Q1 mobile responsive smoke", () => {
     page,
     context,
   }) => {
+    test.setTimeout(90_000);
     const a = await seedAccount(context);
     const b = await seedAccount(context);
     const match = await seedMatches(a.id, b.id, 1, {

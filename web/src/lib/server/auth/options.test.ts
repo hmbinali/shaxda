@@ -87,6 +87,8 @@ describe("Better Auth options", () => {
         accessToken: "access",
         refreshToken: "refresh",
         idToken: "id-token",
+        accessTokenExpiresAt: new Date(),
+        refreshTokenExpiresAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -101,6 +103,8 @@ describe("Better Auth options", () => {
       accessToken: null,
       refreshToken: null,
       idToken: null,
+      accessTokenExpiresAt: null,
+      refreshTokenExpiresAt: null,
     });
   });
 
@@ -115,11 +119,20 @@ describe("Better Auth options", () => {
           accessToken: "new-access",
           refreshToken: "new-refresh",
           idToken: "new-id",
+          accessTokenExpiresAt: new Date(),
+          refreshTokenExpiresAt: new Date(),
         },
         null,
       ),
     ).resolves.toEqual({
-      data: { updatedAt, accessToken: null, refreshToken: null, idToken: null },
+      data: {
+        updatedAt,
+        accessToken: null,
+        refreshToken: null,
+        idToken: null,
+        accessTokenExpiresAt: null,
+        refreshTokenExpiresAt: null,
+      },
     });
   });
 

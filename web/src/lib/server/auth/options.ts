@@ -166,4 +166,6 @@ const discardedProviderTokens = {
   accessToken: null,
   refreshToken: null,
   idToken: null,
+  accessTokenExpiresAt: null,
+  refreshTokenExpiresAt: null,
 };

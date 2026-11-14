@@ -77,9 +77,19 @@ test result at ledger sequence 1. Each operation changed and marked one
 match, and the final rebuild showed zero drift. The D1 audit records the
 restore bookmarks for both operations.
 
-The focused follow-up passed six local Playwright scenarios and 34 Worker
-consent tests. The additional live rated matrix still needs a reachable
-second test-account browser session.
+The focused follow-up passed six local Playwright scenarios, 34 Worker
+consent tests, and three D1 rating policy and processor tests. A repeat
+preview rebuild found one processed result, no held or pending results,
+and zero drift. The live browser rerun was blocked by the saved preview
+site permission, and only one Chrome profile was reachable.
+
+| Remaining live rated check                                                        | Evidence so far                                                                                                                                                         |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1 friendly save and privacy, declined invite, and M9 mixed-vote friendly rematch | Covered by local Playwright. Two authenticated preview browser sessions are needed.                                                                                     |
+| M2 three placements and resignation                                               | The earlier live rated game verified consent, a public result, history, replay, and rating processing with one placement. The full three-placement case passed locally. |
+| M4 fourth same-pair rated game in 24 hours                                        | The local D1 tests verified the pair cap and its rating decision. The live public label remains to be checked.                                                          |
+| M7 ending before the first move                                                   | Local Worker tests verified the empty ledger and outbox. Live room and counter verification remains open.                                                               |
+| Older cached build and rated switch off and on                                    | Local Worker tests covered older votes and the switch. The two-account preview rehearsal remains open, including a friendly save with game analytics disabled.          |
 
 Native Somali copy review remains open under Q4. See the
 [analytics runbook](../ops/x1a-analytics-runbook.md), the

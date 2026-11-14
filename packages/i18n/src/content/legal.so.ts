@@ -53,6 +53,7 @@ export interface LegalPageContent {
 // ciyaarta-martida, adeegyada, carruurta, xuquuqda, shuruudaha, and
 // isticmaal-fiican) must be verified by a native/fluent Somali reviewer before
 // release. It describes only what is live; it must not promise later features.
+// TODO(translation-review): Verify the X1a usage and retention disclosures.
 export const legalContentSo = {
   path: "/legal",
   title: "Sharciga iyo asturnaanta",
@@ -94,6 +95,7 @@ export const legalContentSo = {
         "Xogta akoonka: iimaylka Google ee la xaqiijiyay, aqoonsiga Google iyo xogta gelitaanka ee Google soo diro, magaca dadweynaha iyo magacyadii hore, dookha sawirka, iyo diiwaanka fadhiyada gelitaanka.",
         "Xogta qolka: aqoonsiyada martida ama akoonka, magacyada bandhigga ama magacyada dadweynaha, koodhka qolka, xaaladda ciyaarta, iyo waqtiyada hawsha.",
         "Xogta ilaalinta: cinwaanka IP-ga, waqtiyada isku dayga qol-samaynta, iyo calaamadaha biraawsarka ama qalabka ee Turnstile.",
+        "Xogta tirakoobka: summad magac-beddel ah oo maalinle ah (90 maalmood) iyo tirooyin maalinle ah oo la isku geeyey.",
         "Xogta cabbirka: jidka bogga, halka booqashadu ka timid, waddanka, biraawsarka, nidaamka qalabka, iyo nooca qalabka.",
       ],
       details: [],
@@ -116,7 +118,12 @@ export const legalContentSo = {
         {
           term: "shaxda:guest-id:v1",
           detail:
-            "Aqoonsi uu qalabku ku sameeyo crypto.randomUUID(); waxaa loo diraa server-ka marka aad qol marti ah gasho.",
+            "Aqoonsi uu qalabku ku sameeyo crypto.randomUUID(); waxaa loo diraa server-ka marka aad qol marti ah gasho ama biraawsarku diro calaamadda firfircoonida.",
+        },
+        {
+          term: "shaxda:analytics-active:v1",
+          detail:
+            "Taariikhda (UTC) ee biraawsarku ugu dambeysay u sheegay server-ka inuu firfircoon yahay, loo kala saaray marti iyo magaca dadweynaha akoon kasta. Waxaa la hayaa taariikhihii ugu dambeeyey ee maalinta la diiwaangeliyey.",
         },
         {
           term: "shaxda:guest-name:v1",
@@ -201,8 +208,12 @@ export const legalContentSo = {
     },
     {
       id: "cabbiraadda",
-      heading: "Cloudflare Web Analytics",
+      heading: "Tirakoobka isticmaalka",
       paragraphs: [
+        "Shaxda waxay maalin kasta tirisaa inta biraawsar iyo akoon ee adeegga isticmaala. Maalintii hal mar, biraawsarkaagu wuxuu server-ka u diraa calaamad muujinaysa inuu firfircoon yahay.",
+        "Server-ku wuxuu isticmaalaa aqoonsiga martida ee biraawsarka; haddii aad gashay akoonkaaga, wuxuu sidoo kale isticmaalaa aqoonsiga gudaha ee akoonka. Aqoon kasta wuxuu u beddelaa summad lagu sameeyey fure sir ah, kadibna wuxuu kaydiyaa summadda, taariikhda (UTC), iyo in ay tahay biraawsar ama akoon; labada summadood lama isku xiro. Aqoonsiga ceeriin, cinwaanka IP-ga, iyo magaca dadweynaha laguma kaydiyo tirakoobkan.",
+        "Summaddu waa magac-beddel: ma muujiso magacaaga, laakiin maalin kasta way isku mid tahay, sidaas darteed maalmaha isticmaalka waa la isku xiri karaa. Safafka summadaha waxaa la tirtiraa 90 maalmood kadib; tirooyinka maalinlaha ah ee la isku geeyey waa la sii hayaa.",
+        "Waxaa kale oo la tiriyaa ciyaaraha maxalliga ah ee la bilaabay iyo kuwa la dhammeeyey. Tirooyinkan maalinlaha ah aqoonsi ma xambaaraan, lamana diro marka qalabku khadka ka maqan yahay.",
         "Haddii calaamadda PUBLIC_CF_BEACON_TOKEN la dejiyo, boggu wuxuu shidaa Cloudflare Web Analytics. Beacon-kan ma isticmaalo cookie ama localStorage, laakiin wuxuu diraa cabbirro la isku geeyey oo ku saabsan booqashada.",
         "Cabbirrada waxaa ka mid noqon kara jidka bogga, bogga ama goobta booqashada laga yimid, waddanka, biraawsarka, nidaamka qalabka, iyo haddii qalabku yahay kombiyuutar, moobil, ama tablet. Cloudflare waxay sheegaysaa inay xogta beacon-ka ee aan la yarayn hayso 7 maalmood, dabadeedna u soo koobto qiyaastii boqolkiiba 10; xogta la isku geeyey waxaa laga heli karaa 6dii bilood ee u dambeeyey.",
       ],
@@ -251,7 +262,7 @@ export const legalContentSo = {
       bullets: [
         "Cloudflare waxay xogta uga shaqayn kartaa dalal kala duwan iyadoo raacaysa heshiisyadeeda iyo sharciyada khuseeya.",
         "Shaxda ma iibiso xogta martida ama akoonka, mana isticmaasho xayeysiis, lacag bixin, taageero ganacsi, ama xiriir iib.",
-        "Kaydka D1 wuxuu hayaa xogta akoonka oo keliya. Ciyaaraha, natiijooyinka, iyo xogta martida laguma hayo.",
+        "Kaydka D1 wuxuu hayaa xogta akoonka, summadaha tirakoobka (90 maalmood), iyo tirooyin maalinle ah. Aqoonsiga martida ee ceeriin laguma hayo.",
       ],
       details: [],
       notes: [],

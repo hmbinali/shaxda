@@ -42,13 +42,22 @@ describe("Somali legal content", () => {
     expect(copy).not.toMatch(/uusan jirin akoon/i);
   });
 
-  it("keeps stating that games and results are not stored", () => {
+  it("discloses pseudonymous analytics and retention", () => {
     const services = legalContentSo.sections.find(
       (section) => section.id === "adeegyada",
     );
 
-    expect(services?.bullets).toContain(
-      "Kaydka D1 wuxuu hayaa xogta akoonka oo keliya. Ciyaaraha, natiijooyinka, iyo xogta martida laguma hayo.",
+    expect(services?.bullets).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("summadaha tirakoobka (90 maalmood)"),
+      ]),
     );
+    const usage = legalContentSo.sections.find(
+      (section) => section.id === "cabbiraadda",
+    );
+    expect(usage?.paragraphs.join(" ")).toMatch(
+      /Summaddu waa magac-beddel.*maalmaha isticmaalka waa la isku xiri karaa.*90 maalmood/,
+    );
+    expect(visibleCopy()).toContain("shaxda:analytics-active:v1");
   });
 });

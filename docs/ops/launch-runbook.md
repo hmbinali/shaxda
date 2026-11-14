@@ -237,3 +237,32 @@ pnpm --filter @shaxda/web exec wrangler rollback
 Rolling back code leaves Durable Object storage intact. Do not rename the Worker,
 edit migration tags or class names, delete either Worker, or remove the Cloudflare
 zone as part of a rollback.
+
+## H1 match ledger
+
+The game Worker's `DB` binding uses the web Worker's D1 database in each
+environment. Apply the ledger migration through the web Wrangler config.
+Local development applies migrations once from `web/` with
+`pnpm exec wrangler d1 migrations apply shaxda-db --local`. Both dev Workers
+use `web/.wrangler/state`. Playwright creates a separate shared database.
+
+For a future rollout, apply the migration, configure the Wrangler secret
+`MATCH_OPS_TOKEN` (at least 32 bytes), then deploy the game Worker followed
+by the web Worker. Production collection follows H2's disclosure. Exercise
+an account game and rematch in preview and use `verify` for both stored
+replays before enabling production. Check a guest game and pre-play
+resignation for zero ledger entries.
+
+```sh
+pnpm match:ops -- list-unsaved --database local
+pnpm match:ops -- retry ROOMCODE 1 --database preview
+pnpm match:ops -- discard ROOMCODE 1 --reason "Document the incident" --database preview
+pnpm match:ops -- verify MATCH_ID --database preview
+```
+
+Use the environment-specific `MATCH_OPS_TOKEN` for remote operations. The
+game Worker applies the `MATCH_OPS_RATE_LIMIT` binding at 20 requests per
+minute per IP. Retry and discard append requested and outcome audit rows.
+A replay mismatch needs an engine fix and a correction workflow. Production
+discard requires typing the room code. Before rolling back the game Worker,
+verify that `list-unsaved` is empty. Keep the ledger migration in place.

@@ -7,7 +7,12 @@ import {
   SELF,
   type D1Migration,
 } from "cloudflare:test";
-import { deserialize, getActingPlayer } from "@shaxda/game-engine";
+import {
+  deserialize,
+  getActingPlayer,
+  serialize,
+  summarizeReplay,
+} from "@shaxda/game-engine";
 import {
   protocolVersion,
   serverMessageSchema,
@@ -26,10 +31,28 @@ const bindings = env as {
   TEST_MIGRATIONS: D1Migration[];
 };
 type Seat = "A" | "B";
+// Prefix of H1's E4 replay through the first pending capture. It reaches a
+// legal blocked space-making turn after 39 actions.
+const actionCodes = `
+P:M7 P:O2 P:I6 P:M5 P:O5 P:M3 P:I3 P:M2 P:M1 P:I2 P:I7 P:O3 P:I1 P:M8 P:O6 P:M4 P:O7 P:O1 P:O8 P:I8 P:O4
+P:I4 P:I5 P:M6 X:I3 X:O3 M:I2>I3 M:I1>I2 M:O2>O3 M:I2>I1 M:M2>I2 M:M1>M2 M:M8>M1 M:M2>O2 M:M3>M2 M:O8>M8
+M:O1>O8 M:O2>O1 M:M2>O2 M:I2>M2 M:I1>I2 M:I8>I1 M:M8>I8 M:M1>M8 M:M4>M3 M:O4>M4 M:O3>O4 M:O2>O3 M:O1>O2
+M:M2>M1 M:O2>O1 M:O3>O2 M:I2>M2 M:I3>I2 M:I2>I3 M:M2>I2 M:O4>O3 M:I2>M2 M:I3>I2 M:O5>O4 M:I2>I3 M:M2>I2
+M:M1>M2 M:O6>O5 M:M2>M1 M:O7>O6 M:O8>O7 M:I2>M2 M:M8>O8 M:M2>I2 M:M1>M8 M:I2>M2 M:I1>I2 M:I8>I1 M:M8>M1
+M:I1>I8 M:O8>M8 M:O1>O8 M:I2>I1 M:O8>O1 M:I3>I2 M:O1>O8 M:O2>O1 M:M2>O2 M:I2>I3 M:O2>M2 M:I3>I2 M:M2>O2
+M:I2>I3 M:O2>M2 M:O1>O2 M:M2>I2 M:M3>M2 M:O8>O1 M:M2>M3 M:O1>O8 M:M1>M2 M:O8>O1 M:M8>O8 M:M7>M8 M:M6>M7
+M:O6>M6 M:M2>M1 M:I2>M2 M:I3>I2 M:O5>O6
+`
+  .trim()
+  .split(/\s+/u);
 type StoredRoom = {
   gameState: Parameters<typeof deserialize>[0];
   turnStartedAt: number;
   lastActivityAt: number;
+  connections: Record<
+    Seat,
+    { connected: boolean; disconnectedAt: number | null }
+  >;
   consent: Record<Seat, { accept: boolean; disclosureV: number } | null>;
 };
 
@@ -126,7 +149,103 @@ describe("rated consent", () => {
     expect((await room.state()).keys).not.toContain("outbox:1");
     expect(room.latest("A", "matchStatus")).toMatchObject({ rated: null });
   });
+
+  it("writes no match or outbox when a pre-play idle claim succeeds", async () => {
+    await applyD1Migrations(bindings.DB, bindings.TEST_MIGRATIONS);
+    const room = await openRoom();
+    await room.answer("A", true);
+    await room.answer("B", true);
+    const idle = getActingPlayer(
+      deserialize((await room.state()).room.gameState),
+    );
+    await room.claim(otherSeat(idle), "idle");
+    expect((await room.state()).keys).not.toContain("outbox:1");
+    await expect(
+      bindings.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
+    ).resolves.toBe(0);
+  });
 });
+
+describe.each([false, true])(
+  "phase-independent losses, rated = %s",
+  (rated) => {
+    it.each([
+      ["placement", 1],
+      ["initialRemoval", 24],
+      ["movement", 26],
+      ["spaceMaking", 39],
+      ["capture", actionCodes.length],
+    ] as const)(
+      "saves resignees and claim losses in %s",
+      async (phase, length) => {
+        await applyD1Migrations(bindings.DB, bindings.TEST_MIGRATIONS);
+        const replay = {
+          v: 1,
+          s: "A",
+          a: actionCodes.slice(0, length),
+        } as const;
+        const prefix = summarizeReplay(replay);
+        if (!prefix.ok)
+          throw new Error(`Invalid R2 replay prefix: ${prefix.error}`);
+        const acting = getActingPlayer(prefix.state);
+        const spaceMaking =
+          prefix.state.phase === "movement" &&
+          acting !== prefix.state.currentPlayer;
+        expect(spaceMaking ? "spaceMaking" : prefix.state.phase).toBe(phase);
+
+        for (const ending of [
+          "ownTurn",
+          "offTurn",
+          "idle",
+          "abandoned",
+        ] as const) {
+          const room = await openRoom({ ratedRequest: rated });
+          if (rated) {
+            await room.answer("A", true);
+            await room.answer("B", true);
+          }
+          await runInDurableObject(
+            room.stub,
+            async (_instance, { storage }) => {
+              const stored = await storage.get<StoredRoom>("room");
+              if (!stored) throw new Error("Missing room");
+              const now = Date.now();
+              await storage.put({
+                room: {
+                  ...stored,
+                  gameState: serialize(prefix.state),
+                  playBeganAt: now - 1_000,
+                  turnStartedAt: now,
+                  rated,
+                  consentPolicyV: rated ? RATED_DISCLOSURE_V : null,
+                },
+                log: { ...replay, matchNumber: 1 },
+              });
+            },
+          );
+          const loser = ending === "offTurn" ? otherSeat(acting) : acting;
+          if (ending === "idle" || ending === "abandoned")
+            await room.claim(otherSeat(loser), ending);
+          else await room.finish(loser);
+          await expect(
+            bindings.DB.prepare(
+              "SELECT rated, winner_seat, end_reason, online_end_reason, action_count FROM match WHERE room_code = ?",
+            )
+              .bind(room.roomCode)
+              .first(),
+          ).resolves.toEqual({
+            rated: Number(rated),
+            winner_seat: otherSeat(loser),
+            end_reason: "resignation",
+            online_end_reason:
+              ending === "idle" || ending === "abandoned" ? ending : null,
+            action_count: length + 1,
+          });
+        }
+      },
+    );
+  },
+);
 
 describe("rated rematches", () => {
   it.each([
@@ -214,6 +333,10 @@ function consent(accept: boolean) {
   };
 }
 
+function otherSeat(seat: Seat): Seat {
+  return seat === "A" ? "B" : "A";
+}
+
 const plainVote = { type: "rematch", vote: "accept" };
 function ratedVote() {
   return { ...plainVote, rated: true, disclosureV: RATED_DISCLOSURE_V };
@@ -296,7 +419,7 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
     });
   }
   function latest<T extends ServerMessage["type"]>(seat: Seat, type: T) {
-    return messages[seat].findLast((message) => message.type === type);
+    return messages[seat].filter((message) => message.type === type).at(-1);
   }
   async function send(seat: Seat, body: object, override?: { flag?: string }) {
     const count = messages[seat].length;
@@ -316,6 +439,7 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
     await expect.poll(() => messages[seat].length).toBeGreaterThan(count);
   }
   return {
+    roomCode,
     stub,
     state,
     latest,
@@ -346,5 +470,35 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
         type: "gameAction",
         action: { type: "resign", player: seat },
       }),
+    claim: async (seat: Seat, reason: "abandoned" | "idle") => {
+      await runInDurableObject(stub, async (instance, ctx) => {
+        const { storage } = ctx;
+        const room = await storage.get<StoredRoom>("room");
+        if (!room) throw new Error("Missing room");
+        const loser = otherSeat(seat);
+        if (reason === "idle") {
+          room.turnStartedAt = Date.now() - 240_000;
+        } else {
+          const socket = ctx
+            .getWebSockets()
+            .find((peer) => peer.deserializeAttachment()?.slot === loser);
+          socket?.serializeAttachment(null);
+          room.connections[loser] = {
+            connected: false,
+            disconnectedAt: Date.now() - 60_000,
+          };
+        }
+        await storage.put("room", room);
+        const claimant = ctx
+          .getWebSockets()
+          .find((peer) => peer.deserializeAttachment()?.slot === seat);
+        if (!claimant) throw new Error("Missing claimant");
+        await (instance as MatchRoom).webSocketMessage(
+          claimant,
+          JSON.stringify({ v: protocolVersion, type: "claimWin", roomCode }),
+        );
+      });
+      expect(deserialize((await state()).room.gameState).winner).toBe(seat);
+    },
   };
 }

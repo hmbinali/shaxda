@@ -11,7 +11,7 @@ import {
 } from "@shaxda/db/rating-admin";
 import { seedAccount } from "./fixtures/auth";
 import { inviteRoomCode, ledgerQuery } from "./fixtures/ledger";
-import { placeOnline, resignOnline } from "./fixtures/online";
+import { isolateRoomQuota, placeOnline, resignOnline } from "./fixtures/online";
 
 test("shows confirmed ratings and a correction for a played rated match", async ({
   browser,
@@ -19,6 +19,7 @@ test("shows confirmed ratings and a correction for a played rated match", async 
   page,
 }) => {
   test.setTimeout(120_000);
+  await isolateRoomQuota(page, 13);
   const opponent = await browser.newContext();
   const a = await seedAccount(context);
   const b = await seedAccount(opponent);
@@ -27,7 +28,7 @@ test("shows confirmed ratings and a correction for a played rated match", async 
   }>({
     configPath: resolve("web/wrangler.e2e.jsonc"),
     persist: { path: resolve("test-results/wrangler-e2e/v3") },
-    envFiles: [],
+    envFiles: [resolve("web/.env.e2e")],
     remoteBindings: false,
   });
   try {

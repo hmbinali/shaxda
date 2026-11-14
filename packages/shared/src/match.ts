@@ -3,7 +3,12 @@ import {
   MAX_REPLAY_ACTIONS,
 } from "@shaxda/game-engine";
 import { z } from "zod";
-import { gameEndReasonSchema, playerIdSchema, roomCodeSchema } from "./schemas";
+import {
+  gameEndReasonSchema,
+  matchIdSchema,
+  playerIdSchema,
+  roomCodeSchema,
+} from "./schemas";
 
 export { matchIdSchema, roomOptionsSchema } from "./schemas";
 
@@ -29,8 +34,6 @@ const matchPlayerPayloadSchema = z.strictObject({
   piecesLeft: z.number().int().min(0).max(12),
   captured: z.number().int().min(0).max(12),
 });
-
-import { matchIdSchema } from "./schemas";
 
 export const matchPayloadSchema = z
   .strictObject({

@@ -8,6 +8,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./match-fixtures": {
+      "types": "./src/match-fixtures.ts",
+      "default": "./src/match-fixtures.ts"
+    },
     "./rated-play": {
       "types": "./src/rated-play.ts",
       "default": "./src/rated-play.ts"

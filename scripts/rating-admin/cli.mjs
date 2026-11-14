@@ -301,8 +301,10 @@ async function main() {
       output(await planRatingAdmin(db, request));
       return 0;
     }
-    const restorePoint = remote
-      ? wrangler([
+    let restorePoint;
+    if (remote) {
+      const checkpoint = JSON.parse(
+        wrangler([
           "d1",
           "time-travel",
           "info",
@@ -310,8 +312,10 @@ async function main() {
           "--json",
           "--config",
           configPath,
-        ])
-      : undefined;
+        ]),
+      );
+      restorePoint = z.string().min(1).parse(checkpoint.bookmark);
+    }
     const result = await applyRatingAdmin(db, request, values.apply, {
       restorePoint,
     });

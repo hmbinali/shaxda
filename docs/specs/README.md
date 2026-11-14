@@ -28,10 +28,9 @@ starts only when the spec is frozen **and** its milestone is activated
 
 ## Current implementation planning
 
-As of 2026-11-14, all 17 milestone specs are frozen and await implementation.
-No V2 milestone is activated. The current request covers preparation and a
-parallel-session plan for the game and account features. Sponsorship (S1–S3)
-and publishing work are scheduled later.
+As of 2026-11-14, all 17 milestone specs are frozen. H1 Match Persistence is
+activated for local implementation and verification from baseline `7c91b50`.
+Sponsorship (S1–S3) and publishing work are scheduled later.
 
 The [build guide](../build_guide.md) maps the specs to session assignments,
 merge order, and shared-file ownership. E5 still precedes R1/R3 activation,

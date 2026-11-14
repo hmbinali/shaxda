@@ -20,8 +20,8 @@ import {
 } from "@shaxda/shared";
 import { mintIdentityTicket } from "@shaxda/shared/identity";
 import { RATED_DISCLOSURE_V } from "@shaxda/shared/rated-play";
-import { afterEach, describe, expect, it } from "vitest";
-import { MatchRoom } from "./match-room";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { MatchRoom, type MatchRoomEnv } from "./match-room";
 
 const bindings = env as {
   DB: D1Database;
@@ -86,6 +86,28 @@ describe("rated consent", () => {
         consent_policy_v: expected ? RATED_DISCLOSURE_V : null,
         winner_seat: "A",
       });
+    },
+  );
+
+  it.each([false, true])(
+    "keeps a successful save when the rating hint throws = %s",
+    async (throws) => {
+      await applyD1Migrations(bindings.DB, bindings.TEST_MIGRATIONS);
+      const room = await openRoom({ ratedRequest: false });
+      await room.placeFirst();
+      const processNow = vi.fn(async () => {
+        if (throws) throw new Error("Fixture RPC failure");
+        return { accepted: true as const };
+      });
+      await room.finish("B", { RATINGS: { processNow } });
+      await expect.poll(() => processNow.mock.calls.length).toBe(1);
+      expect(room.latest("A", "matchStatus")).toMatchObject({
+        save: { status: "saved" },
+      });
+      const saved = await bindings.DB.prepare(
+        "SELECT COUNT(*) AS n FROM match",
+      ).first("n");
+      expect(saved).toBe(1);
     },
   );
 
@@ -421,7 +443,11 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
   function latest<T extends ServerMessage["type"]>(seat: Seat, type: T) {
     return messages[seat].filter((message) => message.type === type).at(-1);
   }
-  async function send(seat: Seat, body: object, override?: { flag?: string }) {
+  async function send(
+    seat: Seat,
+    body: object,
+    override?: { flag?: string; RATINGS?: MatchRoomEnv["RATINGS"] },
+  ) {
     const count = messages[seat].length;
     await runInDurableObject(stub, async (instance, ctx) => {
       const socket = ctx
@@ -429,7 +455,11 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
         .find((peer) => peer.deserializeAttachment()?.slot === seat);
       if (!socket) throw new Error(`Missing seat ${seat}`);
       const engine = override
-        ? new MatchRoom(ctx, { ...bindings, RATED_PLAY_ENABLED: override.flag })
+        ? new MatchRoom(ctx, {
+            ...bindings,
+            RATED_PLAY_ENABLED: override.flag,
+            RATINGS: override.RATINGS,
+          })
         : (instance as MatchRoom);
       await engine.webSocketMessage(
         socket,
@@ -465,11 +495,15 @@ async function openRoom({ ratedRequest = true, guest = false } = {}) {
         override,
       );
     },
-    finish: (seat: Seat) =>
-      send(seat, {
-        type: "gameAction",
-        action: { type: "resign", player: seat },
-      }),
+    finish: (seat: Seat, override?: { RATINGS: MatchRoomEnv["RATINGS"] }) =>
+      send(
+        seat,
+        {
+          type: "gameAction",
+          action: { type: "resign", player: seat },
+        },
+        override,
+      ),
     claim: async (seat: Seat, reason: "abandoned" | "idle") => {
       await runInDurableObject(stub, async (instance, ctx) => {
         const { storage } = ctx;

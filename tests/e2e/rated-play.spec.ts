@@ -67,11 +67,19 @@ test("records two-account agreement and a mixed-vote friendly rematch", async ({
       params: { cron: "* * * * *" },
     });
     expect(sweep.ok()).toBe(true);
-    await expect(page.getByTestId("match-rating-confirmed")).toContainText(
-      "+162",
-    );
-    await expect(joiner.getByTestId("match-rating-confirmed")).toContainText(
-      "−162",
+    // Processing and the browser's scheduled polls are independent.
+    await Promise.all(
+      (
+        [
+          [page, "+162"],
+          [joiner, "−162"],
+        ] as const
+      ).map(([player, delta]) =>
+        expect(player.getByTestId("match-rating-confirmed")).toContainText(
+          delta,
+          { timeout: 35_000 },
+        ),
+      ),
     );
     expect(
       ledgerQuery(

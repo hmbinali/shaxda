@@ -355,7 +355,7 @@
                   {messages.so.pwa.update.action}
                 </Button>
               {:else if controller.ratedPlayDisabled && controller.ratedRoom}
-                <p>{copy.errors.ratedPlayDisabled}</p>
+                <p>{ratedCopy.rematch.ratedPaused}</p>
               {/if}
               {#if saveNotice}
                 <p

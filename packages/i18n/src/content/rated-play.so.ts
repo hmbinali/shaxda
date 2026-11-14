@@ -34,6 +34,7 @@ export const ratedPlaySo = {
   rematch: {
     rated: "Dib u ciyaar Tartan",
     friendly: "Dib u ciyaar Saaxiibtinimo",
+    ratedPaused: "Dib-u-ciyaarka Tartanka ah hadda waa hakad.",
     opponentOfferedRated:
       "Ciyaaryahanka kale wuxuu codsaday dib-u-ciyaar Tartan ah.",
     startedFriendly:

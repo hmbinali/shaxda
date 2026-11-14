@@ -709,6 +709,51 @@ describe("/online", () => {
     );
   });
 
+  it("keeps the finished rating label when new rated rematches are paused", async () => {
+    const socket = await startFinishedGame();
+    socket.message({
+      v: protocolVersion,
+      type: "presence",
+      roomCode: "ABCDEFGH",
+      players: { A: { kind: "account" }, B: { kind: "account" } },
+      started: true,
+    });
+    socket.message({
+      v: protocolVersion,
+      type: "matchStatus",
+      roomCode: "ABCDEFGH",
+      connections: { A: true, B: true },
+      idleSlot: null,
+      claimableBy: null,
+      claimReason: null,
+      mode: "invite",
+      ratedRequest: true,
+      consent: { A: true, B: true },
+      rated: true,
+    });
+    await fireEvent.click(await screen.findByTestId("online-rated-rematch"));
+    socket.message({
+      v: protocolVersion,
+      type: "error",
+      roomCode: "ABCDEFGH",
+      code: "ratedPlayDisabled",
+      message: "Rated play is paused.",
+    });
+
+    const result = within(screen.getByTestId("online-game-result"));
+    expect(
+      await result.findByText(messages.so.ratedPlay.rematch.ratedPaused),
+    ).toBeVisible();
+    expect(result.getByTestId("rated-label")).toHaveTextContent("Tartan");
+    expect(
+      result.queryByText(copy.errors.ratedPlayDisabled),
+    ).not.toBeInTheDocument();
+    expect(
+      result.queryByTestId("online-rated-rematch"),
+    ).not.toBeInTheDocument();
+    expect(result.getByTestId("online-rematch")).toBeVisible();
+  });
+
   it("declines a rematch and keeps the completed result", async () => {
     const socket = await startFinishedGame();
     socket.message(rematchStatusMessage(1, { A: null, B: "accept" }));

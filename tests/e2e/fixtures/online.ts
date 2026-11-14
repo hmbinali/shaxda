@@ -48,3 +48,19 @@ export async function resignOnline(page: Page): Promise<void> {
     .getByRole("button", { name: "Xaqiiji" })
     .click();
 }
+
+// Completed rooms remain available for rematches. Give each browser scenario
+// its own client identity while exercising the normal coordinator limits.
+export async function isolateRoomQuota(page: Page, scenario: number) {
+  await page.route(
+    (url) => url.hostname === "127.0.0.1" && url.pathname === "/rooms",
+    async (route) => {
+      await route.continue({
+        headers: {
+          ...route.request().headers(),
+          "cf-connecting-ip": `192.0.2.${scenario}`,
+        },
+      });
+    },
+  );
+}

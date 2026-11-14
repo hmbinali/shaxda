@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import { seedAccount } from "./fixtures/auth";
 import { inviteRoomCode } from "./fixtures/ledger";
 import { seedMatches } from "./fixtures/match";
-import { placeOnline, resignOnline } from "./fixtures/online";
+import { isolateRoomQuota, placeOnline, resignOnline } from "./fixtures/online";
 
 const unknownId = "Y".repeat(20);
 
@@ -222,6 +222,7 @@ test("opens a real saved account game from both overlays and histories", async (
   browser,
 }) => {
   test.setTimeout(90_000);
+  await isolateRoomQuota(page, 13);
   const opponent = await browser.newContext();
   const guest = await browser.newContext();
   const outsider = await browser.newContext();

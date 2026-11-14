@@ -1,9 +1,11 @@
 <script lang="ts">
   import type { PlayerId } from "@shaxda/game-engine";
+  import type { Snippet } from "svelte";
   import { messages } from "@shaxda/i18n";
   import { modal } from "$lib/a11y/modal";
   import type { GameStatus } from "$lib/game/status";
   import Button from "$components/ui/Button.svelte";
+  import ButtonLink from "$components/ui/ButtonLink.svelte";
   import type { GameResultAction } from "./gameResultActions";
 
   interface Props {
@@ -11,6 +13,7 @@
     playerName: (player: PlayerId) => string;
     reason?: string | null;
     notice?: string | null;
+    statusLine?: Snippet;
     testId: string;
     actions: readonly GameResultAction[];
     inertTargets?: readonly (HTMLElement | null | undefined)[];
@@ -21,6 +24,7 @@
     playerName,
     reason = null,
     notice = null,
+    statusLine,
     testId,
     actions,
     inertTargets = [],
@@ -35,7 +39,8 @@
       .filter((id) => id !== null)
       .join(" "),
   );
-  let primaryAction = $state<HTMLButtonElement | null>(null);
+  let primaryButton = $state<HTMLButtonElement | null>(null);
+  let primaryLink = $state<HTMLAnchorElement | null>(null);
 </script>
 
 <div
@@ -46,7 +51,11 @@
   aria-modal="true"
   aria-labelledby={titleId}
   aria-describedby={describedBy.length === 0 ? undefined : describedBy}
-  use:modal={{ inertTargets, initialFocus: primaryAction, onEscape: null }}
+  use:modal={{
+    inertTargets,
+    initialFocus: primaryButton ?? primaryLink,
+    onEscape: null,
+  }}
 >
   <div class="result-panel" data-testid="game-result-panel">
     <div
@@ -77,15 +86,35 @@
       </p>
     {/if}
 
+    {@render statusLine?.()}
+
     <div
       class="actions"
       class:single={actions.length === 1}
       class:lead={actions.length % 2 === 1 && actions.length > 1}
     >
       {#each actions as action, index (action.id)}
-        {#if index === 0}
+        {#if action.href !== undefined && index === 0}
+          <ButtonLink
+            bind:element={primaryLink}
+            href={action.href}
+            variant={action.variant ?? "primary"}
+            data-testid={action.testId}
+            data-result-primary
+          >
+            {action.label}
+          </ButtonLink>
+        {:else if action.href !== undefined}
+          <ButtonLink
+            href={action.href}
+            variant={action.variant ?? "outline"}
+            data-testid={action.testId}
+          >
+            {action.label}
+          </ButtonLink>
+        {:else if index === 0}
           <Button
-            bind:element={primaryAction}
+            bind:element={primaryButton}
             variant={action.variant ?? "primary"}
             onclick={action.onSelect}
             testId={action.testId}

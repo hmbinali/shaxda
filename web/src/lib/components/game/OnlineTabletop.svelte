@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import Board from "$components/Board.svelte";
   import Button from "$components/ui/Button.svelte";
+  import { matchPath } from "$lib/site/metadata";
   import type { OnlineGameController } from "$lib/online/onlineGame.svelte";
   import {
     instructionKeyFor,
@@ -63,7 +64,7 @@
     onSelect: () => controller.requestRematch(),
     testId: "online-rematch",
   });
-  const resultActions = $derived.by((): GameResultAction[] => {
+  const rematchActions = $derived.by((): GameResultAction[] => {
     if (!controller.canRematch) {
       return [{ ...newMatchAction, variant: "primary" }];
     }
@@ -88,6 +89,26 @@
         return [rematchAction, newMatchAction];
     }
   });
+  const resultActions = $derived.by((): GameResultAction[] => {
+    const id = controller.savedMatchId;
+    if (id === null) return rematchActions;
+    return [
+      ...rematchActions,
+      {
+        id: "view-match",
+        label: copy.result.viewMatch,
+        href: matchPath(id),
+        testId: "online-view-match",
+      },
+    ];
+  });
+  const saveNotice = $derived(
+    controller.save?.status === "pending"
+      ? copy.result.saving
+      : controller.save?.status === "stalled"
+        ? copy.result.notSaved
+        : null,
+  );
   const resultNotice = $derived.by((): string | null => {
     if (!controller.canRematch) {
       return null;
@@ -199,7 +220,19 @@
             testId="online-game-result"
             actions={resultActions}
             inertTargets={[topBar, topRailElement, bottomRailElement]}
-          />
+          >
+            {#snippet statusLine()}
+              {#if saveNotice}
+                <p
+                  role="status"
+                  data-testid="online-save-status"
+                  class="text-sm text-board-100"
+                >
+                  {saveNotice}
+                </p>
+              {/if}
+            {/snippet}
+          </GameResultOverlay>
         {/if}
       </div>
     {/snippet}

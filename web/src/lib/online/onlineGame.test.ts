@@ -226,6 +226,37 @@ describe("OnlineGameController", () => {
     expect(game.feedback?.cues).toEqual(["invalid"]);
   });
 
+  it("attaches an out-of-order reconnect save only to the matching generation", () => {
+    const client = new FakeClient();
+    const game = createOnlineGameController({
+      client: client as unknown as OnlineGameClient,
+    });
+    joinStartedGame(game, client);
+    const status = {
+      v: protocolVersion,
+      type: "matchStatus" as const,
+      roomCode: "ABCDEFGH",
+      connections: { A: true, B: true },
+      idleSlot: null,
+      claimableBy: null,
+      claimReason: null,
+    };
+    const saved = {
+      status: "saved" as const,
+      matchNumber: 3,
+      matchId: "A".repeat(20),
+    };
+    client.message({ ...status, save: saved });
+    expect(game.savedMatchId).toBeNull();
+    client.message(rematchStatus(3, { A: null, B: null }));
+    expect(game.savedMatchId).toBe(saved.matchId);
+    client.message({ ...status, save: { ...saved, matchId: "invalid" } });
+    expect(game.savedMatchId).toBeNull();
+    client.message({ ...status, save: saved });
+    client.message(status);
+    expect(game.save).toBeNull();
+  });
+
   it("tracks match status and sends claim-win", () => {
     const client = new FakeClient();
     const game = createOnlineGameController({

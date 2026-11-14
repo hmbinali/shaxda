@@ -5,10 +5,11 @@ import {
   summarizeReplay,
 } from "@shaxda/game-engine";
 import { parseStoredReplay } from "@shaxda/shared";
-import { PAIR_CAP_WINDOW_MS, writesLedgerRow } from "@shaxda/shared/rated-play";
+import { PAIR_CAP_WINDOW_MS } from "@shaxda/shared/rated-play";
 import {
   decideEvent,
   foldLedger,
+  ledgerRowFollowsWritePolicy,
   validateEvent,
   type LedgerEvent,
 } from "../rating/fold";
@@ -238,16 +239,8 @@ export async function checkConsistency(db: D1Database, replays: boolean) {
       .bind(cursor)
       .all<LedgerEvent>();
     for (const row of results) {
-      const validate =
-        row.a_id &&
-        row.b_id &&
-        row.a_id !== row.b_id &&
-        writesLedgerRow({
-          seatKinds: { A: "account", B: "account" },
-          playBegan: true,
-          endedBy: "action",
-        });
-      if (!validate && !issues.ledger) issues.ledger = row.id;
+      if (!ledgerRowFollowsWritePolicy(row) && !issues.ledger)
+        issues.ledger = row.id;
       if (replays && !issues.replay) {
         const problem = await verifyReplay(db, row.id);
         if (problem) issues.replay = { id: row.id, problem };

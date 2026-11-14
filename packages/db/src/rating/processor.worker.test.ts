@@ -58,9 +58,12 @@ it("decides ledger-ordered batches bit for bit with the fold under competing tri
   const matches = await db
     .prepare("SELECT * FROM match_rating ORDER BY seq")
     .all();
-  expect(matches.results.map(({ decided_at: _at, ...row }) => row)).toEqual(
-    folded.matches,
-  );
+  expect(
+    matches.results.map(({ decided_at, ...row }) => {
+      void decided_at;
+      return row;
+    }),
+  ).toEqual(folded.matches);
   expect(
     (
       await db

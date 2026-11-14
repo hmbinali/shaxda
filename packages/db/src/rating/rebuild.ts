@@ -247,7 +247,10 @@ export function verifyRebuild(
   // Exclude the storage timestamp even when a live row is missing from the rebuild.
   compare(
     MATCHES,
-    snapshot.matches.map(({ decided_at: _decidedAt, ...row }) => row),
+    snapshot.matches.map(({ decided_at, ...row }) => {
+      void decided_at;
+      return row;
+    }),
     rebuilt.matches,
   );
   compare(SEATS, snapshot.seats, rebuilt.seats);

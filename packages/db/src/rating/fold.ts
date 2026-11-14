@@ -1,3 +1,4 @@
+import { REPLAY_VERSION, RULES_VERSION } from "@shaxda/game-engine";
 import {
   DEFAULTS,
   effectiveRd,
@@ -13,6 +14,7 @@ import {
   PAIR_CAP_WINDOW_MS,
   RATING_POLICY_V,
   ratingSkipReason,
+  writesLedgerRow,
 } from "@shaxda/shared/rated-play";
 
 type Seat = "A" | "B";
@@ -27,6 +29,9 @@ export interface LedgerEvent {
   consent_policy_v: number | null;
   rules_v: number;
   replay_v: number;
+  action_count: number;
+  end_reason: string;
+  online_end_reason: string | null;
   winner_seat: string | null;
   ended_at: number;
   a_id: string | null;
@@ -75,9 +80,32 @@ export interface PlayerRating extends State {
   excluded: number;
 }
 
+export function ledgerRowFollowsWritePolicy(row: LedgerEvent): boolean {
+  // H1 counts the final resignation in the compact log. Two actions
+  // establish that there was play before that terminal action.
+  return (
+    row.a_id !== row.b_id &&
+    writesLedgerRow({
+      seatKinds: {
+        A: row.a_id ? "account" : undefined,
+        B: row.b_id ? "account" : undefined,
+      },
+      playBegan: row.action_count > (row.end_reason === "resignation" ? 1 : 0),
+      endedBy: row.online_end_reason === null ? "action" : "claim",
+    })
+  );
+}
+
 export function validateEvent(
   row: LedgerEvent,
-): "seats" | "results" | "consent" | "rulesVersion" | "replayVersion" | null {
+):
+  | "seats"
+  | "results"
+  | "consent"
+  | "rulesVersion"
+  | "replayVersion"
+  | "playBegan"
+  | null {
   if (!row.a_id || !row.b_id || row.a_id === row.b_id) return "seats";
   if (
     (row.winner_seat !== null &&
@@ -95,9 +123,9 @@ export function validateEvent(
     (row.mode === "invite" || row.mode === "quick") &&
     row.consent_policy_v === 1;
   if (!friendly && !rated) return "consent";
-  if (row.rules_v !== 1) return "rulesVersion";
-  if (row.replay_v !== 1) return "replayVersion";
-  return null;
+  if (row.rules_v !== RULES_VERSION) return "rulesVersion";
+  if (row.replay_v !== REPLAY_VERSION) return "replayVersion";
+  return ledgerRowFollowsWritePolicy(row) ? null : "playBegan";
 }
 
 function resultFor(winner: string | null, seat: Seat): Result {

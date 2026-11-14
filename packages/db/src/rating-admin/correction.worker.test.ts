@@ -102,7 +102,10 @@ it("publishes invalidate and rescind atomically and reproduces every full-precis
   await correct("rescind-invalidation", ids[1]!);
   const after = await readRatingSnapshot(db);
   const untimed = (rows: typeof before.matches) =>
-    rows.map(({ decided_at: _at, ...row }) => row);
+    rows.map(({ decided_at, ...row }) => {
+      void decided_at;
+      return row;
+    });
   expect(untimed(after.matches)).toEqual(untimed(before.matches));
   expect(after.seats).toEqual(before.seats);
   expect(after.players).toEqual(before.players);

@@ -9,7 +9,7 @@ import {
   RatingMathError,
   updateMatch,
   updatePeriod,
-} from "./index.ts";
+} from "./index";
 import { illinois } from "./solver";
 
 const DAY = 86_400_000;

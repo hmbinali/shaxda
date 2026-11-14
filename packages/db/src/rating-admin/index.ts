@@ -34,6 +34,7 @@ export interface AdminRequest {
 
 type Outcome = "planned" | "applied" | "noop" | "rejected" | "failed";
 
+const MARK_CHUNK_SIZE = 4_000;
 const CLOCK = "CAST(unixepoch('subsecond') * 1000 AS INTEGER)";
 
 export async function databaseTime(db: D1Database): Promise<number> {
@@ -118,7 +119,7 @@ async function makePlan(
       ? verifyRebuild(snapshot, invalidations)
       : null;
   if (req.command === "rebuild-ratings") changed = !!rebuild?.diffs.length;
-  const halves = {
+  const digestInput = {
     command: req.command,
     target,
     reason: req.reason,
@@ -127,13 +128,22 @@ async function makePlan(
     highWaterSeq: high,
     policyV,
     algorithmV,
-    invalidationHead: snapshot.sourceHeads.invalidation,
-    exclusionHead: snapshot.sourceHeads.audit,
-    diff: rebuild?.diffs ?? [],
+    invalidationLogHead: snapshot.sourceHeads.invalidation,
+    diff:
+      rebuild?.diffs ??
+      (excluded === null
+        ? { maintenance: req.command === "pause-ratings" ? 0 : 1 }
+        : {
+            source: target ? Number(snapshot.exclusions.has(target)) : null,
+            projection:
+              snapshot.players.find((player) => player.user_id === target)
+                ?.excluded ?? null,
+            desired: excluded,
+          }),
   };
   const bytes = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(JSON.stringify(halves)),
+    new TextEncoder().encode(JSON.stringify(digestInput)),
   );
   const digest = Array.from(new Uint8Array(bytes), (b) =>
     b.toString(16).padStart(2, "0"),
@@ -200,7 +210,7 @@ function corrections(
         rebuild.marked.length,
       ),
     ...Array.from(
-      { length: Math.ceil(rebuild.marked.length / 10_000) },
+      { length: Math.ceil(rebuild.marked.length / MARK_CHUNK_SIZE) },
       (_, i) =>
         db
           .prepare(
@@ -211,7 +221,12 @@ function corrections(
           )
           .bind(
             digest,
-            JSON.stringify(rebuild.marked.slice(i * 10_000, (i + 1) * 10_000)),
+            JSON.stringify(
+              rebuild.marked.slice(
+                i * MARK_CHUNK_SIZE,
+                (i + 1) * MARK_CHUNK_SIZE,
+              ),
+            ),
           ),
     ),
   ];
@@ -294,6 +309,22 @@ export async function applyRatingAdmin(
 
   try {
     const paused = await readRatingSnapshot(db);
+    const applied = await db
+      .prepare(
+        "SELECT id FROM rating_admin_audit WHERE plan_digest = ? AND outcome = 'applied'",
+      )
+      .bind(digest)
+      .first("id");
+    if (applied !== null) {
+      await releaseMaintenance(
+        db,
+        token,
+        high,
+        await databaseTime(db),
+        snapshot.state.maintenance === 1,
+      );
+      return finish("noop", "alreadyApplied");
+    }
     const revised = await makePlan(db, req, paused);
     if (revised.digest !== digest) {
       await releaseMaintenance(

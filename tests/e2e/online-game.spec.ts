@@ -30,6 +30,11 @@ test.describe("O1 guest online game", () => {
     const joiner = await joinerContext.newPage();
     try {
       await joiner.goto(shareLink);
+      // Identity loading may auto-join once the display name is entered.
+      // Finish that check before entering the name to exercise manual join.
+      await expect(
+        joiner.getByRole("link", { name: "Gal koontada" }),
+      ).toBeVisible();
       await joiner.getByLabel("Magaca martida").fill("Cabdi");
       await joiner.getByTestId("join-room").click();
 
@@ -107,6 +112,11 @@ test.describe("O1 guest online game", () => {
     const joiner = await joinerContext.newPage();
     try {
       await joiner.goto(shareLink);
+      // Identity loading may auto-join once the display name is entered.
+      // Finish that check before entering the name to exercise manual join.
+      await expect(
+        joiner.getByRole("link", { name: "Gal koontada" }),
+      ).toBeVisible();
       await joiner.getByLabel("Magaca martida").fill("Cabdi");
       await joiner.getByTestId("join-room").click();
 

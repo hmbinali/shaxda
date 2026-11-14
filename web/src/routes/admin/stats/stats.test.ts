@@ -1,0 +1,86 @@
+import { isHttpError, isRedirect } from "@sveltejs/kit";
+import { render, screen } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { load } from "./+page.server";
+import Stats from "./+page.svelte";
+
+const { read } = vi.hoisted(() => ({ read: vi.fn() }));
+vi.mock("@shaxda/db/analytics", () => ({ readAnalyticsStats: read }));
+
+const now = Date.parse("2026-11-14T02:15:00Z");
+const syntheticData = {
+  daily: [
+    { day: "2026-11-13", event: "active_browsers_1d", count: 4 },
+    { day: "2026-11-13", event: "local_started", count: 4 },
+    { day: "2026-11-13", event: "local_completed", count: 3 },
+  ],
+  today: { guest: 2, account: 1 },
+  recordedSince: {
+    active_browsers_1d: "2026-11-13",
+    local_started: "2026-11-13",
+    local_completed: "2026-11-13",
+  },
+  lastSuccessAt: now,
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.spyOn(Date, "now").mockReturnValue(now);
+  read.mockResolvedValue(syntheticData);
+});
+
+function args(id: string | null) {
+  const setHeaders = vi.fn();
+  return {
+    setHeaders,
+    locals: { user: id === null ? null : { id } },
+    platform: { env: { DB: {}, ADMIN_USER_IDS: "one,admin,other" } },
+    url: new URL("https://shaxda.example/admin/stats"),
+  } as unknown as Parameters<typeof load>[0];
+}
+
+describe("admin stats", () => {
+  it("redirects signed-out users and rejects non-exact IDs", async () => {
+    const redirected = await Promise.resolve()
+      .then(() => load(args(null)))
+      .catch((error) => error);
+    expect(isRedirect(redirected)).toBe(true);
+    expect(redirected).toMatchObject({
+      status: 303,
+      location: "/login?returnTo=%2Fadmin%2Fstats",
+    });
+    const forbidden = await Promise.resolve()
+      .then(() => load(args("ad")))
+      .catch((error) => error);
+    expect(isHttpError(forbidden, 403)).toBe(true);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("returns only aggregate data with private cache and indexing headers", async () => {
+    const request = args("admin");
+    const data = await load(request);
+    expect(request.setHeaders).toHaveBeenCalledWith({
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex",
+    });
+    expect(data).toMatchObject({ daily: syntheticData.daily });
+    expect(read).toHaveBeenCalledExactlyOnceWith(
+      request.platform?.env.DB,
+      "2026-10-11",
+      "2026-11-14",
+      expect.any(Array),
+    );
+  });
+
+  it("includes raw counts with percentages and marks unavailable blocks", async () => {
+    const data = await load(args("admin"));
+    render(Stats, { data: { ...data, account: null } });
+    expect(screen.getAllByText(/75\s?% \(3 \/ 4\)/)).toHaveLength(2);
+    expect(
+      screen.getByRole("heading", { name: "Ciyaaraha khadka" }),
+    ).toBeVisible();
+    expect(
+      screen.getAllByText("Weli lama diiwaangelin.").length,
+    ).toBeGreaterThanOrEqual(4);
+  });
+});

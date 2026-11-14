@@ -371,7 +371,38 @@ export const siteContent = {
     footer: {
       tagline: "Shaxda Soomaali keliya, si fudud loogu barto loona ciyaaro.",
     },
+    // TODO(translation-review): Confirm the admin statistics and forbidden copy.
+    adminStats: {
+      title: "Tirakoobka gudaha",
+      lastRun: "Xisaabintii ugu dambeysay",
+      lastCompleteDay: "Maalintii ugu dambeysay ee la xisaabiyey",
+      missingYesterday: "Tirooyinka shalay weli lama xisaabin.",
+      browsers: "Biraawsarro firfircoon",
+      accounts: "Akoonno firfircoon",
+      activityNote:
+        "Tirooyinkani waa qiyaas. Kuwani ma aha tirada dadka; labada lama isku darin.",
+      today: "Maanta ilaa hadda",
+      registrations: "Diiwaangelin cusub",
+      local: "Ciyaaraha maxalliga ah (qiyaas)",
+      started: "La bilaabay",
+      completed: "La dhammeeyey",
+      completionRate: "Heerka dhammaystirka",
+      online: "Ciyaaraha khadka",
+      saved: "Ciyaaraha akoonka ee la kaydiyey",
+      weeklyReturning: "Ciyaartoyda soo laabatay toddobaadka xiga",
+      cohorts: "Soo laabashada maalinta 7aad iyo 30aad",
+      waitingForWeeks: "Ha go'aamin ka hor laba toddobaad oo dhammaystiran.",
+      immature: "Weli ma dhammaystirna",
+      unrecorded: "Weli lama diiwaangelin.",
+      recordedSince: "La diiwaangeliyey laga bilaabo",
+      day: "Maalinta (UTC)",
+      days: { "1d": "1 maalin", "7d": "7 maalmood", "30d": "30 maalmood" },
+    },
     errorPage: {
+      forbidden: {
+        title: "Boggan waa xiran yahay",
+        description: "Akoonkaagu ma laha ogolaansho uu ku furo boggan.",
+      },
       notFound: {
         title: "Bogga lama helin",
         description: "Bogga aad raadinayso ma jiro ama waa laga saaray boggan.",

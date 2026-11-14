@@ -17,6 +17,9 @@ function game(seq: number, at: number, reversed = false): LedgerEvent {
     consent_policy_v: 1,
     rules_v: 1,
     replay_v: 1,
+    action_count: 4,
+    end_reason: "resignation",
+    online_end_reason: null,
     winner_seat: reversed ? "B" : "A",
     a_id: reversed ? "donor" : "farmer",
     b_id: reversed ? "farmer" : "donor",
@@ -114,4 +117,9 @@ it("validates before friendly decisions and honors operator invalidation before 
     { user_id: "farmer", board_key: 1, rating: 1500, excluded: 0, form: "D" },
     { user_id: "donor", board_key: 2, rating: 1500, excluded: 1, form: "D" },
   ]);
+});
+
+it("holds a resignation before any nonterminal action", () => {
+  const row = { ...game(1, 0), action_count: 1 };
+  expect(foldLedger([row], empty).matches[0]?.rating_status).toBe("held");
 });

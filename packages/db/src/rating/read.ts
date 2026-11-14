@@ -55,7 +55,7 @@ export async function readMatchRating(
   const [a, b] = seats!.results as SeatRating[];
   return {
     status: row.rating_status ?? "pending",
-    reason: row.rating_skip_reason,
+    reason: row.rating_skip_reason ?? null,
     updating: row.maintenance === 1,
     corrected:
       row.rated === 1 &&

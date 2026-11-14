@@ -6,7 +6,8 @@ import type { LedgerEvent } from "./fold";
 
 export const EVENT_SELECT = `
   SELECT m.seq, m.id, m.mode, m.rated, m.consent_policy_v, m.rules_v,
-         m.replay_v, m.winner_seat, m.ended_at,
+         m.replay_v, m.winner_seat, m.ended_at, m.action_count,
+         m.end_reason, m.online_end_reason,
          a.user_id AS a_id, b.user_id AS b_id,
          a.result AS a_result, b.result AS b_result
     FROM match m

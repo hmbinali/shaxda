@@ -17,7 +17,7 @@ import {
   verifyRebuild,
   verifyReplay,
 } from "@shaxda/db/rating-admin";
-import { matchIdSchema } from "@shaxda/shared";
+import { matchIdSchema, usernameSchema } from "@shaxda/shared";
 import {
   acquireMaintenance,
   publishRebuild,
@@ -76,6 +76,8 @@ async function main() {
     .enum(["local", "preview", "production"])
     .parse(values.database);
   const [database, databaseId] = dbs[environment];
+  if (mode !== "rebuild" && mode !== "admin")
+    throw new Error("Unknown ratings tool");
   const [command, id, ...extra] = positionals;
   const read =
     readCommands.includes(command) ||
@@ -147,19 +149,15 @@ async function main() {
       ) {
         throw new Error("Use exactly one of --user-id or --username");
       }
-      if (values["user-id"])
+      if (values["user-id"] !== undefined) {
         target = z
           .string()
           .min(1)
           .max(128)
           .regex(/^[A-Za-z0-9_.:-]+$/)
           .parse(values["user-id"]);
-      if (values.username !== undefined)
-        z.string()
-          .min(1)
-          .max(32)
-          .regex(/^[A-Za-z0-9_-]+$/)
-          .parse(values.username);
+      }
+      if (values.username !== undefined) usernameSchema.parse(values.username);
     }
   }
 

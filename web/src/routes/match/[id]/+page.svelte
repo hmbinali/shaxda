@@ -1,6 +1,7 @@
 <script lang="ts">
   import { siteContent } from "@shaxda/i18n";
   import MatchParticipant from "$components/history/MatchParticipant.svelte";
+  import RatedLabel from "$components/game/RatedLabel.svelte";
   import PageMeta from "$components/PageMeta.svelte";
   import ShareLink from "$components/ShareLink.svelte";
   import { formatDuration, formatMatchDateTime } from "$lib/history/format";
@@ -22,9 +23,12 @@
   <header
     class="rounded-2xl border border-board-700/20 bg-board-50 p-5 text-center sm:p-8"
   >
-    <p class="text-sm font-bold text-board-700">
-      {match.rated ? copy.rated : copy.friendly}
-    </p>
+    <RatedLabel
+      rated={match.rated}
+      decision={match.ratingDecision}
+      corrected={match.ratingCorrected}
+      showDetail={match.rated}
+    />
     <h1 class="mt-3 text-3xl leading-tight font-semibold sm:text-4xl">
       {data.headline}
     </h1>

@@ -26,6 +26,9 @@ type HistoryMatchRow = {
   online_end_reason: MatchPayload["onlineEndReason"];
   started_at: number;
   ended_at: number;
+  rating_status: "processed" | "held" | "skipped" | null;
+  rating_skip_reason: "friendly" | "pairCap" | "invalidated" | null;
+  rating_corrected: 0 | 1;
 };
 
 type HistoryPageRow = HistoryMatchRow &
@@ -90,6 +93,13 @@ function profileFor(row: JoinedProfile): PublicProfile | null {
 }
 
 function matchFields(row: HistoryMatchRow) {
+  const { rating_status: status, rating_skip_reason: reason } = row;
+  const ratingDecision =
+    status === "processed" || status === "held"
+      ? { status }
+      : status === "skipped" && reason !== null
+        ? { status, reason }
+        : null;
   return {
     id: row.id,
     mode: row.mode,
@@ -98,6 +108,8 @@ function matchFields(row: HistoryMatchRow) {
     onlineEndReason: row.online_end_reason,
     startedAt: row.started_at,
     endedAt: row.ended_at,
+    ratingDecision,
+    ratingCorrected: row.rating_corrected === 1,
   };
 }
 
@@ -115,12 +127,15 @@ export async function readHistoryPage(
     .prepare(
       `SELECT m.id, m.mode, m.rated, m.end_reason, m.online_end_reason, m.started_at,
        mp.ended_at, mp.result, mp.pieces_left, op.pieces_left AS opponent_pieces_left,
-       u.id AS profile_id, u.username, u.avatar_mode, u.image
+       u.id AS profile_id, u.username, u.avatar_mode, u.image,
+       mr.rating_status, mr.rating_skip_reason, (rc.match_id IS NOT NULL) AS rating_corrected
      FROM match_player AS mp
      CROSS JOIN match AS m ON m.id = mp.match_id
      CROSS JOIN match_player AS op ON op.match_id = mp.match_id
        AND op.seat = CASE mp.seat WHEN 'A' THEN 'B' ELSE 'A' END
      LEFT JOIN user AS u ON u.id = op.user_id
+     LEFT JOIN match_rating AS mr ON m.rated = 1 AND mr.match_id = m.id
+     LEFT JOIN rating_correction_mark AS rc ON m.rated = 1 AND rc.match_id = m.id
      WHERE mp.user_id = ? ${filterSql}
        ${cursor === null ? "" : "AND (mp.ended_at, mp.match_id) < (?, ?)"}
      ORDER BY mp.ended_at DESC, mp.match_id DESC LIMIT ?`,
@@ -184,9 +199,12 @@ export async function readMatchForViewer(
        m.first_advantage_by, m.winner_seat, m.end_reason, m.online_end_reason,
        m.action_count, m.started_at, m.ended_at, mp.seat, mp.user_id,
        mp.result, mp.pieces_left, mp.captured, u.id AS profile_id,
-       u.username, u.avatar_mode, u.image
+       u.username, u.avatar_mode, u.image,
+       mr.rating_status, mr.rating_skip_reason, (rc.match_id IS NOT NULL) AS rating_corrected
      FROM match AS m CROSS JOIN match_player AS mp ON mp.match_id = m.id
      LEFT JOIN user AS u ON u.id = mp.user_id
+     LEFT JOIN match_rating AS mr ON m.rated = 1 AND mr.match_id = m.id
+     LEFT JOIN rating_correction_mark AS rc ON m.rated = 1 AND rc.match_id = m.id
      WHERE m.id = ?`,
     )
     .bind(matchId)

@@ -75,7 +75,5 @@ export const load: PageServerLoad = async ({
     shareTitle: match.rated ? interpolate(copy.share.shareTitle, names) : null,
     headline: interpolate(copy.headline[result], names),
     reason,
-    // The rating table is introduced by R1.
-    ratingNote: null,
   };
 };

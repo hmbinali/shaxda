@@ -46,6 +46,17 @@ test("records two-account agreement and a mixed-vote friendly rematch", async ({
       action_count: 4,
     });
     await expect(page.getByTestId("match-rating-pending")).toBeVisible();
+    const anonymous = await browser.newContext();
+    try {
+      const visitor = await anonymous.newPage();
+      const response = await visitor.goto(`/match/${first!.id}`);
+      expect(response?.status()).toBe(200);
+      await expect(visitor.getByTestId("rated-label")).toContainText(
+        "Waa la xisaabinayaa",
+      );
+    } finally {
+      await anonymous.close();
+    }
     const sweep = await page.request.get("/cdn-cgi/handler/scheduled", {
       params: { cron: "* * * * *" },
     });
@@ -73,7 +84,8 @@ test("records two-account agreement and a mixed-vote friendly rematch", async ({
     await placeOnline(pages, "M1");
     await resignOnline(joiner);
     await expectSaved(page);
-    expect(matchRows(code)[1]).toMatchObject({
+    const rematch = matchRows(code)[1];
+    expect(rematch).toMatchObject({
       match_number: 2,
       rated: 0,
       consent_policy_v: null,
@@ -81,6 +93,22 @@ test("records two-account agreement and a mixed-vote friendly rematch", async ({
     await expect(page.getByTestId("rated-label")).toContainText(
       "Saaxiibtinimo",
     );
+    await page.goto("/history");
+    const history = page.getByTestId("history-row");
+    await expect(history.nth(0).getByTestId("rated-label")).toHaveText(
+      "Saaxiibtinimo",
+    );
+    await expect(history.nth(1).getByTestId("rated-label")).toHaveText(
+      "Tartan",
+    );
+    const signedOut = await browser.newContext();
+    try {
+      expect(
+        (await signedOut.request.get(`/match/${rematch!.id}`)).status(),
+      ).toBe(404);
+    } finally {
+      await signedOut.close();
+    }
   } finally {
     await opponent.close();
     a.cleanup();
@@ -109,9 +137,18 @@ test("saves a declined rated invitation as friendly", async ({
     await placeOnline(pages, "O1");
     await resignOnline(joiner);
     await expectSaved(page);
-    expect(matchRows(code)).toMatchObject([
+    const rows = matchRows(code);
+    expect(rows).toMatchObject([
       { match_number: 1, rated: 0, consent_policy_v: null },
     ]);
+    const signedOut = await browser.newContext();
+    try {
+      const matchPath = `/match/${rows[0]!.id}`;
+      expect((await signedOut.request.get(matchPath)).status()).toBe(404);
+      expect((await page.request.get(matchPath)).status()).toBe(200);
+    } finally {
+      await signedOut.close();
+    }
   } finally {
     await opponent.close();
     a.cleanup();

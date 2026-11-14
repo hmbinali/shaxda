@@ -32,6 +32,8 @@ const found = {
   match: {
     id,
     rated: false,
+    ratingDecision: null,
+    ratingCorrected: false,
     mode: "invite",
     endReason: "resignation",
     onlineEndReason: "idle",

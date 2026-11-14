@@ -131,6 +131,10 @@ async function assertIndexed(
     expect(plan).toContain(
       ownerRange ? "match_player_owner_idx" : "sqlite_autoindex_match_1",
     );
+    if (sql.includes("LEFT JOIN match_rating")) {
+      expect(plan).toMatch(/SEARCH mr USING INDEX .+\(match_id=\?\)/i);
+      expect(plan).toMatch(/SEARCH rc USING COVERING INDEX .+\(match_id=\?\)/i);
+    }
     const { meta } = await db
       .prepare(sql)
       .bind(...args)
@@ -267,6 +271,41 @@ describe("history D1 reads", () => {
       .run();
     await expect(readMatchForViewer(db, malformed, owner)).resolves.toEqual({
       kind: "missing",
+    });
+  });
+
+  it("returns rated decisions to history owners and signed-out match readers", async () => {
+    for (const [matchId, status, reason, algorithm] of [
+      [id(2), "held", null, null],
+      [id(4), "skipped", "pairCap", null],
+      [id(6), "skipped", "invalidated", null],
+      [id(8), "processed", null, 1],
+    ] as const) {
+      await db
+        .prepare(
+          "INSERT INTO match_rating SELECT id, seq, ?, ?, 1, ?, 50000 FROM match WHERE id = ?",
+        )
+        .bind(status, reason, algorithm, matchId)
+        .run();
+      const decision = reason === null ? { status } : { status, reason };
+      await expect(
+        readMatchForViewer(db, matchId, null),
+      ).resolves.toMatchObject({
+        kind: "found",
+        match: { rated: true, ratingDecision: decision },
+      });
+      const { rows } = await readHistoryPage(db, {
+        userId: owner,
+        filter: "rated",
+        cursor: null,
+      });
+      expect(rows.find((row) => row.id === matchId)).toMatchObject({
+        ratingDecision: decision,
+      });
+    }
+    await expect(readMatchForViewer(db, id(10), null)).resolves.toMatchObject({
+      kind: "found",
+      match: { rated: true, ratingDecision: null },
     });
   });
 });

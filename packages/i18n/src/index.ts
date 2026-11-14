@@ -602,8 +602,6 @@ export const siteContent = {
           idle: "{name} wuu hakaday, wareeggiisiina wuu dhaafay.",
         },
         modes: { quick: "Kulan degdeg ah", invite: "Casuumaad" },
-        rated: "Tartan",
-        friendly: "Saaxiibtinimo",
         details: {
           heading: "Faahfaahinta ciyaarta",
           playedAt: "Taariikhda",

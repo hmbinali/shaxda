@@ -1,6 +1,7 @@
 <script lang="ts">
   import { siteContent } from "@shaxda/i18n";
   import MatchParticipant from "$components/history/MatchParticipant.svelte";
+  import RatedLabel from "$components/game/RatedLabel.svelte";
   import PageMeta from "$components/PageMeta.svelte";
   import ButtonLink from "$components/ui/ButtonLink.svelte";
   import {
@@ -15,7 +16,6 @@
 
   let { data }: { data: PageData } = $props();
   const copy = siteContent.so.pages.history;
-  const matchCopy = siteContent.so.pages.match;
   const percent = new Intl.NumberFormat("so-SO", {
     style: "percent",
     maximumFractionDigits: 1,
@@ -131,13 +131,17 @@
               {copy.endReasons[row.onlineEndReason ?? row.endReason]}
             </p>
           </div>
-          <p class="font-semibold">
-            {row.mode === "quick"
-              ? copy.row.quick
-              : row.rated
-                ? matchCopy.rated
-                : matchCopy.friendly}
-          </p>
+          <div>
+            {#if row.mode === "quick"}
+              <p class="mb-1 text-xs">{copy.row.quick}</p>
+            {/if}
+            <RatedLabel
+              rated={row.rated}
+              decision={row.ratingDecision}
+              corrected={row.ratingCorrected}
+              showDetail={row.rated}
+            />
+          </div>
           <div class="text-board-700">
             <span class="sr-only">{copy.row.playedAt}</span>
             <time datetime={new Date(row.endedAt).toISOString()}

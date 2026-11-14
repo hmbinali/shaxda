@@ -11,6 +11,14 @@
     "./identity": {
       "types": "./src/identity/ticket.ts",
       "default": "./src/identity/ticket.ts"
+    },
+    "./analytics/events": {
+      "types": "./src/analytics/events.ts",
+      "default": "./src/analytics/events.ts"
+    },
+    "./analytics/hash": {
+      "types": "./src/analytics/hash.ts",
+      "default": "./src/analytics/hash.ts"
     }
   },
   "scripts": {

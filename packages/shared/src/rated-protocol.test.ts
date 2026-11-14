@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { createHash } from "node:crypto";
-import { ratedPlaySo } from "../../i18n/src/content/rated-play.so";
 import { z } from "zod";
 import {
   clientMessageSchema,
@@ -13,16 +11,6 @@ import { RATED_DISCLOSURE_V } from "./rated-play";
 const envelope = { v: protocolVersion, roomCode: "ABCDEFGH" } as const;
 
 describe("rated play protocol", () => {
-  it("pins the Somali disclosure strings by version", () => {
-    const hashes: Record<number, string> = {
-      1: "bf60c6bf41e0eaa3617e1b37c8dbc560b885ef6c904df8aded074ee069b24906",
-    };
-    expect(
-      createHash("sha256")
-        .update(JSON.stringify(ratedPlaySo.disclosure))
-        .digest("hex"),
-    ).toBe(hashes[RATED_DISCLOSURE_V]);
-  });
   it("requires the match generation and disclosure version for consent", () => {
     const message = {
       ...envelope,

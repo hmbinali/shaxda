@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { seedAccount } from "./fixtures/auth";
+import { placeOnline } from "./fixtures/online";
 
 test.describe("V1.1-A2 online account identity", () => {
   test("a signed-in account and guest play, refresh, and expose no account id", async ({
@@ -36,17 +37,13 @@ test.describe("V1.1-A2 online account identity", () => {
       await expect(creator.getByTestId("player-rail-A")).toContainText(
         `@${account.username}`,
       );
-      await creator.locator('[data-point-id="O1"]').click();
-      await expect(joiner.locator('[data-point-id="O1"]')).toHaveAttribute(
-        "data-occupant",
-        "A",
-      );
+      const starter = await placeOnline({ A: creator, B: joiner }, "O1");
 
       await creator.reload();
       await expect(creator.getByTestId("online-board")).toBeVisible();
       await expect(creator.locator('[data-point-id="O1"]')).toHaveAttribute(
         "data-occupant",
-        "A",
+        starter,
       );
       await expect(creator.locator("body")).not.toContainText(account.id);
     } finally {

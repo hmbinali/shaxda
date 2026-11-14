@@ -246,7 +246,7 @@ export class OnlineGameClient {
     }
   }
 
-  sendGameAction(action: GameAction): boolean {
+  sendGameAction(action: GameAction, matchNumber?: number): boolean {
     if (
       this.#socket === null ||
       this.#roomCode === null ||
@@ -258,6 +258,7 @@ export class OnlineGameClient {
     const message = clientMessageSchema.parse({
       v: protocolVersion,
       type: "gameAction",
+      matchNumber,
       roomCode: this.#roomCode,
       action,
     });
@@ -265,7 +266,7 @@ export class OnlineGameClient {
     return true;
   }
 
-  sendClaimWin(roomCode = this.#roomCode): boolean {
+  sendClaimWin(roomCode = this.#roomCode, matchNumber?: number): boolean {
     if (
       this.#socket === null ||
       roomCode === null ||
@@ -277,13 +278,14 @@ export class OnlineGameClient {
     const message = clientMessageSchema.parse({
       v: protocolVersion,
       type: "claimWin",
+      matchNumber,
       roomCode,
     });
     this.#socket.send(JSON.stringify(message));
     return true;
   }
 
-  sendRematchVote(vote: RematchVote): boolean {
+  sendRematchVote(vote: RematchVote, matchNumber?: number): boolean {
     if (
       this.#socket === null ||
       this.#roomCode === null ||
@@ -295,6 +297,7 @@ export class OnlineGameClient {
     const message = clientMessageSchema.parse({
       v: protocolVersion,
       type: "rematch",
+      matchNumber,
       roomCode: this.#roomCode,
       vote,
     });

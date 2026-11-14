@@ -219,6 +219,38 @@ and an image proxy remain follow-up hardening work.
 
 ## Smoke test
 
+### A3 account deletion
+
+Apply `0005_account_deletion.sql` before publishing the web Worker. Test the
+request, cancellation, and reauthentication with a dedicated preview account.
+Use the wrapped Worker's scheduled test endpoint with cron `16 0 * * *` for
+finalization and `17 0 * * *` for username release on a disposable local
+database. The deployed minute dispatcher starts both jobs at 00:15 UTC.
+Confirm profile and alias URLs return 404 at request time. Existing sockets
+can finish, and the opponent sees the neutral seat in history and match pages.
+
+Review only aggregate counts in a routine check. Run the export before any
+restore, store it outside the repository, and restrict it to its operator.
+
+```sh
+pnpm account:ops -- counts --database local
+pnpm account:ops -- export-deletions --database local --file /private/path/deletions.json
+pnpm account:ops -- replay-deletions --database local --file /private/path/deletions.json
+```
+
+For an import, replay onto the imported database before switching the
+binding. For an in-place Time Travel restore, use `replay-deletions` with the
+pre-restore export, `--time-travel <bookmark>`, and `--confirm-database` set to
+the exact database name. Rehearse on preview. After replay succeeds, check
+counts and verify pending sessions and a final account's match page. Dispose
+of the export after verification. Preserve the deletion schema throughout
+the restore, applying the migration to an imported copy before replay.
+
+Roll forward if a finalizer needs repair. Keep the account status and cancel
+routes live for pending users.
+
+### Google sign-in
+
 Run this with a real Google test account:
 
 1. Open `/login`, choose **Ku sii wad Google**, and finish Google consent.

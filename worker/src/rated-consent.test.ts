@@ -295,6 +295,7 @@ describe.each([false, true])(
           });
         }
       },
+      20_000, // Each phase runs four complete room and ledger-save scenarios.
     );
   },
 );

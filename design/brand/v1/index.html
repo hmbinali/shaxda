@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="so">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Astaanta, midabbada, iyo sawirrada Shaxda."
+    />
+    <title>Aqoonsiga Shaxda</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #241811;
+        --walnut: #43291c;
+        --cream: #f6edde;
+        --clay: #a2432c;
+        --honey: #ebc285;
+        --paper: #fbf7ef;
+        --rule: #c9b8a5;
+        --display: "STIX Two Text", Georgia, serif;
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      a {
+        color: inherit;
+        text-underline-offset: 0.25em;
+      }
+      a:hover {
+        color: var(--clay);
+      }
+      a:focus-visible {
+        outline: 2px solid var(--clay);
+        outline-offset: 5px;
+      }
+      h1,
+      h2,
+      h3,
+      p,
+      figure {
+        margin: 0;
+      }
+      .wrap {
+        width: min(100% - 72px, 1312px);
+        margin-inline: auto;
+      }
+      .header,
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        min-height: 76px;
+      }
+      .header {
+        border-bottom: 1px solid var(--rule);
+      }
+      .header img {
+        width: 130px;
+      }
+      .header nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 26px;
+      }
+      .header nav a {
+        font-size: 0.85rem;
+        text-decoration: none;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: 4fr 6fr;
+        min-height: 450px;
+        margin-top: 24px;
+        background: var(--cream);
+      }
+      .hero-copy {
+        padding: clamp(28px, 4.5vw, 68px);
+        display: grid;
+        align-content: center;
+      }
+      .eyebrow {
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.13em;
+        font-size: 0.73rem;
+      }
+      .hero h1 {
+        font: 600 clamp(46px, 6.8vw, 106px)/0.88 var(--display);
+        letter-spacing: -0.057em;
+        margin-block: 28px 24px;
+      }
+      .hero h1 span {
+        display: block;
+      }
+      .hero p:last-child {
+        font-size: clamp(0.95rem, 1.35vw, 1.2rem);
+      }
+      .hero-photo {
+        position: relative;
+        min-height: 290px;
+      }
+      .hero-photo img {
+        position: absolute;
+        inset: 0;
+        height: 100%;
+        object-fit: cover;
+        object-position: 62% center;
+      }
+      .palette {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+      .palette li {
+        min-height: 96px;
+        display: grid;
+        align-content: end;
+        padding: 14px 16px;
+        font-size: 0.81rem;
+      }
+      .palette small {
+        display: block;
+        font-size: 0.72rem;
+        font-family: ui-monospace, monospace;
+      }
+      .ink {
+        background: var(--ink);
+        color: var(--cream);
+      }
+      .walnut {
+        background: var(--walnut);
+        color: var(--cream);
+      }
+      .clay {
+        background: var(--clay);
+        color: var(--cream);
+      }
+      .honey {
+        background: var(--honey);
+      }
+      .cream {
+        background: var(--cream);
+      }
+      .section {
+        margin-top: 64px;
+        scroll-margin-top: 20px;
+      }
+      .section h2 {
+        padding-bottom: 11px;
+        border-bottom: 1px solid var(--rule);
+        margin-bottom: 18px;
+        font: 600 clamp(29px, 4vw, 48px)/1 var(--display);
+        letter-spacing: -0.04em;
+      }
+      .identity,
+      .social,
+      .website {
+        display: grid;
+        gap: 14px;
+      }
+      .identity {
+        grid-template-columns: 2.2fr 2.2fr 1fr;
+      }
+      .identity .tile {
+        display: flex;
+        flex-direction: column;
+      }
+      .tile {
+        min-width: 0;
+      }
+      .tile a:first-child:not(.logo-preview) {
+        display: block;
+      }
+      .tile a:first-child:hover img {
+        opacity: 0.94;
+      }
+      .tile figcaption {
+        display: flex;
+        gap: 5px 12px;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        padding-block: 9px 0;
+      }
+      .tile figcaption span {
+        color: var(--walnut);
+        font-size: 0.82rem;
+      }
+      .logo-preview {
+        min-height: 170px;
+        flex: 1;
+        display: grid;
+        place-items: center;
+        padding: 22px;
+      }
+      .logo-preview img {
+        width: 71%;
+      }
+      .logo-preview.mark img {
+        max-width: 88px;
+      }
+      .social {
+        grid-template-columns: 1fr 1fr 0.64fr;
+        align-items: start;
+      }
+      .social img {
+        aspect-ratio: 1;
+        object-fit: contain;
+        object-position: right top;
+      }
+      .social .portrait img {
+        aspect-ratio: 4 / 5;
+      }
+      .social .story img {
+        aspect-ratio: 9 / 16;
+      }
+      .website {
+        grid-template-columns: 1.12fr 1fr;
+        align-items: start;
+      }
+      .download-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        font-size: 0.82rem;
+        margin-top: 16px;
+      }
+      .footer {
+        margin-top: 58px;
+        border-top: 1px solid var(--rule);
+        font-size: 0.81rem;
+      }
+      .footer img {
+        width: 108px;
+      }
+      @media (max-width: 960px) {
+        .hero {
+          min-height: 380px;
+        }
+        .hero-copy {
+          padding: 32px;
+        }
+        .hero h1 {
+          margin-block: 21px 17px;
+        }
+      }
+      @media (max-width: 660px) {
+        .wrap {
+          width: calc(100% - 32px);
+        }
+        .header {
+          min-height: 63px;
+          gap: 14px;
+        }
+        .header img {
+          width: 96px;
+        }
+        .header nav {
+          column-gap: 12px;
+          justify-content: flex-end;
+        }
+        .header nav a {
+          font-size: 0.75rem;
+        }
+        .hero {
+          grid-template-columns: 1fr;
+          margin-top: 16px;
+        }
+        .hero-copy {
+          padding: 34px 24px 32px;
+        }
+        .hero h1 {
+          font-size: clamp(51px, 10vw, 78px);
+        }
+        .hero-photo {
+          min-height: 0;
+          aspect-ratio: 1.52;
+        }
+        .palette li {
+          min-height: 65px;
+          padding: 6px;
+          font-size: 0.63rem;
+        }
+        .palette small {
+          font-size: 0.57rem;
+        }
+        .section {
+          margin-top: 42px;
+        }
+        .identity,
+        .social,
+        .website {
+          grid-template-columns: 1fr 1fr;
+        }
+        .identity .icon {
+          grid-column: span 2;
+        }
+        .identity .icon .logo-preview {
+          min-height: 112px;
+        }
+        .identity .icon img {
+          width: 65px;
+        }
+        .identity .logo-preview {
+          min-height: 115px;
+          padding: 12px;
+        }
+        .identity .logo-preview img {
+          width: 100%;
+        }
+        .social .story {
+          width: 100%;
+        }
+        .website {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header wrap">
+      <img src="logos/lockup-dark.svg" alt="Shaxda" />
+      <nav aria-label="Qaybaha">
+        <a href="#astaanta">Astaanta</a>
+        <a href="#bulshada">Baraha bulshada</a>
+        <a href="#webka">Webka</a>
+      </nav>
+    </header>
+    <main class="wrap">
+      <section class="hero" aria-labelledby="cinwaanka">
+        <div class="hero-copy">
+          <p class="eyebrow">Aqoonsiga Shaxda</p>
+          <h1 id="cinwaanka">
+            <span>Saddex</span> <span>dhagax,</span> <span>hal jare.</span>
+          </h1>
+          <p>Ciyaar dhaqameed Soomaali ah.</p>
+        </div>
+        <picture class="hero-photo">
+          <source
+            media="(max-width: 660px)"
+            srcset="website/hero-jare-836.webp"
+          />
+          <img
+            src="website/hero-jare.webp"
+            alt="Saddex dhagax oo alwaax ah oo saf toosan ku jira."
+            fetchpriority="high"
+          />
+        </picture>
+      </section>
+      <ul class="palette" aria-label="Midabbada Shaxda">
+        <li class="ink">Khad<small>#241811</small></li>
+        <li class="walnut">Qori<small>#43291C</small></li>
+        <li class="clay">Dhoobo<small>#A2432C</small></li>
+        <li class="honey">Malab<small>#EBC285</small></li>
+        <li class="cream">Kareem<small>#F6EDDE</small></li>
+      </ul>
+      <section class="section" id="astaanta">
+        <h2>Astaanta</h2>
+        <div class="identity">
+          <figure class="tile">
+            <a class="logo-preview cream" href="logos/lockup-dark.svg" download>
+              <img
+                src="logos/lockup-dark.svg"
+                alt="Soo dejiso astaanta asalka ah"
+              />
+            </a>
+            <figcaption>Astaanta asalka ah <span>SVG</span></figcaption>
+          </figure>
+          <figure class="tile">
+            <a
+              class="logo-preview walnut"
+              href="logos/lockup-light.svg"
+              download
+            >
+              <img
+                src="logos/lockup-light.svg"
+                alt="Soo dejiso astaanta iftiinka ah"
+              />
+            </a>
+            <figcaption>Astaanta iftiinka ah <span>SVG</span></figcaption>
+          </figure>
+          <figure class="tile icon">
+            <a
+              class="logo-preview mark honey"
+              href="website/app-icon-512.png"
+              download
+            >
+              <img src="website/app-icon.svg" alt="Soo dejiso astaanta abka" />
+            </a>
+            <figcaption>Astaanta abka <span>PNG</span></figcaption>
+          </figure>
+        </div>
+        <div class="download-list" aria-label="Astaamo kale">
+          <a href="logos/lockup-mono.svg" download>Astaanta hal midab</a>
+          <a href="logos/mark-dark.svg" download>Summadda looxa</a>
+          <a href="logos/wordmark.svg" download>Magaca Shaxda</a>
+        </div>
+      </section>
+      <section class="section" id="bulshada">
+        <h2>Baraha bulshada</h2>
+        <div class="social">
+          <figure class="tile">
+            <a href="social/jare-square-1080.png" download>
+              <img
+                src="social/jare-square-1080.png"
+                width="1080"
+                height="1080"
+                alt="Saddex dhagax, hal jare. Ciyaar dhaqameed Soomaali ah. shaxda.app"
+              />
+            </a>
+            <figcaption>
+              Sawirka afar-geeska ah <span>1080 × 1080</span>
+            </figcaption>
+          </figure>
+          <figure class="tile portrait">
+            <a href="social/saaxiib-portrait-1080x1350.png" download>
+              <img
+                src="social/saaxiib-portrait-1080x1350.png"
+                width="1080"
+                height="1350"
+                alt="La ciyaar saaxiibkaa. Shaxda ku ciyaar bilaash. shaxda.app"
+              />
+            </a>
+            <figcaption>Sawirka taagan <span>1080 × 1350</span></figcaption>
+          </figure>
+          <figure class="tile story">
+            <a href="social/saaxiib-story-1080x1920.png" download>
+              <img
+                src="social/saaxiib-story-1080x1920.png"
+                width="1080"
+                height="1920"
+                alt="La ciyaar saaxiibkaa. Ciyaar bilaash. shaxda.app"
+              />
+            </a>
+            <figcaption>Sawirka sheekada <span>1080 × 1920</span></figcaption>
+          </figure>
+        </div>
+        <div class="download-list">
+          <a href="social/avatar-512.png" download>Sawirka bogga</a>
+          <a href="social/cover-1500x500.png" download>Sawirka daboolka</a>
+        </div>
+      </section>
+      <section class="section" id="webka">
+        <h2>Webka</h2>
+        <div class="website">
+          <figure class="tile">
+            <a href="website/share-card-1200x630.png" download>
+              <img
+                src="website/share-card-1200x630.png"
+                width="1200"
+                height="630"
+                alt="Shaxda. Ciyaar dhaqameed Soomaali ah. shaxda.app"
+              />
+            </a>
+            <figcaption>Sawirka xiriiriyaha <span>1200 × 630</span></figcaption>
+          </figure>
+          <figure class="tile">
+            <a href="website/hero-jare.webp" download>
+              <img
+                src="website/hero-jare.webp"
+                width="1672"
+                height="941"
+                alt="Saddex dhagax oo alwaax ah oo saaran khad loox ku xardhan."
+              />
+            </a>
+            <figcaption>Sawirka bogga hore <span>WebP</span></figcaption>
+          </figure>
+        </div>
+        <div class="download-list" aria-label="Sawirrada webka">
+          <a href="website/hero-jare-836.webp" download>Sawirka moobilka</a>
+          <a href="website/app-icon-maskable-512.png" download
+            >Astaanta abka la rakibo</a
+          >
+          <a href="website/favicon-32.png" download>Astaanta tabka</a>
+          <a href="website/apple-touch-icon-180.png" download
+            >Astaanta iPhone</a
+          >
+        </div>
+      </section>
+    </main>
+    <footer class="footer wrap">
+      <img src="logos/lockup-dark.svg" alt="Shaxda" />
+      <a href="https://shaxda.app">shaxda.app</a>
+    </footer>
+  </body>
+</html>

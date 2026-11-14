@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" role="img" aria-labelledby="title">
+  <title id="title">Summadda Shaxda</title>
+  <g transform="translate(0 0) scale(1)">
+    <path d="M9 9H91V91H9Z M23 23H77V77H23Z M37 37H63V63H37Z M50 9V37 M50 63V91 M9 50H37 M63 50H91"
+      fill="none" stroke="#F6EDDE" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <g fill="#EBC285">
+      <circle cx="50" cy="9" r="5.8"/>
+      <circle cx="50" cy="23" r="5.8"/>
+      <circle cx="50" cy="37" r="5.8"/>
+    </g>
+  </g>
+</svg>

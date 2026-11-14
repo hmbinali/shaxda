@@ -14,13 +14,29 @@ parity, history, and the Pixel 5 viewport.
 
 ## Preview
 
-1. Open a newly saved friendly match as each player. Replay to the final
-   position and compare it with the room result. Compare HTML and
-   `__data.json` for that match and an unknown match while signed out.
-2. Open a saved rated match signed out. Check the final board and result,
-   share an interior position, then open that URL in a fresh tab. Check that
-   stepping and playback make no data requests and leave the canonical URL
-   free of the position query.
+On 2026-11-14 the [preview app manifest](https://shaxda-web-preview.shaxda.workers.dev/_app/immutable/entry/app.CRQ3R4qL.js)
+mapped `/match/[id]` to `nodes/12.DlPzhi60.js`. That route rendered the H2
+match details and match-level share action. The H3 viewer and position
+sharing were absent. The H3 preview smoke checks are open.
+
+1. After preview deployment is authorized, coordinate the window with
+   [Wave 2 verification](../specs/README.md#wave-2-verification) and record
+   the active preview web Worker version for rollback. From the approved
+   [PR #50](https://github.com/hmbinali/shaxda/pull/50) commit, use the
+   existing preview build settings and run `pnpm deploy:preview:web`.
+   Record the commit and the new `shaxda-web-preview` version. Confirm the
+   match page serves the H3 viewer before running the smoke checks.
+2. Reuse Wave 2's next friendly save and the two approved participant
+   sessions. Open the new match as each player and compare the final replay
+   board and result with the room. While signed out and in an unrelated
+   session, compare the match's HTML and `__data.json` with an unknown ID.
+   Expect page 404 and a 404 error node in the data response. Check
+   `Cache-Control: no-store` on both admitted responses.
+3. Reuse Wave 2's existing public rated save. Signed out, check the final
+   board and result, share an interior position and open the URL in a fresh
+   tab. Check that stepping and playback make no page data requests and
+   that canonical and Open Graph URLs omit the position query. Record the
+   Worker version, match IDs, and smoke results here.
 
 ## Physical Android gate
 

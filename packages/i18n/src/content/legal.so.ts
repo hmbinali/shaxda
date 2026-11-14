@@ -89,6 +89,8 @@ export const legalContentSo = {
       paragraphs: [
         "Akoonku waa ikhtiyaari. Waxaad ku ciyaari kartaa marti ahaan adigoon akoon samaysan: martidu waxay doorataa magac bandhig, qalabkuna wuxuu samaystaa aqoonsi marti oo aan kala sooc lahayn. Haddii aad Google ku gasho, waxaad yeelanaysaa akoon leh magac dadweyne oo joogto ah iyo bog dadweyne.",
         "Xogta akoonka waxaa lagu kaydiyaa Cloudflare D1, oo ah kayd xogeed. Marka ciyaar khadka ahi bilaabato oo dhammaato iyadoo labada ciyaaryahanba akoon ku galeen, Shaxda waxay si gaar ah u kaydisaa natiijada, sababta ay ku dhammaatay, waqtiyada, tallaabooyinka ciyaarta, koodhka qolka, iyo aqoonsiga gudaha ee labada akoon. Magacyo iyo sawirro laguma kaydiyo diiwaanka ciyaarta. Ciyaaraha uu marti ka qayb qaatay lama kaydiyo.",
+        // TODO(translation-review)
+        "Maamulka Shaxda wuxuu kaydin karaa qoraallo gudaha ah oo ku saabsan dib-u-eegista ciyaaraha Tartanka iyo akoonnada; qoraalladaas lama soo bandhigo.",
       ],
       bullets: [
         "Xogta qalabka: ciyaarta maxalliga ah, aqoonsiga martida, magaca bandhigga, dookha codka, iyo xusuusta diidmada rakibidda.",

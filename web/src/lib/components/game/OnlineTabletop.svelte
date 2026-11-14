@@ -14,6 +14,7 @@
   } from "$lib/game/seating";
   import BoardNotice from "./BoardNotice.svelte";
   import GameResultOverlay from "./GameResultOverlay.svelte";
+  import MatchRatingResult from "./MatchRatingResult.svelte";
   import type { GameResultAction } from "./gameResultActions";
   import InvalidToast from "./InvalidToast.svelte";
   import PlayerRail from "./PlayerRail.svelte";
@@ -296,13 +297,25 @@
                 <p data-testid="rated-result-not-saved">
                   {ratedCopy.result.notSaved}
                 </p>
-              {:else if controller.accountMatch && controller.ratedStatus.rated !== undefined}
-                <RatedLabel
-                  rated={controller.ratedStatus.rated === true}
-                  showDetail={controller.ratedStatus.rated === false ||
-                    controller.save?.matchNumber !== controller.matchNumber ||
-                    controller.save.status !== "stalled"}
-                />
+              {:else if controller.accountMatch && controller.ratedStatus.rated === false}
+                <RatedLabel rated={false} />
+              {:else if controller.ratedStatus.rated === true}
+                <MatchRatingResult
+                  rated
+                  save={controller.save?.matchNumber === controller.matchNumber
+                    ? controller.save
+                    : null}
+                  matchNumber={controller.matchNumber}
+                >
+                  {#snippet children(view)}
+                    <RatedLabel
+                      rated
+                      decision={view}
+                      corrected={view?.corrected}
+                      showDetail={view !== null && view.status !== "pending"}
+                    />
+                  {/snippet}
+                </MatchRatingResult>
               {/if}
               {#if showRatedRematch}
                 <RatedDisclosure />

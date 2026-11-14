@@ -40,6 +40,27 @@ describe("server auth hook", () => {
   });
 
   it.each([
+    ["/history", "/history"],
+    ["/match/[id]", "/match/AAAAAAAAAAAAAAAAAAAA/__data.json"],
+  ])(
+    "sets no-store even when the %s page loader is skipped",
+    async (routeId, path) => {
+      const event = requestEvent(routeId, path, {});
+      const response = new Response("partial response", {
+        headers: { "x-test": "retained" },
+      });
+      authMocks.getAuth.mockReturnValue({
+        api: { getSession: async () => null },
+      });
+      authMocks.svelteKitHandler.mockResolvedValue(response);
+      const result = await handle({ event, resolve: vi.fn() });
+      expect(result.headers.get("cache-control")).toBe("no-store");
+      expect(result.headers.get("x-test")).toBe("retained");
+      expect(await result.text()).toBe("partial response");
+    },
+  );
+
+  it.each([
     ["/login", "/login"],
     ["/register", "/register"],
     ["/account", "/account"],

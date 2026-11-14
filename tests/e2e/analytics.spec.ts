@@ -9,18 +9,22 @@ test("runs the analytics job through the wrapped Worker without exposing its ent
     expect((await request.get(path)).status()).toBe(404);
   }
 
-  const response = await request.get("/cdn-cgi/handler/scheduled", {
-    params: { cron: "15 0 * * *" },
-  });
-  expect(response.ok()).toBe(true);
+  // Each tick advances a bounded step when earlier tests left ledger rows.
   await expect
-    .poll(() =>
-      ledgerQuery<{
-        last_success_at: number | null;
-        last_error: string | null;
-      }>(
-        "SELECT last_success_at, last_error FROM job_state WHERE name = 'x1.nightly'",
-      ),
+    .poll(
+      async () => {
+        const response = await request.get("/cdn-cgi/handler/scheduled", {
+          params: { cron: "15 0 * * *" },
+        });
+        expect(response.ok()).toBe(true);
+        return ledgerQuery<{
+          last_success_at: number | null;
+          last_error: string | null;
+        }>(
+          "SELECT last_success_at, last_error FROM job_state WHERE name = 'x1.nightly'",
+        );
+      },
+      { timeout: 30_000 },
     )
     .toEqual([{ last_success_at: expect.any(Number), last_error: null }]);
 });

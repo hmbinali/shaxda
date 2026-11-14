@@ -260,14 +260,17 @@ describe("replay frames", () => {
     if (!result.ok) throw new Error(result.reason);
     expect(result.frames).toHaveLength(1404);
     expect(applyAction).toHaveBeenCalledTimes(1403);
+    let found = 0;
     const seekStart = performance.now();
-    for (let i = 0; i < 1000; i++)
-      expect(result.frames[(i * 97) % 1404]).toBeDefined();
+    for (let i = 0; i < 1000; i++) {
+      found += Number(result.frames[(i * 97) % 1404] !== undefined);
+    }
     for (let i = 0; i < 1404; i++) {
-      expect(result.frames[i]).toBeDefined();
-      expect(result.frames[1403 - i]).toBeDefined();
+      found += Number(result.frames[i] !== undefined);
+      found += Number(result.frames[1403 - i] !== undefined);
     }
     expect(performance.now() - seekStart).toBeLessThan(500);
+    expect(found).toBe(3808);
     expect(applyAction).toHaveBeenCalledTimes(1403);
   });
 });

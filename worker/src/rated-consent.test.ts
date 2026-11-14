@@ -143,6 +143,24 @@ describe("rated consent", () => {
     await guest.error("A", consent(true), "consentUnavailable");
   });
 
+  it("freezes friendly when a stored consent was for a previous disclosure", async () => {
+    const room = await openRoom();
+    await room.answer("A", true);
+    await room.answer("B", true);
+    await runInDurableObject(room.stub, async (_instance, { storage }) => {
+      const stored = await storage.get<StoredRoom>("room");
+      if (!stored) throw new Error("Missing room");
+      // Emulate a disclosure version bump while this room is still waiting.
+      stored.consent.B = { accept: true, disclosureV: RATED_DISCLOSURE_V - 1 };
+      await storage.put("room", stored);
+    });
+    await room.placeFirst();
+    expect(room.latest("B", "matchStatus")).toMatchObject({
+      consent: { A: true, B: null },
+      rated: false,
+    });
+  });
+
   it.each([undefined, "false", "TRUE"])(
     "refuses new consent with switch %s and keeps complete consent",
     async (flag) => {
@@ -162,6 +180,18 @@ describe("rated consent", () => {
       });
     },
   );
+
+  it("keeps an incomplete agreement friendly while the switch is off", async () => {
+    const room = await openRoom();
+    await room.answer("A", true);
+    const disabled = { flag: "false" };
+    await room.error("B", consent(true), "ratedPlayDisabled", disabled);
+    await room.placeFirst(disabled);
+    expect(room.latest("B", "matchStatus")).toMatchObject({
+      consent: { A: true, B: null },
+      rated: false,
+    });
+  });
 
   it("writes no match or outbox when an agreed room ends before play", async () => {
     const room = await openRoom();

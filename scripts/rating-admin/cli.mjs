@@ -181,9 +181,13 @@ async function main() {
       throw new Error("Wrangler identity unavailable");
     identity = info.email ?? `${credential} ${account}`;
   }
+  // Wrangler 4.107 falls back to .dev.vars when envFiles is an empty array.
+  // An explicitly named empty binding file also avoids process-env overrides.
+  process.env.CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV = "true";
+  process.env.CLOUDFLARE_INCLUDE_PROCESS_ENV = "false";
   const proxy = await getPlatformProxy({
     configPath,
-    envFiles: [],
+    envFiles: ["bindings.env"],
     remoteBindings: remote,
     persist: remote ? false : { path: resolve(web, ".wrangler/state/v3") },
   });

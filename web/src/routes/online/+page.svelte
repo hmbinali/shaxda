@@ -440,6 +440,8 @@
   }
 
   function errorMessage(code: string): string {
+    if (code === "ratedPlayDisabled" && status.phase === "gameOver")
+      return ratedCopy.rematch.ratedPaused;
     return code in copy.errors
       ? copy.errors[code as keyof typeof copy.errors]
       : copy.invalid.actionRejected;

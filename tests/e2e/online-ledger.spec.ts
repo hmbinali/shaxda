@@ -9,6 +9,7 @@ import {
 import { expect, test, type Page } from "@playwright/test";
 import { ledgerQuery, inviteRoomCode } from "./fixtures/ledger";
 import { seedAccount } from "./fixtures/auth";
+import { expectMissingMatch } from "./fixtures/history";
 import {
   actingSeat,
   isolateRoomQuota,
@@ -45,7 +46,7 @@ function observeFinalState(page: Page) {
   return () => state;
 }
 
-test("saves a played account game and rematch in the web Worker's D1", async ({
+test("saves an account game and rematch and opens the history for both players", async ({
   browser,
   context,
   page,
@@ -53,8 +54,11 @@ test("saves a played account game and rematch in the web Worker's D1", async ({
   test.setTimeout(120_000);
   await isolateRoomQuota(page, 14);
   const opponent = await browser.newContext();
+  const guest = await browser.newContext();
+  const outsider = await browser.newContext();
   const a = await seedAccount(context);
   const b = await seedAccount(opponent);
+  const c = await seedAccount(outsider);
   try {
     const bPage = await opponent.newPage();
     const pages = { A: page, B: bPage };
@@ -125,9 +129,52 @@ test("saves a played account game and rematch in the web Worker's D1", async ({
         { match_number: 1, starting_seat: starter },
         { match_number: 2, starting_seat: rematchStarter },
       ]);
+
+    // Follow the rematch from both result overlays once H1 acknowledges it.
+    const rematch = ledgerQuery<LedgerRow>(
+      `SELECT id FROM match WHERE room_code = '${code}' AND match_number = 2`,
+    );
+    const matchId = rematch[0]!.id;
+    const href = `/match/${matchId}`;
+    const winningAccount = rematchStarter === "A" ? b : a;
+    for (const seat of ["A", "B"] as const) {
+      const player = pages[seat];
+      const link = player.getByTestId("online-view-match");
+      await expect(link).toHaveAttribute("href", href);
+      await expect(player.getByTestId("online-rematch")).toBeFocused();
+      await link.click();
+      await expect(player.getByRole("heading", { level: 1 })).toContainText(
+        `@${winningAccount.username}`,
+      );
+      await expect(
+        player.getByText("Ciyaaryahan ayaa is dhiibay."),
+      ).toBeVisible();
+      for (const account of [a, b]) {
+        await expect(
+          player.getByRole("link", { name: `@${account.username}` }),
+        ).toBeVisible();
+      }
+      await player.goto("/history");
+      const row = player.getByTestId("history-row").filter({
+        has: player.locator(`a[href="${href}"]`),
+      });
+      await expect(row).toContainText(
+        seat === rematchStarter ? "Guuldarro" : "Guul",
+      );
+      await expect(row).toContainText("Saaxiibtinimo");
+      const data = await player.request.get(`${href}/__data.json`);
+      expect(data.headers()["cache-control"]).toBe("no-store");
+      const body = await data.text();
+      for (const value of [a.id, b.id, a.email, b.email, code]) {
+        expect(body).not.toContain(value);
+      }
+    }
+    await expectMissingMatch(guest.request, matchId);
+    await expectMissingMatch(outsider.request, matchId);
   } finally {
-    await opponent.close();
+    await Promise.all([opponent.close(), guest.close(), outsider.close()]);
     a.cleanup();
     b.cleanup();
+    c.cleanup();
   }
 });

@@ -15,12 +15,14 @@ Wave 1 account games created through the Workers are friendly.
   before and after a cursor, both summary statements, and detail reads for
   rated, friendly, and missing ids. The local rerun with
   `0002_match_ledger.sql` in place of the spec DDL reproduced all 17 plans
-  and rows-read counts, including when executing the implemented readers. Pages read 84–295 rows, the summary read 5,021
-  across both statements, and detail read six rows for an existing match
+  and rows-read counts, including when executing the implemented readers.
+  Pages read 84–295 rows, the summary read 5,021 across both statements,
+  and detail read six rows for an existing match
   and zero for a missing id. The reader's Worker tests check the actual
   prepared statements against rows saved by the H1 writer.
-- The browser test follows a real account invite through two placements,
-  resignation, the saved-result links, both histories, and outsider 404s.
+- The ledger browser test follows a real account invite and rematch
+  through play, resignation, the saved-result links, both histories, and
+  outsider 404s.
 
 ## Preview and production handoff
 

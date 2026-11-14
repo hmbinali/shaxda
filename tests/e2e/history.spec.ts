@@ -1,28 +1,7 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { seedAccount } from "./fixtures/auth";
-import { inviteRoomCode } from "./fixtures/ledger";
+import { expectMissingMatch } from "./fixtures/history";
 import { seedMatches } from "./fixtures/match";
-import { isolateRoomQuota, placeOnline, resignOnline } from "./fixtures/online";
-
-const unknownId = "Y".repeat(20);
-
-async function expectMissingMatch(request: APIRequestContext, id: string) {
-  for (const suffix of ["", "/__data.json"]) {
-    const [denied, unknown] = await Promise.all(
-      [id, unknownId].map((matchId) =>
-        request.get(`/match/${matchId}${suffix}`),
-      ),
-    );
-    // SvelteKit carries loader error codes in the data response's error node.
-    expect(denied!.status()).toBe(unknown!.status());
-    expect(denied!.headers()["cache-control"]).toBe("no-store");
-    expect(unknown!.headers()["cache-control"]).toBe("no-store");
-    const body = await denied!.text();
-    expect(body.replaceAll(id, unknownId)).toBe(await unknown!.text());
-    if (suffix) expect(body).toContain('"status":404');
-    else expect(denied!.status()).toBe(404);
-  }
-}
 
 test("keeps history owner-only and preserves filters across pagination", async ({
   page,
@@ -212,79 +191,6 @@ test("gates friendly HTML and data, shares rated pages, and excludes matches fro
     rated.cleanup();
     a.cleanup();
     if (!opponentDeleted) b.cleanup();
-    c.cleanup();
-  }
-});
-
-test("opens a real saved account game from both overlays and histories", async ({
-  page,
-  context,
-  browser,
-}) => {
-  test.setTimeout(90_000);
-  await isolateRoomQuota(page, 13);
-  const opponent = await browser.newContext();
-  const guest = await browser.newContext();
-  const outsider = await browser.newContext();
-  const a = await seedAccount(context);
-  const b = await seedAccount(opponent);
-  const c = await seedAccount(outsider);
-  try {
-    const bPage = await opponent.newPage();
-    await page.goto("/online");
-    await expect(page.getByTestId("online-account-identity")).toBeVisible();
-    await page.getByTestId("create-room").click();
-    const invite = await page.getByTestId("share-link").inputValue();
-    await bPage.goto(invite);
-    const pages = { A: page, B: bPage };
-    await placeOnline(pages, "O1");
-    await placeOnline(pages, "O2");
-    await resignOnline(page);
-    const hrefs: string[] = [];
-    for (const player of Object.values(pages)) {
-      const link = player.getByTestId("online-view-match");
-      await expect(link).toBeVisible();
-      await expect(player.getByTestId("online-rematch")).toBeFocused();
-      const href = await link.getAttribute("href");
-      expect(href).toMatch(/^\/match\/[A-Z2-9]{20}$/);
-      hrefs.push(href!);
-      await link.click();
-      await expect(player.getByRole("heading", { level: 1 })).toContainText(
-        `@${b.username}`,
-      );
-      await expect(
-        player.getByText("Ciyaaryahan ayaa is dhiibay."),
-      ).toBeVisible();
-      await expect(
-        player.getByRole("link", { name: `@${a.username}` }),
-      ).toBeVisible();
-      await player.goto("/history");
-      const row = player
-        .getByTestId("history-row")
-        .filter({ has: player.locator(`a[href="${href}"]`) });
-      await expect(row).toContainText(player === page ? "Guuldarro" : "Guul");
-      await expect(row).toContainText("Saaxiibtinimo");
-      const data = await player.request.get(`${href}/__data.json`);
-      expect(data.headers()["cache-control"]).toBe("no-store");
-      const serialized = await data.text();
-      for (const value of [
-        a.id,
-        b.id,
-        a.email,
-        b.email,
-        inviteRoomCode(invite),
-      ]) {
-        expect(serialized).not.toContain(value);
-      }
-    }
-    expect(hrefs[0]).toBe(hrefs[1]);
-    const id = hrefs[0]!.split("/").pop()!;
-    await expectMissingMatch(guest.request, id);
-    await expectMissingMatch(outsider.request, id);
-  } finally {
-    await Promise.all([opponent.close(), guest.close(), outsider.close()]);
-    a.cleanup();
-    b.cleanup();
     c.cleanup();
   }
 });

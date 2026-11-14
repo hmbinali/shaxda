@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { seedAccount } from "./fixtures/auth";
-import { placeOnline } from "./fixtures/online";
+import { placeOnline, resignOnline } from "./fixtures/online";
+import { ledgerQuery, inviteRoomCode } from "./fixtures/ledger";
 
 test.describe("V1.1-A2 online account identity", () => {
   test("a signed-in account and guest play, refresh, and expose no account id", async ({
@@ -46,6 +47,12 @@ test.describe("V1.1-A2 online account identity", () => {
         starter,
       );
       await expect(creator.locator("body")).not.toContainText(account.id);
+      await resignOnline(joiner);
+      await expect(creator.getByTestId("online-game-result")).toBeVisible();
+      const code = inviteRoomCode(shareLink);
+      expect(
+        ledgerQuery(`SELECT id FROM match WHERE room_code = '${code}'`),
+      ).toEqual([]);
     } finally {
       await joinerContext.close();
       account.cleanup();

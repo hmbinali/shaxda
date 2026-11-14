@@ -1680,6 +1680,13 @@ describe("match room hibernation spike", () => {
       },
     );
     await resignToGameOver(first, second, roomCode);
+    // Match the operations view only after the asynchronous hold is synced.
+    await expect
+      .poll(async () => {
+        const room = await readStoredRoom(roomCode);
+        return room?.holdSynced;
+      })
+      .toBe(true);
     const entry = await loadOutbox(roomCode);
     expect(entry).toMatchObject({
       status: "stalled",
@@ -1698,8 +1705,7 @@ describe("match room hibernation spike", () => {
     await expect(
       testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
     ).resolves.toBe(0);
-    first.close();
-    second.close();
+    await closeRoomSockets(first, second);
   });
 
   it.each([false, true])(
@@ -1732,8 +1738,7 @@ describe("match room hibernation spike", () => {
           testEnv.DB.prepare("SELECT count(*) AS n FROM match").first("n"),
         )
         .toBe(playBegan ? 0 : 1);
-      first.close();
-      second.close();
+      await closeRoomSockets(first, second);
     },
   );
 
@@ -1996,6 +2001,12 @@ async function waitForJoinedOrError(
     const message = serverMessageSchema.parse(await nextJson(socket));
     if (message.type === "joined" || message.type === "error") return message;
   }
+}
+
+async function closeRoomSockets(...sockets: WebSocket[]): Promise<void> {
+  const closed = sockets.map((socket) => waitForClose(socket));
+  for (const socket of sockets) socket.close();
+  await Promise.all(closed);
 }
 
 function waitForClose(

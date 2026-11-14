@@ -1327,10 +1327,9 @@ describe("match room hibernation spike", () => {
     ).resolves.toMatchObject({ votes: { A: null, B: "accept" } });
 
     const reconnected = await connectRoom(roomCode);
+    const restoredVotes = waitForMessage(reconnected, "rematchStatus");
     await joinAndWait(reconnected, roomCode, "guest-id-a");
-    await expect(
-      waitForMessage(reconnected, "rematchStatus"),
-    ).resolves.toMatchObject({
+    await expect(restoredVotes).resolves.toMatchObject({
       matchNumber: 1,
       votes: { A: null, B: "accept" },
     });
